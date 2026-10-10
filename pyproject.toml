@@ -28,12 +28,14 @@ dev = [
 testpaths = [
     "platform/serving/tests",
     "pipelines/platform/tests",
+    "platform/box/tests",
 ]
 pythonpath = [
     "platform/serving",
     "pipelines/platform/publish",
     "pipelines/platform/spark",
     "pipelines/platform/dags",
+    "platform/box",
 ]
 addopts = "-ra --strict-markers"
 filterwarnings = [
