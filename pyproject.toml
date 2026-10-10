@@ -40,6 +40,10 @@ filterwarnings = [
     # Starlette's TestClient warns that httpx is deprecated in favour of httpx2.
     # The warning comes from third-party code. Remove this line when the test client changes.
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+    # Mangum 0.22.0, the newest release, asks asyncio for an event loop that does not exist yet.
+    # Python 3.12, the Lambda runtime I use, only warns. Python 3.14 would raise an error, so the
+    # runtime stays on 3.12 until Mangum fixes this. Remove this line when it does.
+    "ignore:There is no current event loop:DeprecationWarning:mangum",
 ]
 
 [tool.ruff]
