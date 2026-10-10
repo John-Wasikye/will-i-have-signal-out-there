@@ -9,7 +9,9 @@
 FROM apache/airflow:3.3.2-python3.11
 
 USER root
+# Apply Debian's security updates first, then add Java.
 RUN apt-get update \
+    && apt-get upgrade --yes \
     && apt-get install --yes --no-install-recommends openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
@@ -17,6 +19,12 @@ USER airflow
 COPY --chown=airflow:root platform/box/requirements-airflow.txt /tmp/requirements-airflow.txt
 RUN pip install --no-cache-dir --requirement /tmp/requirements-airflow.txt \
     --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.11.txt"
+
+# PySpark ships Derby and ZooKeeper, which only a Hive metastore and a Spark cluster use.
+# I use neither, and both have known critical vulnerabilities, so I delete them. The Spark
+# tests run in this image, so a missing class would make them fail.
+RUN spark_jars="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')" \
+    && rm -f "${spark_jars}"/derby-*.jar "${spark_jars}"/zookeeper-*.jar
 
 COPY --chown=airflow:root pipelines/platform /opt/airflow/pipelines/platform
 

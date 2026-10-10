@@ -1,4 +1,4 @@
 # Packages added to the Airflow image. Airflow's own dependency list pins their versions
 # where it covers them, so this file names only what the nightly DAG needs on top.
-pyspark==3.5.3
+pyspark==3.5.9
 pyarrow
