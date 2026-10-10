@@ -53,3 +53,23 @@ def test_maintenance_waits_for_metrics_and_status(skeleton_dag):
 def test_maintenance_runs_even_when_earlier_tasks_fail(skeleton_dag):
     maintenance = skeleton_dag.get_task("iceberg_maintenance")
     assert maintenance.trigger_rule == "all_done"
+
+
+def test_every_task_records_an_incident_when_it_fails(skeleton_dag):
+    module = importlib.import_module("platform_skeleton_dag")
+
+    assert skeleton_dag.default_args["on_failure_callback"] is module.record_failure_callback
+
+
+def test_the_failure_callback_writes_an_incident_file(monkeypatch, tmp_path):
+    module = importlib.import_module("platform_skeleton_dag")
+    monkeypatch.setenv("PLATFORM_INCIDENTS_DIR", str(tmp_path))
+    context = {
+        "dag": type("Dag", (), {"dag_id": "platform_skeleton_nightly"})(),
+        "task_instance": type("TaskInstance", (), {"task_id": "publish_sample"})(),
+        "exception": RuntimeError("disk full"),
+    }
+
+    module.record_failure_callback(context)
+
+    assert len(list(tmp_path.glob("INC-*.parquet"))) == 1

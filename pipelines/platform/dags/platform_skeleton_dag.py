@@ -5,6 +5,7 @@ The sample is written to Iceberg first, then published. Iceberg maintenance runs
 Order follows docs/platform/design-doc.md section 7.4. The DAG only wires tasks together.
 The logic lives in modules that have their own tests:
 - pipelines/platform/publish/sample_flow.py
+- pipelines/platform/publish/incidents.py
 - pipelines/platform/spark/sample_iceberg_job.py
 - pipelines/platform/spark/iceberg_maintenance.py
 """
@@ -18,6 +19,7 @@ from pathlib import Path
 import sample_flow
 from airflow.sdk import dag, task
 from iceberg_maintenance import maintain_tables
+from incidents import record_failure
 from sample_iceberg_job import build_spark_session, run_sample_iceberg_job
 
 PUBLISHED_DIR = Path(os.environ.get("PLATFORM_PUBLISHED_DIR", "/data/published"))
@@ -28,12 +30,21 @@ ICEBERG_TABLE = "sample_answer"
 MAX_SPARK_ROWS = 1_000
 
 
+def record_failure_callback(context: dict) -> None:
+    """Record an incident for a task that failed. Airflow calls this with the task's context.
+
+    The folder is read when the callback runs, so a test can point it somewhere else.
+    """
+    record_failure(context, Path(os.environ.get("PLATFORM_INCIDENTS_DIR", "/data/incidents")))
+
+
 @dag(
     dag_id="platform_skeleton_nightly",
     schedule="0 10 * * *",
     start_date=datetime(2026, 10, 1, tzinfo=UTC),
     catchup=False,
     tags=["platform"],
+    default_args={"on_failure_callback": record_failure_callback},
 )
 def platform_skeleton_nightly():
     """Nightly run of the skeleton. The schedule is 10:00 UTC (design doc section 2)."""

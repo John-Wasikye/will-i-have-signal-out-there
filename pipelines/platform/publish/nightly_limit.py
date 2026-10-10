@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from timeutil import format_utc, require_utc
+from incidents import build_incident
+from timeutil import require_utc
 
 NIGHTLY_MAXIMUM = timedelta(hours=2)
 
@@ -21,17 +22,11 @@ def reached_maximum(started_utc: datetime, now_utc: datetime) -> bool:
 
 
 def build_maximum_incident(number: int, opened_utc: datetime, pipeline: str) -> dict:
-    """Build the incident record for a run that reached the maximum.
-
-    The incident ID uses the UTC date the incident opened, plus a two-digit number.
-    """
-    opened = require_utc(opened_utc, "opened_utc")
-    return {
-        "incident_id": f"INC-{opened:%Y-%m-%d}-{number:02d}",
-        "opened_at_utc": format_utc(opened),
-        "project": "platform",
-        "pipeline": pipeline,
-        "what_broke": "The nightly run reached its 2 hour maximum before it finished.",
-        "reached_maximum_runtime": True,
-        "status": "open",
-    }
+    """Build the incident record for a run that reached the maximum."""
+    return build_incident(
+        number=number,
+        opened_utc=opened_utc,
+        pipeline=pipeline,
+        what_broke="The nightly run reached its 2 hour maximum before it finished.",
+        reached_maximum_runtime=True,
+    )
