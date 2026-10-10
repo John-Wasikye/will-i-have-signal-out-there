@@ -59,6 +59,25 @@ jobs:
       - name: Run the DAG tests
         run: pytest pipelines/platform/tests/test_dag.py -v
 
+  box-image:
+    name: Airflow image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the shell scripts
+        run: shellcheck platform/box/*.sh
+      - name: Build the image
+        run: docker build --file platform/box/Dockerfile.airflow --tag portfolio-airflow:ci .
+      - name: Smoke test the image
+        run: bash platform/box/smoke_test_airflow_image.sh portfolio-airflow:ci
+      - name: Scan the image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: portfolio-airflow:ci
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
   site:
     name: Site build and tests
     runs-on: ubuntu-latest
