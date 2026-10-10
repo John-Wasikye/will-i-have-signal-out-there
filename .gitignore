@@ -28,3 +28,6 @@ crash.log
 *.tfvars
 !*.tfvars.example
 backend.hcl
+
+# Lambda package build output
+platform/serving/build/

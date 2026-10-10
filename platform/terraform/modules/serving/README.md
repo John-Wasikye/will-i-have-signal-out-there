@@ -35,3 +35,15 @@ What it creates:
 |---|---|
 | `api_url` | Base URL of the API. |
 | `function_name` | Name of the function. |
+
+## Building the package
+
+The zip comes from `platform/serving/build_package.py`. I run it from the repository root:
+
+```powershell
+python platform/serving/build_package.py
+```
+
+It downloads arm64 wheels for Python 3.12, adds the app's Python files, and writes `platform/serving/build/function.zip`. It prints the `lambda_zip_sha256` value to pass to this module. The zip is deterministic, so the checksum changes only when the code or the dependencies change. The last build was 22.6 MB zipped and 64.7 MB unzipped, well inside Lambda's limits.
+
+The package leaves out `pyarrow` and `boto3`. DuckDB reads Parquet on its own, and the Lambda runtime provides `boto3`.
