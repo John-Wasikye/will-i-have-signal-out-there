@@ -7,6 +7,14 @@ mock_provider "aws" {
       account_id = "123456789012"
     }
   }
+
+  # These tests check buckets and lifecycle rules. The bucket policies are tested in
+  # storage_policy.tftest.hcl, so the mock only needs to return a valid empty policy.
+  mock_data "aws_iam_policy_document" {
+    defaults = {
+      json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
+    }
+  }
 }
 
 run "dev_buckets_are_not_object_locked" {

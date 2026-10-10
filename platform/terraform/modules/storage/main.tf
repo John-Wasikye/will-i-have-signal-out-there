@@ -9,6 +9,8 @@ terraform {
 
 data "aws_caller_identity" "current" {}
 
+data "aws_partition" "current" {}
+
 locals {
   account_id = data.aws_caller_identity.current.account_id
 
@@ -31,6 +33,13 @@ locals {
       object_lock = false
       dev_expiry  = false
     }
+  }
+
+  # Built from the names, which are known before the buckets exist. This lets a plan show
+  # the full bucket policies, so the tests can check them.
+  bucket_arns = {
+    for key, bucket in local.buckets :
+    key => "arn:${data.aws_partition.current.partition}:s3:::${bucket.name}"
   }
 }
 
@@ -77,14 +86,15 @@ resource "aws_s3_bucket_public_access_block" "this" {
   restrict_public_buckets = true
 }
 
-data "aws_iam_policy_document" "tls_only" {
+# A bucket has only one policy, so every rule for a bucket goes in this document.
+data "aws_iam_policy_document" "bucket" {
   for_each = local.buckets
 
   statement {
     sid       = "DenyInsecureTransport"
     effect    = "Deny"
     actions   = ["s3:*"]
-    resources = [aws_s3_bucket.this[each.key].arn, "${aws_s3_bucket.this[each.key].arn}/*"]
+    resources = [local.bucket_arns[each.key], "${local.bucket_arns[each.key]}/*"]
 
     principals {
       type        = "*"
@@ -97,13 +107,37 @@ data "aws_iam_policy_document" "tls_only" {
       values   = ["false"]
     }
   }
+
+  # Only the site bucket can be read through CloudFront, and only by the one distribution
+  # that serves the site.
+  dynamic "statement" {
+    for_each = each.key == "site" && var.site_distribution_arn != null ? [1] : []
+
+    content {
+      sid       = "AllowCloudFrontToRead"
+      effect    = "Allow"
+      actions   = ["s3:GetObject"]
+      resources = ["${local.bucket_arns[each.key]}/*"]
+
+      principals {
+        type        = "Service"
+        identifiers = ["cloudfront.amazonaws.com"]
+      }
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceArn"
+        values   = [var.site_distribution_arn]
+      }
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "this" {
   for_each = local.buckets
 
   bucket = aws_s3_bucket.this[each.key].id
-  policy = data.aws_iam_policy_document.tls_only[each.key].json
+  policy = data.aws_iam_policy_document.bucket[each.key].json
 
   depends_on = [aws_s3_bucket_public_access_block.this]
 }

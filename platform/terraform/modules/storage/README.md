@@ -10,6 +10,8 @@ Each bucket has a CloudWatch alarm on its size. The alarm fires when the size pa
 
 Bucket names look like `portfolio-<env>-raw-<account-id>`.
 
+A bucket has only one policy, so every rule for a bucket lives in one policy document. Each bucket denies requests without TLS. The site bucket also lets one CloudFront distribution read it, once I pass that distribution's ARN. I build the bucket ARNs from the names, so a plan shows the full policies and the tests can check them.
+
 ## Inputs
 
 | Name | Type | Default | Description |
@@ -17,6 +19,7 @@ Bucket names look like `portfolio-<env>-raw-<account-id>`.
 | `env` | string | none | `dev` or `live`. |
 | `size_alarm_bytes` | number | 100 GB | Size in bytes that raises the size alarm. |
 | `alarm_actions` | list(string) | `[]` | Targets notified by the size alarm. |
+| `site_distribution_arn` | string | `null` | The CloudFront distribution that serves the site. When set, only this distribution may read the site bucket. |
 
 ## Outputs
 

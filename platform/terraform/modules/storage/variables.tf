@@ -19,3 +19,9 @@ variable "alarm_actions" {
   type        = list(string)
   default     = []
 }
+
+variable "site_distribution_arn" {
+  description = "ARN of the CloudFront distribution that serves the site. When set, only this distribution may read the site bucket. Leave it null before the distribution exists."
+  type        = string
+  default     = null
+}
