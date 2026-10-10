@@ -1,28 +1,28 @@
 # Will I have signal out there?
 
-A trip planner for hikers, campers and backpackers. Pick a trail and see where each carrier has coverage, where it drops out, and when a Starlink Direct-to-Cell satellite text could get through. This repository holds the shared platform and the first project's code.
+I am building a trip planner for hikers, campers and backpackers. You pick a trail and see where each phone carrier has coverage, where it drops out, and when a Starlink Direct-to-Cell satellite text could get through. This repository holds the shared platform I am building for all five of my projects, and the code for this first project.
 
-The project is in its first phase. The platform skeleton is being built, and it is not yet deployed to AWS.
+The project is in its first phase. I am building the platform skeleton first. It is not deployed to AWS yet.
 
-## What is built
+## What I have built
 
 | Part | Folder | Status |
 |---|---|---|
-| Serving API (FastAPI, DuckDB over Parquet, Lambda handler) | `platform/serving` | Built, tested |
-| Publish gate, write-audit-publish, status and run metrics | `pipelines/platform/publish` | Built, tested |
-| Spark job writing an Iceberg table | `pipelines/platform/spark/sample_iceberg_job.py` | Built, tested with a fake Spark session |
+| Serving API (FastAPI, DuckDB over Parquet, Lambda handler) | `platform/serving` | Built and tested |
+| Publish gate, write-audit-publish, status and run metrics | `pipelines/platform/publish` | Built and tested |
+| Spark job that writes an Iceberg table | `pipelines/platform/spark/sample_iceberg_job.py` | Built, tested with a fake Spark session |
 | Iceberg maintenance task | `pipelines/platform/spark/iceberg_maintenance.py` | Built, tested with a fake Spark session |
-| Nightly Airflow DAG | `pipelines/platform/dags` | Built, not run (Airflow does not install on Windows) |
-| Site template (React, TypeScript) | `app` | Built, tested |
-| Terraform (storage, catalog, IAM, budget, parameters, visitor data) | `platform/terraform` | Built, validated and tested with mock plans. Nothing applied to AWS |
-| Continuous integration | `.github/workflows/ci.yml` | Written. Not yet run on GitHub |
-| Dev container | `.devcontainer` | Written. Not yet opened in Codespaces |
+| Nightly Airflow DAG | `pipelines/platform/dags` | Built, not run yet (Airflow does not install on Windows) |
+| Site template (React, TypeScript) | `app` | Built and tested |
+| Terraform (storage, catalog, IAM, budget, parameters, visitor data) | `platform/terraform` | Built and validated. Storage and IAM have tests. Nothing applied to AWS |
+| Continuous integration | `.github/workflows/ci.yml` | Written. Not run on GitHub yet |
+| Dev container | `.devcontainer` | Written. Not opened in Codespaces yet |
 
-Not built yet: the session box (k3s, Airflow and Spark on spot instances), the AWS deployment, the GitHub remote, the Terraform state bucket, the status page on a live site, and the Project 1 trail data.
+I have not built these yet: the session box (the nightly server that runs Airflow and Spark), the AWS deployment, the Terraform state bucket, the live status page, and the trail data for Project 1.
 
 ## Run the checks yourself
 
-These steps assume Windows and PowerShell. Python 3.11, Node 24 and Terraform 1.16 are needed.
+These steps assume Windows and PowerShell, with Python 3.11, Node 24 and Terraform 1.16 installed.
 
 ### 1. Python tests and lint
 
@@ -34,7 +34,7 @@ ruff check .
 pytest
 ```
 
-Expected: `ruff` reports `All checks passed!`, and `pytest` reports the tests passing, with one test skipped because Airflow is not installed on Windows.
+You should see `All checks passed!` from ruff. Pytest should report the tests passing, with one test skipped because Airflow is not installed on Windows.
 
 ### 2. Site
 
@@ -59,15 +59,15 @@ cd ..\..\..\..
 terraform fmt -check -recursive platform\terraform
 ```
 
-The module tests use a mock AWS provider and make no AWS calls. The IAM module tests use the real provider with three values overridden, so they also make no AWS calls.
+The module tests use a mock AWS provider and make no AWS calls. The IAM tests use the real provider with three lookups overridden, so they make no AWS calls either.
 
-## Working rules
+## How I work
 
-- Tests come first. For each new behavior, write a test, watch it fail, then write the code that makes it pass. See [CONTRIBUTING.md](CONTRIBUTING.md).
-- Every timestamp is UTC. The page converts it to local time.
+- I write tests first. For each new behavior, I write a test, watch it fail, then write the code that passes it. The rules are in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Every timestamp is stored in UTC. The page converts it to the reader's local time.
 - Every key lives in AWS Parameter Store. None is stored in this repository or in GitHub.
 - The platform design is in [docs/platform](docs/platform). The planning documents are in [docs](docs).
 
 ## License
 
-The code is under the MIT license ([LICENSE](LICENSE)). The data used by each project keeps its own license, and the project notes list them.
+I released the code under the MIT license ([LICENSE](LICENSE)). Each data source keeps its own license, and the project notes list them.

@@ -7,7 +7,7 @@ variable "region" {
 variable "github_repo" {
   description = "GitHub repository allowed to assume the live pipeline roles, in owner/name form. Live roles accept only the main branch."
   type        = string
-  default     = "jwasikye/will-i-have-signal-out-there"
+  default     = "John-Wasikye/will-i-have-signal-out-there"
 }
 
 variable "pipeline_names" {

@@ -40,7 +40,7 @@ def test_document_matches_the_contract_keys(tmp_path):
     pipeline = _pipeline(
         last_good_run_utc=NOW,
         last_row_count=3,
-        incident_url="https://github.com/jwasikye/will-i-have-signal-out-there/issues/1",
+        incident_url="https://github.com/John-Wasikye/will-i-have-signal-out-there/issues/1",
     )
     document = build_status_document([pipeline], NOW)
     assert set(document) == {"generated_at_utc", "pipelines"}
@@ -51,7 +51,7 @@ def test_document_matches_the_contract_keys(tmp_path):
         "freshness_target_hours": 26.0,
         "last_good_run_utc": "2026-10-09T10:00:00Z",
         "last_row_count": 3,
-        "incident_url": "https://github.com/jwasikye/will-i-have-signal-out-there/issues/1",
+        "incident_url": "https://github.com/John-Wasikye/will-i-have-signal-out-there/issues/1",
     }
 
 

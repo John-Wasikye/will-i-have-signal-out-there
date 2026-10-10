@@ -1,6 +1,6 @@
 # catalog module
 
-Creates one AWS Glue catalog database for an environment. The database is named `portfolio_dev` or `portfolio_live`. Glue names cannot contain hyphens, so underscores are used here.
+I use this module to create one AWS Glue catalog database for each environment. The database is named `portfolio_dev` or `portfolio_live`. Glue names cannot contain hyphens, so I use underscores.
 
 ## Inputs
 

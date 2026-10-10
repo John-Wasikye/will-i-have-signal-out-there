@@ -85,7 +85,7 @@ run "dev_role_trusts_any_ref_in_the_repository" {
   }
 
   assert {
-    condition     = strcontains(aws_iam_role.pipeline["platform_skeleton"].assume_role_policy, "repo:jwasikye/will-i-have-signal-out-there:*")
+    condition     = strcontains(aws_iam_role.pipeline["platform_skeleton"].assume_role_policy, "repo:John-Wasikye/will-i-have-signal-out-there:*")
     error_message = "Dev roles must trust any ref in the repository."
   }
 }
@@ -123,7 +123,7 @@ run "live_role_trusts_only_the_main_branch" {
   }
 
   assert {
-    condition     = output.github_subject == "repo:jwasikye/will-i-have-signal-out-there:ref:refs/heads/main"
+    condition     = output.github_subject == "repo:John-Wasikye/will-i-have-signal-out-there:ref:refs/heads/main"
     error_message = "Live roles must trust only the main branch."
   }
 }

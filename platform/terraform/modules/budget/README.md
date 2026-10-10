@@ -1,12 +1,12 @@
 # budget module
 
-Creates the monthly cost budget `portfolio-monthly` for the whole AWS account, with a $40 limit by default.
+I use this module to create the monthly cost budget `portfolio-monthly` for the whole AWS account. The default limit is $40.
 
 Alerts go to `alert_emails` at 80 percent of actual spend and at 100 percent of forecast spend. With an empty list, the budget still exists and tracks spend, but it sends no alerts.
 
-Budget actions that deny new launches are a backup and are not configured here. The 4-hour session limit and the idle alarm are the real guards.
+I do not configure budget actions that deny new launches. They are a backup only. The 4-hour session limit and the idle alarm are the real guards, because budget alerts can lag by hours.
 
-Call this module only from `envs/live`. Budget names are unique per account, so a second call would clash.
+I call this module only from `envs/live`. Budget names are unique per account, so a second call would clash.
 
 ## Inputs
 

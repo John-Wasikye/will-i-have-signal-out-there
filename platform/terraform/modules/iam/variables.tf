@@ -11,7 +11,7 @@ variable "env" {
 variable "github_repo" {
   description = "GitHub repository allowed to assume the pipeline roles, in owner/name form."
   type        = string
-  default     = "jwasikye/will-i-have-signal-out-there"
+  default     = "John-Wasikye/will-i-have-signal-out-there"
 
   validation {
     condition     = can(regex("^[^/]+/[^/]+$", var.github_repo))

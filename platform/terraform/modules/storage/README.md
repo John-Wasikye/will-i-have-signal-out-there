@@ -1,10 +1,10 @@
 # storage module
 
-Creates the three S3 buckets for one environment: raw, lake and site.
+I use this module to create the three S3 buckets for one environment: raw, lake and site.
 
-Every bucket has versioning, a public access block, default AES-256 encryption and a policy that denies requests without TLS. Every bucket has the clean-up rules from the platform requirements (PR-20). Pipelines write temporary files under `tmp/`, Spark checkpoints under `checkpoints/` and logs under `logs/`.
+Every bucket has versioning, a public access block, default AES-256 encryption, and a policy that denies requests without TLS. Every bucket has the clean-up rules from my platform requirements (PR-20). Pipelines write temporary files under `tmp/`, Spark checkpoints under `checkpoints/`, and logs under `logs/`.
 
-Dev raw and lake data expire after 14 days. The live raw bucket has Object Lock in governance mode for 30 days. Object Lock must be set when a bucket is created, so it cannot be added later. Dev buckets are created with `force_destroy`, so they can be torn down cheaply.
+Dev raw and lake data expire after 14 days. The live raw bucket has Object Lock in governance mode for 30 days. Object Lock must be set when a bucket is created, so I cannot add it later. Dev buckets are created with `force_destroy`, so they can be torn down cheaply.
 
 Each bucket has a CloudWatch alarm on its size. The alarm fires when the size passes `size_alarm_bytes`.
 

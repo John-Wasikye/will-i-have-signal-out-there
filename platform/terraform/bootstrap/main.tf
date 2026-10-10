@@ -1,10 +1,10 @@
 # Bootstrap: creates the bucket that holds Terraform state for dev and live.
 #
-# This is a separate root configuration. It is applied once, by hand, from John's
-# machine, before envs/dev or envs/live are initialised. It is not run by CI.
+# This is a separate root configuration. I apply it once, by hand, from my own machine,
+# before envs/dev or envs/live are initialised. CI never runs it.
 #
-# Its own state is local. Keep that file outside the repository, for example by
-# running: terraform apply -state=C:\Users\johnw\secure\portfolio-bootstrap.tfstate
+# Its own state is local. I keep that state file outside the repository and pass its
+# location with -state, for example: terraform apply -state=<folder outside the repo>\bootstrap.tfstate
 # The .gitignore blocks *.tfstate as a backstop only.
 #
 # This configuration never creates AWS resources in the environment folders.
