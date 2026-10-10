@@ -214,3 +214,111 @@ def test_restoring_sends_the_decompressed_text_to_the_database(tmp_path):
 
     assert run.input == b"CREATE TABLE dag;\n"
     assert run.command == ["psql", "airflow"]
+
+
+def test_a_command_runs_inside_the_database_pod_and_reads_the_password_there():
+    from airflow_db_backup import in_pod
+
+    wrapped = in_pod(["pg_dump", "postgres"], namespace="airflow", pod="airflow-postgresql-0")
+
+    assert wrapped[:6] == [
+        "kubectl",
+        "exec",
+        "--namespace",
+        "airflow",
+        "airflow-postgresql-0",
+        "--",
+    ]
+    inner = wrapped[-1]
+    assert 'PGPASSWORD="$POSTGRES_PASSWORD"' in inner
+    assert "pg_dump postgres" in inner
+    assert "-i" not in wrapped[:3]
+
+
+def test_a_restore_command_keeps_standard_input_open():
+    from airflow_db_backup import in_pod
+
+    wrapped = in_pod(["psql", "postgres"], namespace="airflow", pod="p", interactive=True)
+
+    assert wrapped[:3] == ["kubectl", "exec", "-i"]
+
+
+def test_the_command_line_has_save_and_restore_with_sensible_defaults():
+    from airflow_db_backup import parse_args
+
+    saved = parse_args(["save", "--bucket", "b"])
+    restored = parse_args(["restore", "--bucket", "b"])
+
+    assert saved.action == "save"
+    assert restored.action == "restore"
+    assert saved.prefix == "airflow-db/"
+    assert saved.namespace == "airflow"
+    assert saved.pod == "airflow-postgresql-0"
+
+
+def test_the_command_line_needs_a_bucket():
+    from airflow_db_backup import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args(["save"])
+
+
+def test_save_dumps_the_database_in_the_pod_and_uploads_the_result():
+    import gzip
+
+    from airflow_db_backup import main
+
+    s3 = FakeS3()
+    run = FakeRun(stdout=b"CREATE TABLE dag;\n")
+
+    exit_code = main(["save", "--bucket", "b"], client=s3, run=run, now=NOW)
+
+    assert exit_code == 0
+    assert run.command[:2] == ["kubectl", "exec"]
+    assert "pg_dump" in run.command[-1]
+    (key,) = s3.objects
+    assert key == "airflow-db/airflow-db-20261010T104505Z.sql.gz"
+    assert gzip.decompress(s3.objects[key]) == b"CREATE TABLE dag;\n"
+
+
+def test_restore_loads_the_newest_backup_into_the_pod():
+    import gzip
+
+    from airflow_db_backup import main
+
+    s3 = FakeS3({"airflow-db/airflow-db-20261009T100000Z.sql.gz": gzip.compress(b"SELECT 1;\n")})
+    run = FakeRun()
+
+    exit_code = main(["restore", "--bucket", "b"], client=s3, run=run, now=NOW)
+
+    assert exit_code == 0
+    assert run.command[:3] == ["kubectl", "exec", "-i"]
+    assert "psql" in run.command[-1]
+    assert run.input == b"SELECT 1;\n"
+
+
+def test_restore_on_a_first_run_has_nothing_to_load_and_still_succeeds(capsys):
+    from airflow_db_backup import main
+
+    run = FakeRun()
+
+    exit_code = main(["restore", "--bucket", "b"], client=FakeS3(), run=run, now=NOW)
+
+    assert exit_code == 0
+    assert run.command is None
+    assert "No backup found" in capsys.readouterr().out
+
+
+def test_the_file_runs_as_a_script_and_asks_for_a_bucket():
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parent.parent / "airflow_db_backup.py"
+
+    result = subprocess.run(
+        [sys.executable, str(script), "save"], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 2
+    assert "--bucket" in result.stderr

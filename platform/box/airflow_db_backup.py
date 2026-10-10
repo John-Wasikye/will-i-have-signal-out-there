@@ -11,8 +11,12 @@ I keep the newest copy and one before it. That is the default for open question 
 
 from __future__ import annotations
 
+import argparse
 import gzip
+import shlex
 import subprocess
+import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -129,3 +133,61 @@ def restore_from_file(
 ) -> None:
     """Send the text inside a gzip dump to the restore command."""
     run(command, input=gzip.decompress(source_path.read_bytes()), env=environment, check=True)
+
+
+def in_pod(command: list[str], namespace: str, pod: str, interactive: bool = False) -> list[str]:
+    """Wrap a database command so it runs inside the PostgreSQL pod.
+
+    The pod already holds the password in its POSTGRES_PASSWORD variable, so the command
+    reads it there. The password never appears in a command line on the box.
+    """
+    inner = f'PGPASSWORD="$POSTGRES_PASSWORD" {shlex.join(command)}'
+    exec_command = ["kubectl", "exec"]
+    if interactive:
+        exec_command.append("-i")
+    return [*exec_command, "--namespace", namespace, pod, "--", "sh", "-c", inner]
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    """Read the command line: ``save`` or ``restore``, and where the backups live."""
+    parser = argparse.ArgumentParser(description="Save or restore Airflow's database in S3.")
+    parser.add_argument("action", choices=["save", "restore"])
+    parser.add_argument("--bucket", required=True, help="S3 bucket that holds the backups")
+    parser.add_argument("--prefix", default="airflow-db/", help="folder inside the bucket")
+    parser.add_argument("--namespace", default="airflow", help="Kubernetes namespace of Airflow")
+    parser.add_argument("--pod", default="airflow-postgresql-0", help="the PostgreSQL pod")
+    parser.add_argument("--database", default="postgres", help="database name")
+    parser.add_argument("--user", default="postgres", help="database user")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str], client=None, run=subprocess.run, now: datetime | None = None) -> int:  # noqa: ANN001
+    """Save or restore the database. ``client``, ``run`` and ``now`` are replaced in tests."""
+    args = parse_args(argv)
+    if client is None:
+        import boto3  # Only the box needs it, and it is installed there.
+
+        client = boto3.client("s3")
+    now = now or datetime.now(UTC)
+    connection = {"host": "localhost", "port": 5432, "user": args.user, "database": args.database}
+
+    with tempfile.TemporaryDirectory() as folder:
+        dump_path = Path(folder) / "airflow.sql.gz"
+        if args.action == "save":
+            command = in_pod(pg_dump_command(**connection), args.namespace, args.pod)
+            dump_to_file(command, dump_path, None, run=run)
+            key = save_backup(client, args.bucket, args.prefix, dump_path, now)
+            print(f"Saved the database to s3://{args.bucket}/{key}")
+            return 0
+
+        if not restore_latest(client, args.bucket, args.prefix, dump_path):
+            print("No backup found, so Airflow starts with an empty database.")
+            return 0
+        command = in_pod(psql_restore_command(**connection), args.namespace, args.pod, True)
+        restore_from_file(command, dump_path, None, run=run)
+        print("Restored the newest database backup.")
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
