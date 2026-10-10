@@ -1,0 +1,80 @@
+# Scope: shared by all five projects (Projects 1 to 5). Not Project 4's own contract.
+# ODCS v3. Published file contract: status.json, read by the status page.
+# Draft. Decided by John, Oct 9, 2026: a small job publishes status.json for the status page (BP 0.5, PR-13).
+apiVersion: v3.0.2
+kind: DataContract
+id: platform-status-json
+name: status_json
+version: 0.1.0
+status: draft
+domain: platform
+dataProduct: platform
+tenant: portfolio
+description:
+  purpose: >
+    The file the status page reads: for each pipeline, its last good run and whether it is late.
+    It is written after each nightly run, so the page works with the session box off (ADR-0008).
+  limitations: >
+    The freshness rule (how late is late) is each project's target (OQ-P08). Until OQ-P08 is answered
+    the file carries the target only as written in the project's contract.
+  usage: Read by the status page on the public site. Shown with a visible late notice when a pipeline is late (ADR-0011 of Project 4 sets the same rule for sky scores).
+servers:
+  - server: site-status
+    type: s3
+    location: s3://portfolio-site-<env>/status.json
+    environment: prod
+    description: Published object in the site bucket, served through CloudFront.
+schema:
+  - name: status_json
+    physicalType: json
+    description: One document, regenerated after each nightly run.
+    properties:
+      - name: generated_at_utc
+        logicalType: timestamp
+        required: true
+        description: Time the file was generated, in UTC.
+      - name: pipelines
+        logicalType: array
+        required: true
+        description: One entry per pipeline shown on the status page.
+      - name: pipelines.name
+        logicalType: string
+        required: true
+        description: Name of the pipeline or project (for example shooting_star_nightly).
+      - name: pipelines.last_good_run_utc
+        logicalType: timestamp
+        required: false
+        description: End of the data interval of the last good run, in UTC. Empty when no run has succeeded yet.
+      - name: pipelines.freshness_target_hours
+        logicalType: number
+        required: true
+        description: Freshness target set by the project (OQ-P08).
+        logicalTypeOptions:
+          minimum: 0
+      - name: pipelines.state
+        logicalType: string
+        required: true
+        description: ok, late, or failed.
+        logicalTypeOptions:
+          pattern: "^(ok|late|failed)$"
+      - name: pipelines.last_row_count
+        logicalType: integer
+        required: false
+        description: Rows written by the last good run.
+        logicalTypeOptions:
+          minimum: 0
+      - name: pipelines.incident_url
+        logicalType: string
+        required: false
+        description: Link to the open incident or GitHub issue, when one is open.
+slaProperties:
+  - property: frequency
+    value: after each nightly run
+    description: Regenerated when the nightly run finishes, and when a failure opens an incident.
+team:
+  - username: jwasikye
+    role: owner
+    description: John, owner of the platform.
+customProperties:
+  - property: openQuestions
+    value: [OQ-P08]

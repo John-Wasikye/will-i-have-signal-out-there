@@ -1,0 +1,106 @@
+# Scope: shared by all five projects (Projects 1 to 5). Not Project 4's own contract.
+# ODCS v3. Shared table contract, written by every DAG.
+# Draft. Decided by John, Oct 9, 2026: every DAG writes freshness and row counts (BP 0.5, requirements PR-13).
+# Default (ADR-0015, for John's approval in OQ-P01): the table is an Iceberg table in the lake.
+apiVersion: v3.0.2
+kind: DataContract
+id: platform-run-metrics
+name: platform_run_metrics
+version: 0.1.0
+status: draft
+domain: platform
+dataProduct: platform
+tenant: portfolio
+description:
+  purpose: >
+    One row per task run in every project's DAGs: freshness of the newest event and row counts,
+    so the status page shows the last good run and failures can be detected (BP 0.5, 1B.9).
+  limitations: >
+    Holds counts and times only, never record contents. The freshness target that a row is compared
+    with belongs to each project's contract, not to this table.
+  usage: Written by emit_run_metrics at the end of each task. Read by publish_status and the status page path.
+servers:
+  - server: lake-platform-metrics
+    type: s3
+    location: s3://portfolio-lake-<env>/Platform/run_metrics/
+    environment: prod
+    description: Iceberg table in the lake, registered in the Glue catalog of each environment (dev and live are separate, ADR-0005).
+schema:
+  - name: platform_run_metrics
+    physicalType: table
+    description: One row per task run.
+    properties:
+      - name: run_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Airflow run identifier.
+      - name: dag_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: Name of the DAG (for example shooting_star_nightly).
+      - name: task_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: Name of the task inside the DAG.
+      - name: project
+        logicalType: string
+        required: true
+        description: Project that owns the DAG (platform for shared tasks).
+      - name: data_interval_start_utc
+        logicalType: timestamp
+        required: true
+        description: Start of the run's data interval, in UTC (Eng 3).
+      - name: data_interval_end_utc
+        logicalType: timestamp
+        required: true
+        description: End of the run's data interval, in UTC.
+      - name: freshest_event_time_utc
+        logicalType: timestamp
+        required: false
+        description: Event time of the newest record written by the task, in UTC (Eng 2). Empty when the task writes no event rows.
+      - name: rows_read
+        logicalType: integer
+        required: true
+        description: Rows read by the task.
+        logicalTypeOptions:
+          minimum: 0
+      - name: rows_written
+        logicalType: integer
+        required: true
+        description: Rows written by the task.
+        logicalTypeOptions:
+          minimum: 0
+      - name: status
+        logicalType: string
+        required: true
+        description: Result of the task.
+        logicalTypeOptions:
+          pattern: "^(success|failed|skipped|limit_exceeded)$"
+      - name: emitted_at_utc
+        logicalType: timestamp
+        required: true
+        description: Time the row was written, in UTC.
+    quality:
+      - type: library
+        rule: duplicateValues
+        mustBe: 0
+        description: Unique on (run_id, dag_id, task_id).
+slaProperties:
+  - property: frequency
+    value: each task run
+    description: Written at the end of every task run, including failed runs where the task can still write.
+team:
+  - username: jwasikye
+    role: owner
+    description: John, owner of the platform.
+customProperties:
+  - property: retention
+    value: Clean-up rule for pipeline logs is 90 days; this table is kept until John decides otherwise (ADR-0010; OQ-P07).
+  - property: openQuestions
+    value: [OQ-P01, OQ-P07]

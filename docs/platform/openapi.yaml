@@ -1,0 +1,140 @@
+openapi: 3.0.3
+info:
+  title: Serving template API (platform)
+  version: 0.1.0
+  description: |
+    The shared API shape that every project's serving template uses: FastAPI on Lambda behind API Gateway (ADR-0026).
+    Each project's API adds its own routes. This file defines the platform routes only: the status document and the usage-event collection point.
+    Status: draft. The route names are proposals (design doc OQ-P9). No API keys are used on these routes (ADR-0022).
+    The first request after a period of inactivity may take up to 10 seconds while the service initializes.
+servers:
+  - url: https://api.example.invalid
+    description: Placeholder. The real host is set by Terraform per environment (dev and live are separate, ADR-0020).
+tags:
+  - name: Status
+    description: Freshness and last good run for each pipeline (ADR-0024).
+  - name: Usage
+    description: Usage-event collection for all five sites (ADR-0025). Draft.
+paths:
+  /v1/status:
+    get:
+      tags: [Status]
+      operationId: getStatus
+      summary: Status of every pipeline
+      description: Returns the content of status.json, built from the pipeline run metrics. Each pipeline's last good run is shown.
+      responses:
+        '200':
+          description: The status document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusDocument'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/events:
+    post:
+      tags: [Usage]
+      operationId: postUsageEvents
+      summary: Collect usage events (draft)
+      description: |
+        Accepts a batch of usage events and writes them to the always-on raw bucket (ADR-0011).
+        The endpoint drops any IP address header and stores no cookie. The sender sets event_time_utc; the endpoint sets received_time_utc.
+        Limits on request size and rate are open (design doc OQ-P8).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageEventBatch'
+      responses:
+        '202':
+          description: Accepted. The events will be loaded by the nightly run.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+components:
+  schemas:
+    StatusDocument:
+      type: object
+      required: [generated_at_utc, pipelines]
+      properties:
+        generated_at_utc:
+          type: string
+          format: date-time
+          description: When this document was built, in UTC.
+        pipelines:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelineStatus'
+    PipelineStatus:
+      type: object
+      required: [pipeline, last_good_run_utc, status]
+      properties:
+        pipeline:
+          type: string
+          description: Name of the DAG or job.
+        last_good_run_utc:
+          type: string
+          format: date-time
+          nullable: true
+          description: Most recent successful run, in UTC. Null if none yet.
+        status:
+          type: string
+          enum: [ok, late, failed]
+          description: late means the freshness target was missed. The site still shows the old data with a late notice (ADR-0013 of Project 2).
+        freshness_target_hours:
+          type: number
+    UsageEventBatch:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/UsageEvent'
+    UsageEvent:
+      type: object
+      required: [event_id, event_time_utc, site, event_name, anon_visitor_id]
+      properties:
+        event_id:
+          type: string
+        event_time_utc:
+          type: string
+          format: date-time
+        site:
+          type: string
+        event_name:
+          type: string
+        anon_visitor_id:
+          type: string
+        route:
+          type: string
+          description: Route name without a query string.
+        client_kind:
+          type: string
+          enum: [web, installed]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Short machine-readable code.
+        message:
+          type: string
+          description: Short human-readable message. Error body shape is proposed (design doc OQ-P9).
+  responses:
+    BadRequest:
+      description: The request is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

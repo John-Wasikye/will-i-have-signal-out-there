@@ -1,0 +1,111 @@
+# Scope: shared by all five projects (Projects 1 to 5). Not Project 4's own contract.
+openapi: 3.0.3
+info:
+  title: Serving template (platform)
+  version: 0.1.0
+  description: |
+    The API spec each project copies for its own API. Served by FastAPI on Lambda behind API Gateway (HTTP type for public pages; REST type only where API keys and per-key limits are needed), with DuckDB over published Parquet (ADR-0012).
+
+    The first request after a period of inactivity may take up to 10 seconds while the service initializes (BP 0.4). Draft: throttle values and key handling are open (OQ-P09).
+servers:
+  - url: https://api.placeholder.invalid
+    description: Placeholder. The real URL is set at deploy. Dev and live are separate deployments (ADR-0005).
+tags:
+  - name: platform
+    description: Routes every project's API copies.
+paths:
+  /health:
+    get:
+      tags: [platform]
+      operationId: getHealth
+      summary: Service health for the status page
+      description: Returns ok when the service can read the published data. Does not read any key.
+      responses:
+        "200":
+          description: The service is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "500":
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /sample:
+    get:
+      tags: [platform]
+      operationId: getSample
+      summary: Sample answer for the skeleton gate
+      description: |
+        The skeleton's sample route (BP 0.4). It reads one row from a sample published table and returns it. It must answer with the session box off. Projects replace it with their own routes.
+      parameters:
+        - name: key
+          in: query
+          required: false
+          description: Key of the sample row. Defaults to the first row.
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        "200":
+          description: The sample row.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SampleAnswer"
+        "404":
+          description: No sample row with that key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Throttled by API Gateway. Throttle values are open (OQ-P09).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, generated_at_utc]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        generated_at_utc:
+          type: string
+          format: date-time
+          description: Time of the answer, in UTC (ADR-0014).
+    SampleAnswer:
+      type: object
+      required: [key, value, last_good_run_utc, late]
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        last_good_run_utc:
+          type: string
+          format: date-time
+          description: End of the data interval of the last good run, in UTC.
+        late:
+          type: boolean
+          description: True when the data is older than its freshness target. The page shows a late notice and never hides the data (ADR-0011 of Project 4).
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        code:
+          type: string

@@ -1,0 +1,30 @@
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Site
+app/node_modules/
+app/dist/
+
+# Local data written by the pipelines and the serving tests
+published/
+metrics/
+warehouse/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Terraform (state and local overrides; lock files are committed)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+backend.hcl
