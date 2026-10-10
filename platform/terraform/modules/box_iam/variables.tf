@@ -22,3 +22,8 @@ variable "parameter_read_policy_json" {
   description = "Parameter Store read policy, from the parameters module."
   type        = string
 }
+
+variable "registry_arn" {
+  description = "ARN of this environment's image repository, from the registry module. The box pulls the Airflow image from it."
+  type        = string
+}

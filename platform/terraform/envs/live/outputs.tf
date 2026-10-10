@@ -32,3 +32,8 @@ output "api_url" {
   description = "Base URL of the API."
   value       = module.serving.api_url
 }
+
+output "airflow_image_repository" {
+  description = "Address of the Airflow image repository. The install script takes it as IMAGE_REPOSITORY."
+  value       = module.registry.repository_url
+}

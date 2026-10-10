@@ -17,6 +17,7 @@ variables {
   site_bucket_arn            = "arn:aws:s3:::portfolio-dev-site-123456789012"
   data_access_policy_json    = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
   parameter_read_policy_json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
+  registry_arn               = "arn:aws:ecr:us-east-1:123456789012:repository/portfolio-dev-airflow"
 }
 
 run "instance_role_is_assumed_only_by_ec2" {
@@ -252,5 +253,78 @@ run "rejects_an_unknown_environment" {
 
   expect_failures = [
     var.env,
+  ]
+}
+
+run "box_can_pull_images_from_its_own_registry_but_not_push" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.registry_pull.policy, "ecr:BatchGetImage") && strcontains(aws_iam_role_policy.registry_pull.policy, "ecr:GetDownloadUrlForLayer")
+    error_message = "The box must be able to pull images."
+  }
+
+  assert {
+    condition     = !strcontains(aws_iam_role_policy.registry_pull.policy, "ecr:PutImage") && !strcontains(aws_iam_role_policy.registry_pull.policy, "ecr:InitiateLayerUpload")
+    error_message = "The box must not be able to push images."
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.registry_pull.policy, "repository/portfolio-dev-airflow")
+    error_message = "Image pulls must be limited to this environment's repository."
+  }
+}
+
+run "refuses_a_live_registry_in_a_dev_configuration" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  variables {
+    registry_arn = "arn:aws:ecr:us-east-1:123456789012:repository/portfolio-live-airflow"
+  }
+
+  expect_failures = [
+    aws_iam_role_policy.registry_pull,
   ]
 }

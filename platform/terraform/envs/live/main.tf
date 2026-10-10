@@ -68,6 +68,7 @@ module "box_iam" {
   site_bucket_arn            = module.storage.bucket_arns["site"]
   data_access_policy_json    = module.iam.data_access_policy_json
   parameter_read_policy_json = module.parameters.read_policy_json
+  registry_arn               = module.registry.repository_arn
 }
 
 module "session_box" {
@@ -97,4 +98,10 @@ module "serving" {
   lambda_zip_path   = var.lambda_zip_path
   lambda_zip_sha256 = var.lambda_zip_sha256
   allowed_origins   = ["https://${module.site.domain_name}"]
+}
+
+module "registry" {
+  source = "../../modules/registry"
+
+  env = local.env
 }

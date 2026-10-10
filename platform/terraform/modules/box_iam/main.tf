@@ -135,3 +135,39 @@ resource "aws_iam_role_policy" "scheduler" {
   role   = aws_iam_role.scheduler.id
   policy = data.aws_iam_policy_document.scheduler.json
 }
+
+# The box pulls the Airflow image from this environment's repository. It can pull but not
+# push. The authorization token call cannot be limited to one repository, so it applies to all.
+data "aws_iam_policy_document" "registry_pull" {
+  statement {
+    sid       = "GetRegistryToken"
+    effect    = "Allow"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "PullFromThisRepository"
+    effect = "Allow"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = [var.registry_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "registry_pull" {
+  name   = "registry-pull"
+  role   = aws_iam_role.box.id
+  policy = data.aws_iam_policy_document.registry_pull.json
+
+  lifecycle {
+    # Guards against giving a dev box the live repository, or the reverse.
+    precondition {
+      condition     = endswith(var.registry_arn, "repository/portfolio-${var.env}-airflow")
+      error_message = "The repository ARN must belong to the same environment as the env variable."
+    }
+  }
+}
