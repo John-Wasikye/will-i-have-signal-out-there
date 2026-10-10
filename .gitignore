@@ -34,3 +34,6 @@ platform/serving/build/
 
 # My working notes for picking the work up in a new session. They stay on my computer only.
 CONTEXT.md
+
+# My planning documents. They stay on my computer only. The project documentation is in docs/platform.
+docs/*.docx

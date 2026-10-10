@@ -66,7 +66,7 @@ The module tests use a mock AWS provider and make no AWS calls. The IAM tests us
 - I write tests first. For each new behavior, I write a test, watch it fail, then write the code that passes it. The rules are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Every timestamp is stored in UTC. The page converts it to the reader's local time.
 - Every key lives in AWS Parameter Store. None is stored in this repository or in GitHub.
-- The platform design is in [docs/platform](docs/platform). The planning documents are in [docs](docs).
+- The platform design, decision records and data contracts are in [docs/platform](docs/platform).
 
 ## License
 
