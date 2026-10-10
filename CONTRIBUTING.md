@@ -27,6 +27,11 @@ I never change a test just to make it pass. If a test is wrong, I say so in the 
 - I explain new terms the first time they appear.
 - Timestamps in code and data are UTC.
 
+## Line endings
+
+- Every text file uses LF line endings. `.gitattributes` and `.editorconfig` set this.
+- On Windows, a script that writes a file must ask for LF, for example `write_text(..., newline="\n")` in Python. The default writes CRLF, which breaks shell scripts: the `\` at the end of a line stops working. Shellcheck catches this.
+
 ## Keys and secrets
 
 - No key, password or token goes in code, tests, docs or GitHub. Keys live in AWS Parameter Store.
