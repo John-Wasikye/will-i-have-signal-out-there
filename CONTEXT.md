@@ -14,14 +14,15 @@ I wrote this file so I can pick the work up again without the earlier conversati
 The trip planner, Will I have signal out there?, platform skeleton steps 0.1 to 0.5 of my build plan.
 
 Done and verified:
-- Python: 128 tests pass on my machine, and 2 are skipped there. The skipped tests run and pass in CI on Linux: 5 on real Spark and Iceberg, and 6 Airflow DAG tests on Airflow 3.3.2. `ruff check .` passes.
+- Python: 138 tests pass on my machine, and 2 are skipped there. The skipped tests run and pass in CI on Linux: 5 on real Spark and Iceberg, and 6 Airflow DAG tests on Airflow 3.3.2. `ruff check .` passes.
 - Site (`app/`): typecheck passes, 4 tests pass and the build passes.
 - Terraform: `terraform fmt -check` is clean, and `terraform validate` passes for `envs/dev` and `envs/live`. Every module has Terraform tests that pass: storage (11), iam (7), catalog (3), visitor_data (5), budget (3), parameters (3), session_box (10), box_iam (7), serving (8) and site (7). Nothing is applied to AWS.
 - The session box creates a persistent spot instance, starts it at 10:00 UTC (off in dev), hard-stops it at 14:00 UTC, and stops it when idle. `box_iam` gives it and the scheduler their roles.
 - The API package builds for real: `python platform/serving/build_package.py` makes an arm64 zip that is 22.6 MB zipped and 64.7 MB unzipped. The Lambda copies published files from S3 before it answers.
 - The site and the API are connected to dev and live. Only the site's CloudFront distribution can read the site bucket, and CloudFront blocks the `published/` folder.
 - The box install files are in `platform/box` and have tests that I wrote first: the Airflow chart settings are tested on the real rendered chart (10 tests), the install script in dry-run mode (13 tests), and the database backup tool (22 tests). The Airflow image builds and passes its smoke test on my machine. Shellcheck passes on both scripts.
-- GitHub CI runs six jobs on every push, and all pass on the latest commit: Python, Spark, Airflow, site, Terraform, and security scans.
+- The Airflow image is scanned with Trivy. On my machine, with Docker, I ran the Airflow and Spark tests inside the real image, and the scan found critical problems that I fixed (Debian updates, PySpark 3.5.9, Derby and ZooKeeper jars removed). Two findings remain, in Netty and in an old Avro copy inside Hadoop, accepted in `.trivyignore` with a reason. Both entries expire on 2027-01-08, so the scan fails again then and I have to look at them again.
+- GitHub CI runs seven jobs on every push, and all pass on the latest commit: Python, Spark, Airflow, the Airflow image, site, Terraform, and security scans.
 
 Not done, in order:
 1. The Terraform state bootstrap (`platform/terraform/bootstrap`) is written but not applied. Applying it creates AWS resources, so I will ask first.
