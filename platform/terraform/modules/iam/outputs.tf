@@ -12,3 +12,8 @@ output "github_subject" {
   description = "The GitHub token subject that the pipeline roles accept, for example repo:owner/name:ref:refs/heads/main."
   value       = local.github_subject
 }
+
+output "data_access_policy_json" {
+  description = "The bucket and Glue access policy that every pipeline role gets. The session box role reuses it."
+  value       = data.aws_iam_policy_document.data_access.json
+}

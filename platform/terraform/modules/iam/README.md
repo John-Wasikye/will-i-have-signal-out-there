@@ -32,3 +32,4 @@ Only one environment per AWS account should create the OIDC provider. In this re
 | `role_arns` | Map of pipeline name to role ARN. |
 | `oidc_provider_arn` | ARN of the GitHub OIDC provider. |
 | `github_subject` | The GitHub token subject the roles accept. |
+| `data_access_policy_json` | The bucket and Glue policy every pipeline role gets. The `box_iam` module reuses it. |

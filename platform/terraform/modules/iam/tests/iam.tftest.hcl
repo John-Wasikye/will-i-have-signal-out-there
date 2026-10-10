@@ -242,3 +242,47 @@ run "rejects_a_pipeline_name_with_capitals" {
     var.pipeline_names,
   ]
 }
+
+run "exposes_the_data_access_policy_for_reuse" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  variables {
+    env                        = "dev"
+    raw_bucket_arn             = "arn:aws:s3:::portfolio-dev-raw-123456789012"
+    lake_bucket_arn            = "arn:aws:s3:::portfolio-dev-lake-123456789012"
+    glue_database_name         = "portfolio_dev"
+    parameter_read_policy_json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
+    create_oidc_provider       = false
+  }
+
+  assert {
+    condition     = strcontains(output.data_access_policy_json, "portfolio-dev-raw-123456789012")
+    error_message = "The exposed policy must cover this environment's raw bucket."
+  }
+
+  assert {
+    condition     = !strcontains(output.data_access_policy_json, "live")
+    error_message = "A dev policy must not mention any live resource."
+  }
+}
