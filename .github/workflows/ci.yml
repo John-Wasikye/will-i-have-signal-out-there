@@ -1,0 +1,86 @@
+name: CI
+
+# Runs on every push and pull request. No job here touches AWS.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python lint and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest
+
+  site:
+    name: Site build and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  terraform:
+    name: Terraform format and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.4"
+      - name: Format
+        run: terraform fmt -check -recursive platform/terraform
+      - name: Module tests
+        run: |
+          for module in platform/terraform/modules/*/; do
+            if [ -d "$module/tests" ]; then
+              (cd "$module" && terraform init -backend=false -input=false && terraform test)
+            fi
+          done
+      - name: Validate environments
+        run: |
+          for env in dev live; do
+            (cd "platform/terraform/envs/$env" && terraform init -backend=false -input=false && terraform validate)
+          done
+
+  security:
+    name: Secret and vulnerability scans
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan dependencies and config
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
