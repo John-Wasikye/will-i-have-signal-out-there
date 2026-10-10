@@ -1,0 +1,12 @@
+# Terraform working files and state. State never lives in the repository.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Variable values may hold account details. Only the example files are kept.
+*.tfvars
+!*.tfvars.example
+
+# Real backend settings (bucket names, account IDs). Copy from backend.hcl.example.
+backend.hcl

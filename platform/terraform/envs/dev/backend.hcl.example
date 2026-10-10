@@ -1,0 +1,6 @@
+# Copy this file to backend.hcl (which is git-ignored) and replace the placeholders.
+# bucket and kms_key_id come from the outputs of the bootstrap configuration.
+bucket     = "portfolio-terraform-state-123456789012"
+key        = "dev/terraform.tfstate"
+region     = "us-east-1"
+kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
