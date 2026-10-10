@@ -37,3 +37,14 @@ variable "box_security_group_ids" {
   type        = list(string)
   default     = []
 }
+
+variable "lambda_zip_path" {
+  description = "Path to the API package built by platform/serving/build_package.py."
+  type        = string
+  default     = "../../../serving/build/function.zip"
+}
+
+variable "lambda_zip_sha256" {
+  description = "Base64 SHA-256 of the API package. The build script prints it."
+  type        = string
+}

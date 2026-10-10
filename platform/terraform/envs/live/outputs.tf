@@ -22,3 +22,13 @@ output "session_box_instance_id" {
   description = "ID of the session box."
   value       = module.session_box.instance_id
 }
+
+output "site_url" {
+  description = "Address of the site."
+  value       = "https://${module.site.domain_name}"
+}
+
+output "api_url" {
+  description = "Base URL of the API."
+  value       = module.serving.api_url
+}

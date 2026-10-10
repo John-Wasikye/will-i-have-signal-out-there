@@ -13,7 +13,10 @@ module "storage" {
 
   env              = local.env
   size_alarm_bytes = var.size_alarm_bytes
-  alarm_actions    = var.alarm_actions
+
+  # Only this distribution can read the site bucket.
+  site_distribution_arn = module.site.distribution_arn
+  alarm_actions         = var.alarm_actions
 }
 
 module "catalog" {
@@ -77,4 +80,21 @@ module "session_box" {
   instance_profile_name = module.box_iam.instance_profile_name
   scheduler_role_arn    = module.box_iam.scheduler_role_arn
   schedule_enabled      = true
+}
+
+module "site" {
+  source = "../../modules/site"
+
+  env                         = local.env
+  bucket_regional_domain_name = module.storage.bucket_regional_domain_names["site"]
+}
+
+module "serving" {
+  source = "../../modules/serving"
+
+  env               = local.env
+  published_bucket  = module.storage.bucket_names["site"]
+  lambda_zip_path   = var.lambda_zip_path
+  lambda_zip_sha256 = var.lambda_zip_sha256
+  allowed_origins   = ["https://${module.site.domain_name}"]
 }

@@ -27,3 +27,4 @@ A bucket has only one policy, so every rule for a bucket lives in one policy doc
 |---|---|
 | `bucket_names` | Map of `raw`, `lake` and `site` to bucket name. |
 | `bucket_arns` | Map of `raw`, `lake` and `site` to bucket ARN. |
+| `bucket_regional_domain_names` | Map of `raw`, `lake` and `site` to regional domain name. CloudFront uses the site one. |
