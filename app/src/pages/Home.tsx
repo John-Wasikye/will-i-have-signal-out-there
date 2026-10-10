@@ -4,10 +4,11 @@ import { MapView } from '../components/MapView'
 export function Home() {
   return (
     <>
-      <h1>Data platform</h1>
+      <h1>Will I have signal out there?</h1>
       <p>
-        This site runs the data platform behind my projects. You can check whether the nightly
-        data run is up to date on the <Link to="/status">status page</Link>, or try the{' '}
+        I am building a trip planner for hikers and campers. It will show where each phone carrier
+        has coverage, and when a satellite text could get through. You can check whether the
+        nightly data run is up to date on the <Link to="/status">status page</Link>, or try the{' '}
         <Link to="/lookup">lookup page</Link>.
       </p>
 

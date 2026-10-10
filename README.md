@@ -1,8 +1,8 @@
 # Will I have signal out there?
 
-I am building a trip planner for hikers, campers and backpackers. You pick a trail and see where each phone carrier has coverage, where it drops out, and when a Starlink Direct-to-Cell satellite text could get through. This repository holds the shared platform I am building for all five of my projects, and the code for this first project.
+I am building a trip planner for hikers, campers and backpackers. You pick a trail and see where each phone carrier has coverage, where it drops out, and when a Starlink Direct-to-Cell satellite text could get through. This repository holds the data platform behind the planner and the planner's code.
 
-The project is in its first phase. I am building the platform skeleton first. It is not deployed to AWS yet.
+The project is in its first phase. I am building the data platform first, and it is not deployed to AWS yet.
 
 ## What I have built
 

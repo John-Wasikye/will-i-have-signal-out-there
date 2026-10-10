@@ -7,14 +7,14 @@ I wrote this file so I can pick the work up again without the earlier conversati
 - Repo: this folder, on my computer. The work is on the branch `feature/platform-skeleton`.
 - GitHub: the repository is pushed to GitHub as a public repository. I push only the feature branch. I never push to `master` without asking.
 - Planning documents: I keep the original build plan and design documents outside the repo. Copies of the approved platform documents are in `docs/`.
-- The Project 1 requirements, ADRs and contracts are not copied into this repo yet.
+- The requirements, decision records and data contracts for the trip planner are not copied into this repo yet.
 
 ## Where the build is
 
-Project 1 (Will I have signal out there?), platform skeleton steps 0.1 to 0.5 of my build plan.
+The trip planner, Will I have signal out there?, platform skeleton steps 0.1 to 0.5 of my build plan.
 
 Done and verified on my machine:
-- Python: 47 tests pass and 1 is skipped. The skipped tests need Airflow, which does not install on Windows. `ruff check .` passes.
+- Python: 60 tests pass and 1 is skipped. The skipped tests need Airflow, which does not install on Windows. `ruff check .` passes.
 - Site (`app/`): typecheck passes, 4 tests pass and the build passes.
 - Terraform: `terraform fmt -check` is clean, and `terraform validate` passes for `envs/dev` and `envs/live`. Every module has Terraform tests that pass: storage (7), iam (6), catalog (3), visitor_data (5), budget (3), parameters (3) and session_box (8). Nothing is applied to AWS.
 - The session box module (`platform/terraform/modules/session_box`) creates a persistent spot instance, starts it at 10:00 UTC, hard-stops it at 14:00 UTC (my four-hour session limit), and stops it when idle. It is not wired into an environment yet.
@@ -22,7 +22,7 @@ Done and verified on my machine:
 
 Not done, in order:
 1. The Terraform state bootstrap (`platform/terraform/bootstrap`) is written but not applied. Applying it creates AWS resources, so I will ask first.
-2. The session box still needs: k3s, Airflow and Spark installed on the box, the two-hour nightly maximum, the two-minute interruption warning handler, an instance profile, an arm64 image, and wiring into `envs/dev`.
+2. The session box still needs: k3s, Airflow and Spark installed on the box, an instance profile, an arm64 image, and wiring into `envs/dev`. The two-hour nightly maximum check (`nightly_limit.py`) and the spot warning handler (`spot_interruption.py`) are written and tested, but nothing calls them yet.
 3. Spark tests on real Spark in CI. The `spark` extra is in `pyproject.toml`. The Spark job and the maintenance task are tested only with fake sessions so far.
 4. Running the Airflow DAG tests. I need to install Airflow on Linux (in CI or on the box), so `test_dag.py` runs instead of skipping.
 5. Serving on AWS (Lambda packaging, API Gateway HTTP type, CloudFront site) and the live status page. This needs Terraform for the `serving` and `site` modules.
@@ -31,7 +31,7 @@ Not done, in order:
 
 ## Decisions I made (with the default I used)
 
-- Repo name: `will-i-have-signal-out-there`, because Project 1 is the first project and the platform is built for it first.
+- Repo name: `will-i-have-signal-out-there`, because the repository holds this one project and its platform.
 - Licence: MIT for the code. Data keeps its own licence. I added this when I asked for a licence to be included.
 - Test-driven development is required for all code. Code must be reviewable and replicable by a person.
 - The platform design document is still marked Draft. I treated my go-ahead to start coding as approval to build to it.

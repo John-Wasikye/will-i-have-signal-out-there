@@ -1,6 +1,6 @@
-# Portfolio data platform site
+# Site
 
-This is the public website for my data platform. It has a home page with cards for my five projects, a status page, and a lookup page. I built it with Vite, React and TypeScript. It compiles to plain static files, so the site has no server of its own. Only the lookup page calls the API.
+This is the public website for my trip planner, Will I have signal out there? It has a home page, a status page that shows whether the nightly data run is up to date, and a lookup page. I built it with Vite, React and TypeScript. It compiles to plain static files, so the site has no server of its own. Only the lookup page calls the API.
 
 ## Run it
 
