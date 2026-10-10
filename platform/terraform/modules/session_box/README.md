@@ -28,7 +28,8 @@ What the module does not do yet: it does not install k3s, Airflow or Spark, it d
 | `subnet_id` | string | none | A public subnet. |
 | `security_group_ids` | list(string) | `[]` | No inbound traffic from the internet. |
 | `instance_profile_name` | string | none | Instance profile with read access to Parameter Store and to the box's buckets. |
-| `scheduler_role_arn` | string | none | Role that the scheduler assumes to start and stop the box. |
+| `scheduler_role_arn` | string | none | Role that the scheduler assumes to start and stop the box. The `box_iam` module creates it. |
+| `schedule_enabled` | bool | `true` | Whether the box starts by itself every night. I turn it off in dev. The hard stop stays on either way. |
 | `root_volume_gb` | number | 50 | Root disk size. Project data is never stored here. |
 | `idle_cpu_percent` | number | 5 | Placeholder idle threshold. |
 | `idle_evaluation_periods` | number | 6 | Placeholder number of idle periods before the stop. |

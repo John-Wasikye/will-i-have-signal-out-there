@@ -60,6 +60,7 @@ resource "aws_scheduler_schedule" "start" {
   description                  = "Starts the session box for the nightly pipeline run."
   schedule_expression          = "cron(0 10 * * ? *)"
   schedule_expression_timezone = "UTC"
+  state                        = var.schedule_enabled ? "ENABLED" : "DISABLED"
 
   flexible_time_window {
     mode = "OFF"
@@ -79,6 +80,7 @@ resource "aws_scheduler_schedule" "hard_stop" {
   description                  = "Stops the session box four hours after its start, whatever the pipelines are doing."
   schedule_expression          = "cron(0 14 * * ? *)"
   schedule_expression_timezone = "UTC"
+  state                        = "ENABLED"
 
   flexible_time_window {
     mode = "OFF"

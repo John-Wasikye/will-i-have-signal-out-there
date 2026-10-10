@@ -47,3 +47,24 @@ module "iam" {
   # envs/live creates the OIDC provider. Apply envs/live before envs/dev the first time.
   create_oidc_provider = false
 }
+
+module "box_iam" {
+  source = "../../modules/box_iam"
+
+  env                        = local.env
+  site_bucket_arn            = module.storage.bucket_arns["site"]
+  data_access_policy_json    = module.iam.data_access_policy_json
+  parameter_read_policy_json = module.parameters.read_policy_json
+}
+
+module "session_box" {
+  source = "../../modules/session_box"
+
+  env                   = local.env
+  ami_id                = var.box_ami_id
+  subnet_id             = var.box_subnet_id
+  security_group_ids    = var.box_security_group_ids
+  instance_profile_name = module.box_iam.instance_profile_name
+  scheduler_role_arn    = module.box_iam.scheduler_role_arn
+  schedule_enabled      = false
+}

@@ -40,6 +40,12 @@ variable "instance_profile_name" {
   type        = string
 }
 
+variable "schedule_enabled" {
+  description = "Whether the box starts by itself every night. I turn it off in dev, so only the live box runs nightly. The hard stop stays on either way."
+  type        = bool
+  default     = true
+}
+
 variable "scheduler_role_arn" {
   description = "Role that EventBridge Scheduler assumes to start and stop the box. It needs ec2:StartInstances and ec2:StopInstances on this box only."
   type        = string

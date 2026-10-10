@@ -173,3 +173,41 @@ run "rejects_an_unknown_environment" {
     var.env,
   ]
 }
+
+run "schedules_are_enabled_by_default" {
+  command = plan
+
+  variables {
+    env                   = "live"
+    ami_id                = "ami-0123456789abcdef0"
+    subnet_id             = "subnet-0123456789abcdef0"
+    instance_profile_name = "portfolio-live-session-box"
+  }
+
+  assert {
+    condition     = aws_scheduler_schedule.start.state == "ENABLED" && aws_scheduler_schedule.hard_stop.state == "ENABLED"
+    error_message = "The start and the hard stop must be enabled by default."
+  }
+}
+
+run "dev_can_turn_the_nightly_schedule_off" {
+  command = plan
+
+  variables {
+    env                   = "dev"
+    ami_id                = "ami-0123456789abcdef0"
+    subnet_id             = "subnet-0123456789abcdef0"
+    instance_profile_name = "portfolio-dev-session-box"
+    schedule_enabled      = false
+  }
+
+  assert {
+    condition     = aws_scheduler_schedule.start.state == "DISABLED"
+    error_message = "With the schedule off, the box must not start by itself."
+  }
+
+  assert {
+    condition     = aws_scheduler_schedule.hard_stop.state == "ENABLED"
+    error_message = "The hard stop must stay on even when the nightly start is off, so a box I start by hand still stops."
+  }
+}

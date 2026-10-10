@@ -17,3 +17,8 @@ output "pipeline_role_arns" {
   description = "Map of pipeline name to live pipeline role ARN."
   value       = module.iam.role_arns
 }
+
+output "session_box_instance_id" {
+  description = "ID of the session box."
+  value       = module.session_box.instance_id
+}

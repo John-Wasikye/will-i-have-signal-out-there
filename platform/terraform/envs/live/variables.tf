@@ -39,3 +39,19 @@ variable "alert_emails" {
   type        = list(string)
   default     = []
 }
+
+variable "box_ami_id" {
+  description = "An arm64 image for the session box. I check its manifest before the first use."
+  type        = string
+}
+
+variable "box_subnet_id" {
+  description = "A public subnet for the session box. There is no NAT gateway."
+  type        = string
+}
+
+variable "box_security_group_ids" {
+  description = "Security groups for the session box. They allow no inbound traffic from the internet."
+  type        = list(string)
+  default     = []
+}
