@@ -14,7 +14,7 @@ I wrote this file so I can pick the work up again without the earlier conversati
 The trip planner, Will I have signal out there?, platform skeleton steps 0.1 to 0.5 of my build plan.
 
 Done and verified on my machine:
-- Python: 60 tests pass and 1 is skipped. The skipped tests need Airflow, which does not install on Windows. `ruff check .` passes.
+- Python: 60 tests pass and 2 are skipped. One skipped test needs Airflow, which does not install on Windows. The other needs pyspark, and it runs and passes in CI (5 tests on real Spark and Iceberg). The skipped tests need Airflow, which does not install on Windows. `ruff check .` passes.
 - Site (`app/`): typecheck passes, 4 tests pass and the build passes.
 - Terraform: `terraform fmt -check` is clean, and `terraform validate` passes for `envs/dev` and `envs/live`. Every module has Terraform tests that pass: storage (7), iam (6), catalog (3), visitor_data (5), budget (3), parameters (3) and session_box (8). Nothing is applied to AWS.
 - The session box module (`platform/terraform/modules/session_box`) creates a persistent spot instance, starts it at 10:00 UTC, hard-stops it at 14:00 UTC (my four-hour session limit), and stops it when idle. It is not wired into an environment yet.
@@ -23,11 +23,10 @@ Done and verified on my machine:
 Not done, in order:
 1. The Terraform state bootstrap (`platform/terraform/bootstrap`) is written but not applied. Applying it creates AWS resources, so I will ask first.
 2. The session box still needs: k3s, Airflow and Spark installed on the box, an instance profile, an arm64 image, and wiring into `envs/dev`. The two-hour nightly maximum check (`nightly_limit.py`) and the spot warning handler (`spot_interruption.py`) are written and tested, but nothing calls them yet.
-3. Spark tests on real Spark in CI. The `spark` extra is in `pyproject.toml`. The Spark job and the maintenance task are tested only with fake sessions so far.
-4. Running the Airflow DAG tests. I need to install Airflow on Linux (in CI or on the box), so `test_dag.py` runs instead of skipping.
-5. Serving on AWS (Lambda packaging, API Gateway HTTP type, CloudFront site) and the live status page. This needs Terraform for the `serving` and `site` modules.
-6. A review pass over every file, looking for dead code and unclear names.
-7. Site lint in CI. Typecheck is already in CI.
+3. Running the Airflow DAG tests. I need to install Airflow on Linux (in CI or on the box), so `test_dag.py` runs instead of skipping.
+4. Serving on AWS (Lambda packaging, API Gateway HTTP type, CloudFront site) and the live status page. This needs Terraform for the `serving` and `site` modules.
+5. A review pass over every file, looking for dead code and unclear names.
+6. Site lint in CI. Typecheck is already in CI.
 
 ## Decisions I made (with the default I used)
 
