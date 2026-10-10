@@ -41,6 +41,24 @@ jobs:
       - name: Run the Spark job and maintenance on real Spark
         run: pytest pipelines/platform/tests/test_spark_integration.py -v
 
+  airflow:
+    name: Airflow DAG tests
+    runs-on: ubuntu-latest
+    env:
+      AIRFLOW_VERSION: "3.3.2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Airflow with its pinned dependency list
+        run: |
+          python -m pip install \
+            "apache-airflow==${AIRFLOW_VERSION}" pyarrow pytest \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
+      - name: Run the DAG tests
+        run: pytest pipelines/platform/tests/test_dag.py -v
+
   site:
     name: Site build and tests
     runs-on: ubuntu-latest
