@@ -6,6 +6,7 @@ Order follows docs/platform/design-doc.md section 7.4. The DAG only wires tasks 
 The logic lives in modules that have their own tests:
 - pipelines/platform/publish/sample_flow.py
 - pipelines/platform/publish/incidents.py
+- pipelines/platform/publish/uploads.py
 - pipelines/platform/spark/sample_iceberg_job.py
 - pipelines/platform/spark/iceberg_maintenance.py
 """
@@ -17,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import sample_flow
+import uploads
 from airflow.sdk import dag, task
 from iceberg_maintenance import maintain_tables
 from incidents import record_failure
@@ -24,6 +26,7 @@ from sample_iceberg_job import build_spark_session, run_sample_iceberg_job
 
 PUBLISHED_DIR = Path(os.environ.get("PLATFORM_PUBLISHED_DIR", "/data/published"))
 METRICS_DIR = Path(os.environ.get("PLATFORM_METRICS_DIR", "/data/metrics"))
+INCIDENTS_DIR = Path(os.environ.get("PLATFORM_INCIDENTS_DIR", "/data/incidents"))
 WAREHOUSE = os.environ.get("PLATFORM_WAREHOUSE", "/data/warehouse")
 USE_GLUE = os.environ.get("PLATFORM_USE_GLUE") == "1"
 ICEBERG_TABLE = "sample_answer"
@@ -35,7 +38,7 @@ def record_failure_callback(context: dict) -> None:
 
     The folder is read when the callback runs, so a test can point it somewhere else.
     """
-    record_failure(context, Path(os.environ.get("PLATFORM_INCIDENTS_DIR", "/data/incidents")))
+    record_failure(context, Path(os.environ.get("PLATFORM_INCIDENTS_DIR", str(INCIDENTS_DIR))))
 
 
 @dag(
@@ -87,6 +90,22 @@ def platform_skeleton_nightly():
             PUBLISHED_DIR / "status.json",
         )
 
+    @task
+    def upload_outputs() -> list[str]:
+        """Copy the published files, status.json, metrics and incidents to S3.
+
+        The box is switched off most of the time, so nothing is live until this runs.
+        """
+        import boto3  # The Airflow image provides boto3.
+
+        locations = uploads.OutputLocations(
+            site_bucket=os.environ["PLATFORM_SITE_BUCKET"],
+            lake_bucket=os.environ["PLATFORM_LAKE_BUCKET"],
+        )
+        return uploads.upload_outputs(
+            boto3.client("s3"), locations, PUBLISHED_DIR, METRICS_DIR, INCIDENTS_DIR
+        )
+
     @task(trigger_rule="all_done")
     def iceberg_maintenance() -> None:
         """Compact, expire and clean up Iceberg tables. Runs even when earlier tasks fail."""
@@ -101,8 +120,10 @@ def platform_skeleton_nightly():
     written >> outcome
     metrics = emit_metrics(outcome)
     status = publish_status(outcome)
+    uploaded = upload_outputs()
+    [metrics, status] >> uploaded
     maintenance = iceberg_maintenance()
-    [metrics, status] >> maintenance
+    uploaded >> maintenance
 
 
 platform_skeleton_nightly()

@@ -31,6 +31,7 @@ def test_every_task_is_in_the_dag(skeleton_dag):
         "publish_sample",
         "emit_metrics",
         "publish_status",
+        "upload_outputs",
         "iceberg_maintenance",
     }
 
@@ -45,9 +46,14 @@ def test_metrics_and_status_wait_for_publishing(skeleton_dag):
         assert "publish_sample" in skeleton_dag.get_task(task_id).upstream_task_ids
 
 
-def test_maintenance_waits_for_metrics_and_status(skeleton_dag):
+def test_the_upload_waits_for_metrics_and_status(skeleton_dag):
+    upload = skeleton_dag.get_task("upload_outputs")
+    assert {"emit_metrics", "publish_status"} <= set(upload.upstream_task_ids)
+
+
+def test_maintenance_waits_for_the_upload(skeleton_dag):
     maintenance = skeleton_dag.get_task("iceberg_maintenance")
-    assert {"emit_metrics", "publish_status"} <= set(maintenance.upstream_task_ids)
+    assert "upload_outputs" in maintenance.upstream_task_ids
 
 
 def test_maintenance_runs_even_when_earlier_tasks_fail(skeleton_dag):

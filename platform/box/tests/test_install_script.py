@@ -21,6 +21,7 @@ REQUIRED_SETTINGS = {
     "IMAGE_REPOSITORY": "123456789012.dkr.ecr.us-east-1.amazonaws.com/portfolio-airflow",
     "IMAGE_TAG": "3.3.2",
     "BACKUP_BUCKET": "portfolio-dev-lake-123456789012",
+    "SITE_BUCKET": "portfolio-dev-site-123456789012",
 }
 
 
@@ -76,6 +77,7 @@ def test_the_steps_run_in_a_safe_order():
         "install helm",
         "create the airflow namespace",
         "create the database secrets from Parameter Store",
+        "create the platform settings",
         "install airflow",
         "restore the database backup",
         "restart airflow",
@@ -114,18 +116,21 @@ def test_the_image_comes_from_the_settings():
 def test_the_database_password_is_read_from_parameter_store_and_never_written_out():
     output = _run(["dev"]).stdout
 
-    assert "/portfolio/dev/platform/airflow-db-password" in output
-    assert "--with-decryption" in output
-    assert "--from-literal" not in output
-    assert "stringData" not in output
+    # Only the password step is checked. The settings step uses --from-literal for bucket names,
+    # which are not secret.
+    secrets_step = output[output.index("STEP 4") : output.index("STEP 5")]
+    assert "/portfolio/dev/platform/airflow-db-password" in secrets_step
+    assert "--with-decryption" in secrets_step
+    assert "--from-literal" not in secrets_step
+    assert "stringData" not in secrets_step
 
 
 def test_the_backup_is_restored_after_airflow_is_installed_and_before_it_restarts():
     output = _run(["dev"]).stdout
 
-    install = output.index("STEP 5")
-    restore = output.index("STEP 6")
-    restart = output.index("STEP 7")
+    install = output.index("STEP 6")
+    restore = output.index("STEP 7")
+    restart = output.index("STEP 8")
     assert install < restore < restart
     assert "airflow_db_backup.py restore --bucket portfolio-dev-lake-123456789012" in output
 
@@ -134,3 +139,20 @@ def test_the_script_stops_at_the_first_failing_step(tmp_path):
     text = SCRIPT.read_text(encoding="utf-8")
 
     assert "set -euo pipefail" in text
+
+
+def test_the_bucket_names_go_into_a_settings_object_that_holds_no_secret():
+    output = _run(["dev"]).stdout
+
+    settings_line = next(line for line in output.splitlines() if "configmap" in line)
+    assert "platform-settings" in settings_line
+    assert "PLATFORM_SITE_BUCKET=portfolio-dev-site-123456789012" in settings_line
+    assert "PLATFORM_LAKE_BUCKET=portfolio-dev-lake-123456789012" in settings_line
+    assert "PLATFORM_WAREHOUSE=s3://portfolio-dev-lake-123456789012/warehouse" in settings_line
+    assert "password" not in settings_line.lower()
+
+
+def test_the_settings_object_is_made_before_airflow_needs_it():
+    output = _run(["dev"]).stdout
+
+    assert output.index("create the platform settings") < output.index("install airflow")

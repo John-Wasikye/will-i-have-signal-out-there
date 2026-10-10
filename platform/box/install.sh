@@ -6,7 +6,8 @@
 # Needs these settings in the environment:
 #   IMAGE_REPOSITORY  where the Airflow image is stored
 #   IMAGE_TAG         the image version to run
-#   BACKUP_BUCKET     the S3 bucket that holds the Airflow database backups
+#   BACKUP_BUCKET     the lake bucket, which holds the Airflow database backups
+#   SITE_BUCKET       the site bucket, where the pipeline publishes its files
 #
 # DRY_RUN=1 prints every step and command and runs none of them. The tests use it.
 set -euo pipefail
@@ -25,7 +26,7 @@ environment="${1:-}"
 [[ -n "${environment}" ]] || fail "usage: install.sh dev|live"
 [[ "${environment}" == "dev" || "${environment}" == "live" ]] \
   || fail "The environment must be dev or live, not '${environment}'."
-for setting in IMAGE_REPOSITORY IMAGE_TAG BACKUP_BUCKET; do
+for setting in IMAGE_REPOSITORY IMAGE_TAG BACKUP_BUCKET SITE_BUCKET; do
   [[ -n "${!setting:-}" ]] || fail "${setting} must be set."
 done
 
@@ -89,6 +90,16 @@ stringData:
   connection: postgresql://postgres:${password}@airflow-postgresql:5432/postgres
 EOF
 fi
+
+step "create the platform settings"
+# The bucket names include the AWS account number, so Airflow reads them from this object
+# instead of from a file in the repository. They are not secrets.
+settings_command="kubectl create configmap platform-settings --namespace ${NAMESPACE}"
+settings_command+=" --from-literal PLATFORM_SITE_BUCKET=${SITE_BUCKET}"
+settings_command+=" --from-literal PLATFORM_LAKE_BUCKET=${BACKUP_BUCKET}"
+settings_command+=" --from-literal PLATFORM_WAREHOUSE=s3://${BACKUP_BUCKET}/warehouse"
+settings_command+=" --dry-run=client --output yaml | kubectl apply -f -"
+run bash -c "${settings_command}"
 
 step "install airflow"
 values_files=(--values "${script_dir}/airflow-values.yaml")

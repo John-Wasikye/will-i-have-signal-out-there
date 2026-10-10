@@ -172,3 +172,28 @@ def test_the_database_password_comes_from_secrets_made_outside_the_chart(dev_obj
     pod_text = yaml.safe_dump([_pod_templates(dev_objects)])
     assert "airflow-postgres" in pod_text
     assert "airflow-metadata-connection" in yaml.safe_dump(dev_objects)
+
+
+def _scheduler_container(objects: list[dict]) -> dict:
+    scheduler = next(
+        item
+        for item in objects
+        if item["kind"] == "StatefulSet" and item["metadata"]["name"] == "airflow-scheduler"
+    )
+    containers = scheduler["spec"]["template"]["spec"]["containers"]
+    return next(container for container in containers if container["name"] == "scheduler")
+
+
+def test_the_pipeline_folders_are_set_inside_the_airflow_home(dev_objects):
+    environment = {e["name"]: e.get("value") for e in _scheduler_container(dev_objects)["env"]}
+
+    assert environment["PLATFORM_PUBLISHED_DIR"] == "/opt/airflow/data/published"
+    assert environment["PLATFORM_METRICS_DIR"] == "/opt/airflow/data/metrics"
+    assert environment["PLATFORM_INCIDENTS_DIR"] == "/opt/airflow/data/incidents"
+    assert environment["PLATFORM_USE_GLUE"] == "1"
+
+
+def test_the_bucket_names_come_from_a_settings_object_made_at_install(dev_objects):
+    env_from = _scheduler_container(dev_objects).get("envFrom", [])
+
+    assert {"configMapRef": {"name": "platform-settings"}} in env_from

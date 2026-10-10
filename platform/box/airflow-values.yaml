@@ -111,3 +111,22 @@ postgresql:
       limits:
         cpu: "1"
         memory: 2Gi
+
+# Where the nightly DAG keeps its working files. Tasks run inside the scheduler pod, and every
+# run uploads its outputs to S3, so nothing here has to outlive the pod.
+env:
+  - name: PLATFORM_PUBLISHED_DIR
+    value: /opt/airflow/data/published
+  - name: PLATFORM_METRICS_DIR
+    value: /opt/airflow/data/metrics
+  - name: PLATFORM_INCIDENTS_DIR
+    value: /opt/airflow/data/incidents
+  - name: PLATFORM_USE_GLUE
+    value: "1"
+
+# The bucket names include the AWS account number, so they are not written here. The install
+# script puts them in this settings object: PLATFORM_SITE_BUCKET, PLATFORM_LAKE_BUCKET and
+# PLATFORM_WAREHOUSE.
+extraEnvFrom: |
+  - configMapRef:
+      name: platform-settings
