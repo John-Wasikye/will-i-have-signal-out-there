@@ -16,18 +16,18 @@ Project 1 (Will I have signal out there?), platform skeleton steps 0.1 to 0.5 of
 Done and verified on my machine:
 - Python: 47 tests pass and 1 is skipped. The skipped tests need Airflow, which does not install on Windows. `ruff check .` passes.
 - Site (`app/`): typecheck passes, 4 tests pass and the build passes.
-- Terraform: `terraform fmt -check` is clean. `terraform validate` passes for `envs/dev` and `envs/live`. `terraform test` passes for `modules/storage` (7 tests) and `modules/iam` (6 tests). Nothing is applied to AWS.
-- The CI workflow and the dev container are written, but I have not run them on GitHub yet.
+- Terraform: `terraform fmt -check` is clean, and `terraform validate` passes for `envs/dev` and `envs/live`. Every module has Terraform tests that pass: storage (7), iam (6), catalog (3), visitor_data (5), budget (3), parameters (3) and session_box (8). Nothing is applied to AWS.
+- The session box module (`platform/terraform/modules/session_box`) creates a persistent spot instance, starts it at 10:00 UTC, hard-stops it at 14:00 UTC (my four-hour session limit), and stops it when idle. It is not wired into an environment yet.
+- GitHub CI runs on every push and passes on all four jobs for the latest commit.
 
 Not done, in order:
-1. Terraform tests for the remaining modules: `catalog`, `visitor_data`, `parameters` and `budget`. I will write each test before I trust the module.
-2. The Terraform state bootstrap (`platform/terraform/bootstrap`) is written but not applied. Applying it creates AWS resources, so I will ask first.
-3. The session box (step 0.3): a Terraform module for the spot instance, k3s, Airflow and Spark with their Helm charts, the 4-hour session limit, the idle alarm, the spot interruption handler, and the 10:00 UTC schedule. None of this exists yet.
-4. Spark tests on real Spark in CI. The `spark` extra is in `pyproject.toml`. The Spark job and the maintenance task are tested only with fake sessions so far.
-5. Running the Airflow DAG tests. I need to install Airflow on Linux (in CI or on the box), so `test_dag.py` runs instead of skipping.
-6. Serving on AWS (Lambda packaging, API Gateway HTTP type, CloudFront site) and the live status page. This needs Terraform for the `serving` and `site` modules.
-7. A review pass over every file, looking for dead code and unclear names.
-8. Site lint in CI. Typecheck is already in CI.
+1. The Terraform state bootstrap (`platform/terraform/bootstrap`) is written but not applied. Applying it creates AWS resources, so I will ask first.
+2. The session box still needs: k3s, Airflow and Spark installed on the box, the two-hour nightly maximum, the two-minute interruption warning handler, an instance profile, an arm64 image, and wiring into `envs/dev`.
+3. Spark tests on real Spark in CI. The `spark` extra is in `pyproject.toml`. The Spark job and the maintenance task are tested only with fake sessions so far.
+4. Running the Airflow DAG tests. I need to install Airflow on Linux (in CI or on the box), so `test_dag.py` runs instead of skipping.
+5. Serving on AWS (Lambda packaging, API Gateway HTTP type, CloudFront site) and the live status page. This needs Terraform for the `serving` and `site` modules.
+6. A review pass over every file, looking for dead code and unclear names.
+7. Site lint in CI. Typecheck is already in CI.
 
 ## Decisions I made (with the default I used)
 
