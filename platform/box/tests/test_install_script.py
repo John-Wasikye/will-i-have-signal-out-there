@@ -43,6 +43,16 @@ def _steps(output: str) -> list[str]:
     return [line for line in output.splitlines() if line.startswith("STEP ")]
 
 
+def _section(output: str, name: str) -> str:
+    """Return the text of one step: from its STEP line to the next STEP line."""
+    lines = output.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("STEP ") and name in line)
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].startswith("STEP ")), len(lines)
+    )
+    return os.linesep.join(lines[start:end])
+
+
 def test_the_script_asks_for_an_environment():
     result = _run([])
 
@@ -75,12 +85,14 @@ def test_the_steps_run_in_a_safe_order():
     assert names == [
         "install k3s",
         "install helm",
+        "install the python tools for the box scripts",
         "create the airflow namespace",
         "create the database secrets from Parameter Store",
         "create the platform settings",
         "install airflow",
         "restore the database backup",
         "restart airflow",
+        "start the watchdog",
     ]
 
 
@@ -118,7 +130,7 @@ def test_the_database_password_is_read_from_parameter_store_and_never_written_ou
 
     # Only the password step is checked. The settings step uses --from-literal for bucket names,
     # which are not secret.
-    secrets_step = output[output.index("STEP 4") : output.index("STEP 5")]
+    secrets_step = _section(output, "create the database secrets")
     assert "/portfolio/dev/platform/airflow-db-password" in secrets_step
     assert "--with-decryption" in secrets_step
     assert "--from-literal" not in secrets_step
@@ -128,9 +140,9 @@ def test_the_database_password_is_read_from_parameter_store_and_never_written_ou
 def test_the_backup_is_restored_after_airflow_is_installed_and_before_it_restarts():
     output = _run(["dev"]).stdout
 
-    install = output.index("STEP 6")
-    restore = output.index("STEP 7")
-    restart = output.index("STEP 8")
+    install = output.index("install airflow")
+    restore = output.index("restore the database backup")
+    restart = output.index("restart airflow")
     assert install < restore < restart
     assert "airflow_db_backup.py restore --bucket portfolio-dev-lake-123456789012" in output
 
@@ -156,3 +168,37 @@ def test_the_settings_object_is_made_before_airflow_needs_it():
     output = _run(["dev"]).stdout
 
     assert output.index("create the platform settings") < output.index("install airflow")
+
+
+def test_the_python_tools_are_installed_before_the_restore_needs_them():
+    output = _run(["dev"]).stdout
+
+    assert output.index("install the python tools") < output.index("restore the database backup")
+    tools = _section(output, "install the python tools")
+    assert "python3.11" in tools
+    assert "requirements-host.txt" in tools
+
+
+def test_the_watchdog_starts_last_as_a_service_that_restarts_if_it_stops():
+    output = _run(["dev"]).stdout
+
+    assert _steps(output)[-1].endswith("start the watchdog")
+    watchdog = _section(output, "start the watchdog")
+    assert "box-watchdog.service" in watchdog
+    assert "systemctl enable --now box-watchdog" in watchdog
+    assert "Restart=on-failure" in watchdog
+
+
+def test_the_watchdog_service_knows_the_bucket_the_cluster_and_where_the_code_is():
+    watchdog = _section(_run(["dev"]).stdout, "start the watchdog")
+
+    assert "box_watchdog.py --bucket portfolio-dev-lake-123456789012" in watchdog
+    assert "KUBECONFIG=/etc/rancher/k3s/k3s.yaml" in watchdog
+    assert "pipelines/platform/publish" in watchdog
+    assert "platform/box" in watchdog
+
+
+def test_helm_and_kubectl_are_pointed_at_the_k3s_cluster():
+    text = SCRIPT.read_text(encoding="utf-8")
+
+    assert "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" in text

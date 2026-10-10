@@ -43,8 +43,8 @@ def keys_to_delete(keys: list[str], keep: int) -> list[str]:
     return ordered[: max(len(ordered) - keep, 0)]
 
 
-def list_backup_keys(client, bucket: str, prefix: str) -> list[str]:  # noqa: ANN001
-    """List the backup keys under ``prefix``. ``client`` is a boto3 S3 client."""
+def list_keys(client, bucket: str, prefix: str) -> list[str]:  # noqa: ANN001
+    """List the keys under ``prefix``. ``client`` is a boto3 S3 client."""
     keys: list[str] = []
     for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
         keys.extend(item["Key"] for item in page.get("Contents", []))
@@ -66,7 +66,7 @@ def save_backup(
     key = backup_key(prefix, now_utc)
     client.upload_file(Filename=str(dump_path), Bucket=bucket, Key=key)
 
-    stale = keys_to_delete(list_backup_keys(client, bucket, prefix), keep)
+    stale = keys_to_delete(list_keys(client, bucket, prefix), keep)
     if stale:
         client.delete_objects(Bucket=bucket, Delete={"Objects": [{"Key": k} for k in stale]})
     return key
@@ -74,7 +74,7 @@ def save_backup(
 
 def restore_latest(client, bucket: str, prefix: str, target_path: Path) -> bool:  # noqa: ANN001
     """Download the newest backup to ``target_path``. Return False on a first run with none."""
-    latest = select_latest(list_backup_keys(client, bucket, prefix))
+    latest = select_latest(list_keys(client, bucket, prefix))
     if latest is None:
         return False
     client.download_file(Bucket=bucket, Key=latest, Filename=str(target_path))

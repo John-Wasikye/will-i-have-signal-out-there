@@ -17,6 +17,9 @@ HELM_VERSION="v4.3.0"
 AIRFLOW_CHART_VERSION="1.22.0"
 NAMESPACE="airflow"
 
+# k3s writes its connection details here. Helm and kubectl read this variable.
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
 fail() {
   echo "$1" >&2
   exit 2
@@ -55,6 +58,11 @@ run env INSTALL_K3S_VERSION="${K3S_VERSION}" \
 step "install helm"
 run env DESIRED_VERSION="${HELM_VERSION}" \
   bash -c "curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash"
+
+step "install the python tools for the box scripts"
+# The database restore and the watchdog are Python scripts that run on the box itself.
+run dnf install --assumeyes python3.11 python3.11-pip
+run python3.11 -m pip install --requirement "${script_dir}/requirements-host.txt"
 
 step "create the ${NAMESPACE} namespace"
 run bash -c "kubectl create namespace ${NAMESPACE} --dry-run=client --output yaml | kubectl apply -f -"
@@ -121,3 +129,29 @@ run python3.11 "${script_dir}/airflow_db_backup.py" restore --bucket "${BACKUP_B
 step "restart airflow"
 run kubectl rollout restart --namespace "${NAMESPACE}" \
   deployment/airflow-api-server deployment/airflow-dag-processor statefulset/airflow-scheduler
+
+step "start the watchdog"
+# The watchdog switches the box off when the nightly run finishes, at the 2-hour maximum, or
+# when AWS sends its two-minute spot warning. It restarts if it stops, because it is a cost guard.
+repo_dir="$(cd "${script_dir}/../.." && pwd)"
+unit_path="/etc/systemd/system/box-watchdog.service"
+unit_text="[Unit]
+Description=Switch the session box off when its work is done
+After=network-online.target
+
+[Service]
+Environment=KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+Environment=PYTHONPATH=${repo_dir}/pipelines/platform/publish:${script_dir}
+ExecStart=/usr/bin/python3.11 ${script_dir}/box_watchdog.py --bucket ${BACKUP_BUCKET}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target"
+echo "+ write ${unit_path}"
+echo "${unit_text}"
+if [[ "${dry_run}" != "1" ]]; then
+  printf '%s\n' "${unit_text}" > "${unit_path}"
+fi
+run systemctl daemon-reload
+run systemctl enable --now box-watchdog

@@ -14,7 +14,7 @@ I wrote this file so I can pick the work up again without the earlier conversati
 The trip planner, Will I have signal out there?, platform skeleton steps 0.1 to 0.5 of my build plan.
 
 Done and verified:
-- Python: 138 tests pass on my machine, and 2 are skipped there. The skipped tests run and pass in CI on Linux: 5 on real Spark and Iceberg, and 6 Airflow DAG tests on Airflow 3.3.2. `ruff check .` passes.
+- Python: 202 tests pass on my machine, and 2 are skipped there. The skipped tests run and pass in CI on Linux: 5 on real Spark and Iceberg, and 9 Airflow DAG tests on Airflow 3.3.2. `ruff check .` passes.
 - Site (`app/`): typecheck passes, 4 tests pass and the build passes.
 - Terraform: `terraform fmt -check` is clean, and `terraform validate` passes for `envs/dev` and `envs/live`. Every module has Terraform tests that pass: storage (11), iam (7), catalog (3), visitor_data (5), budget (3), parameters (3), session_box (10), box_iam (7), serving (8) and site (7). Nothing is applied to AWS.
 - The session box creates a persistent spot instance, starts it at 10:00 UTC (off in dev), hard-stops it at 14:00 UTC, and stops it when idle. `box_iam` gives it and the scheduler their roles.
@@ -26,7 +26,7 @@ Done and verified:
 
 Not done, in order:
 1. The Terraform state bootstrap (`platform/terraform/bootstrap`) is written but not applied. Applying it creates AWS resources, so I will ask first.
-2. The box files exist but have never run on a real box. I still need to run `install.sh` on a real spot instance, push the image to a registry (ECR), and measure memory and the idle threshold. Spark runs inside the scheduler in local mode; the Spark operator is the next step. Nothing creates an Airflow login yet. The two-hour nightly maximum check (`nightly_limit.py`) and the spot warning handler (`spot_interruption.py`) are written and tested, but nothing calls them yet.
+2. The box files exist but have never run on a real box. I still need to run `install.sh` on a real spot instance, push the image to the registry (the registry module exists, but nothing pushes yet), and measure memory and the idle threshold. Spark runs inside the scheduler in local mode; the Spark operator is the next step. Nothing creates an Airflow login yet. The watchdog (`platform/box/box_watchdog.py`) is written and tested, but its real-machine parts (the cluster, the metadata service, `systemctl poweroff`) have only run against stand-ins.
 3. The nightly DAG does not yet call the incident record or the run metrics for failures beyond the publish step.
 4. First-run checks on AWS: the Lambda concurrency cap of 10 may be refused on a new account, and the arm64 image manifest must be checked before the box uses it.
 5. A review pass over every file, looking for dead code and unclear names.
