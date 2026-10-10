@@ -1,0 +1,113 @@
+# Settings for the official Apache Airflow chart (version 1.22.0) on the session box.
+#
+# The box is one small machine, so I keep Airflow in its simplest mode: the local executor,
+# with no Celery, Redis, Flower, StatsD or PgBouncer. Everything is limited in CPU and memory.
+# The install script passes the real image address and the environment's Parameter Store
+# prefix. The values here are the dev defaults.
+
+executor: LocalExecutor
+
+images:
+  airflow:
+    repository: portfolio-airflow
+    tag: "3.3.2"
+    pullPolicy: IfNotPresent
+
+redis:
+  enabled: false
+statsd:
+  enabled: false
+pgbouncer:
+  enabled: false
+triggerer:
+  enabled: false
+
+# The chart's default user is admin with the password admin. I turn the job off, and the
+# install script creates the user with a password from Parameter Store.
+createUserJob:
+  enabled: false
+
+# The database password and the full connection string come from two Kubernetes secrets that
+# the install script makes from Parameter Store, so no password is written in this file.
+data:
+  metadataSecretName: airflow-metadata-connection
+
+config:
+  core:
+    dags_folder: /opt/airflow/pipelines/platform/dags
+    load_examples: "False"
+  # Connection keys are read from Parameter Store, so the database backup holds none.
+  secrets:
+    backend: airflow.providers.amazon.aws.secrets.systems_manager.SystemsManagerParameterStoreBackend
+    backend_kwargs: >-
+      {"connections_prefix": "/portfolio/dev/airflow/connections",
+      "variables_prefix": "/portfolio/dev/airflow/variables",
+      "config_prefix": "/portfolio/dev/airflow/config"}
+
+# Limits for every container. With the local executor, tasks run inside the scheduler, so it
+# gets most of the memory, because the Spark job runs there in local mode. These numbers are
+# placeholders until I measure the real stack on the box (open question OQ-P04).
+scheduler:
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      cpu: "6"
+      memory: 16Gi
+  logGroomerSidecar:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+apiServer:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+dagProcessor:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  logGroomerSidecar:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+migrateDatabaseJob:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# The bundled PostgreSQL holds only Airflow's run history, and it is saved to S3.
+postgresql:
+  auth:
+    existingSecret: airflow-postgres
+  primary:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi

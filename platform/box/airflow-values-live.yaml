@@ -1,0 +1,8 @@
+# Settings that change for the live environment. They go on top of airflow-values.yaml.
+# Live reads its connection keys from the live Parameter Store path, never the dev one.
+config:
+  secrets:
+    backend_kwargs: >-
+      {"connections_prefix": "/portfolio/live/airflow/connections",
+      "variables_prefix": "/portfolio/live/airflow/variables",
+      "config_prefix": "/portfolio/live/airflow/config"}
