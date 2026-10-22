@@ -9,9 +9,10 @@ variable "env" {
 }
 
 variable "alert_emails" {
-  description = "Email addresses that receive run alerts. Each address must confirm the subscription from the email AWS sends. Empty means the topic exists but emails nobody."
+  description = "Email addresses that receive run alerts. Each address must confirm the subscription from the email AWS sends. Empty means the topic exists but emails nobody. Sensitive, so plans in public Actions logs hide them."
   type        = list(string)
   default     = []
+  sensitive   = true
 }
 
 variable "watched_pipelines" {

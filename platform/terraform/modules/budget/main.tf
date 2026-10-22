@@ -35,7 +35,8 @@ resource "aws_budgets_budget" "monthly" {
   time_unit    = "MONTHLY"
 
   dynamic "notification" {
-    for_each = length(var.alert_emails) > 0 ? local.notifications : {}
+    # Only whether the list is empty is used here, so it is safe to reveal.
+    for_each = nonsensitive(length(var.alert_emails) > 0) ? local.notifications : {}
 
     content {
       comparison_operator        = "GREATER_THAN"

@@ -32,6 +32,7 @@ variable "alert_emails" {
   description = "Email addresses that receive budget alerts and run alerts. Each must confirm the subscription email from AWS. Empty means nothing is emailed."
   type        = list(string)
   default     = []
+  sensitive   = true
 }
 
 variable "box_ami_id" {

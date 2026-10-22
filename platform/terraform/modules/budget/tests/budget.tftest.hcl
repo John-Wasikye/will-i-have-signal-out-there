@@ -47,4 +47,9 @@ run "alerts_at_80_percent_actual_and_100_percent_forecast" {
     condition     = length([for n in aws_budgets_budget.monthly.notification : n if n.threshold == 100 && n.notification_type == "FORECASTED"]) == 1
     error_message = "There must be an alert at 100 percent of forecast spend."
   }
+
+  assert {
+    condition     = issensitive(aws_budgets_budget.monthly.notification)
+    error_message = "Email addresses must be hidden in plan output, because Actions logs on a public repository are public."
+  }
 }

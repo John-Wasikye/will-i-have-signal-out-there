@@ -76,6 +76,11 @@ run "each_email_address_gets_one_email_subscription" {
     condition     = alltrue([for s in aws_sns_topic_subscription.email : s.protocol == "email"])
     error_message = "Every subscription must be an email subscription."
   }
+
+  assert {
+    condition     = alltrue([for s in aws_sns_topic_subscription.email : issensitive(s.endpoint)])
+    error_message = "Email addresses must be hidden in plan output, because Actions logs on a public repository are public."
+  }
 }
 
 run "no_missed_run_alarm_unless_a_pipeline_is_watched" {

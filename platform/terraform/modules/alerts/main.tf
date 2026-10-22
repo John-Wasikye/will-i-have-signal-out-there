@@ -23,12 +23,14 @@ resource "aws_sns_topic" "run_alerts" {
 }
 
 # AWS emails each address a link. The subscription does nothing until the link is clicked.
+# The addresses are sensitive, and Terraform cannot name resources after a sensitive value, so
+# the subscriptions are counted. Only the number of addresses shows in a plan.
 resource "aws_sns_topic_subscription" "email" {
-  for_each = toset(var.alert_emails)
+  count = nonsensitive(length(var.alert_emails))
 
   topic_arn = aws_sns_topic.run_alerts.arn
   protocol  = "email"
-  endpoint  = each.value
+  endpoint  = var.alert_emails[count.index]
 }
 
 # The box records one data point per good run. If the box never starts, nothing on it can
