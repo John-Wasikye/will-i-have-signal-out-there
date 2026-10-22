@@ -124,9 +124,9 @@ env:
   - name: PLATFORM_USE_GLUE
     value: "1"
 
-# The bucket names include the AWS account number, so they are not written here. The install
-# script puts them in this settings object: PLATFORM_SITE_BUCKET, PLATFORM_LAKE_BUCKET and
-# PLATFORM_WAREHOUSE.
+# The bucket names and the alerts topic include the AWS account number, so they are not written
+# here. The install script puts them in this settings object: PLATFORM_SITE_BUCKET,
+# PLATFORM_LAKE_BUCKET, PLATFORM_WAREHOUSE, PLATFORM_ENV and PLATFORM_ALERT_TOPIC_ARN.
 extraEnvFrom: |
   - configMapRef:
       name: platform-settings

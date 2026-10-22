@@ -8,6 +8,7 @@
 #   IMAGE_TAG         the image version to run
 #   BACKUP_BUCKET     the lake bucket, which holds the Airflow database backups
 #   SITE_BUCKET       the site bucket, where the pipeline publishes its files
+#   ALERT_TOPIC_ARN   the run alerts topic, from the alert_topic_arn Terraform output
 #
 # DRY_RUN=1 prints every step and command and runs none of them. The tests use it.
 set -euo pipefail
@@ -29,9 +30,12 @@ environment="${1:-}"
 [[ -n "${environment}" ]] || fail "usage: install.sh dev|live"
 [[ "${environment}" == "dev" || "${environment}" == "live" ]] \
   || fail "The environment must be dev or live, not '${environment}'."
-for setting in IMAGE_REPOSITORY IMAGE_TAG BACKUP_BUCKET SITE_BUCKET; do
+for setting in IMAGE_REPOSITORY IMAGE_TAG BACKUP_BUCKET SITE_BUCKET ALERT_TOPIC_ARN; do
   [[ -n "${!setting:-}" ]] || fail "${setting} must be set."
 done
+# A dev box must never email through the live topic, or the reverse.
+[[ "${ALERT_TOPIC_ARN}" == *":portfolio-${environment}-run-alerts" ]] \
+  || fail "ALERT_TOPIC_ARN must be the ${environment} run alerts topic."
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dry_run="${DRY_RUN:-0}"
@@ -100,12 +104,14 @@ EOF
 fi
 
 step "create the platform settings"
-# The bucket names include the AWS account number, so Airflow reads them from this object
-# instead of from a file in the repository. They are not secrets.
+# The bucket names and the topic include the AWS account number, so Airflow reads them from
+# this object instead of from a file in the repository. They are not secrets.
 settings_command="kubectl create configmap platform-settings --namespace ${NAMESPACE}"
 settings_command+=" --from-literal PLATFORM_SITE_BUCKET=${SITE_BUCKET}"
 settings_command+=" --from-literal PLATFORM_LAKE_BUCKET=${BACKUP_BUCKET}"
 settings_command+=" --from-literal PLATFORM_WAREHOUSE=s3://${BACKUP_BUCKET}/warehouse"
+settings_command+=" --from-literal PLATFORM_ENV=${environment}"
+settings_command+=" --from-literal PLATFORM_ALERT_TOPIC_ARN=${ALERT_TOPIC_ARN}"
 settings_command+=" --dry-run=client --output yaml | kubectl apply -f -"
 run bash -c "${settings_command}"
 

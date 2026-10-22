@@ -22,7 +22,9 @@ REQUIRED_SETTINGS = {
     "IMAGE_TAG": "3.3.2",
     "BACKUP_BUCKET": "portfolio-dev-lake-123456789012",
     "SITE_BUCKET": "portfolio-dev-site-123456789012",
+    "ALERT_TOPIC_ARN": "arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts",
 }
+LIVE_TOPIC = "arn:aws:sns:us-east-1:123456789012:portfolio-live-run-alerts"
 
 
 def _run(arguments: list[str], settings: dict[str, str] | None = None):
@@ -112,7 +114,10 @@ def test_dev_uses_only_the_base_settings_file():
 
 
 def test_live_adds_the_live_settings_file():
-    output = _run(["live"], settings={**REQUIRED_SETTINGS, "BACKUP_BUCKET": "b"}).stdout
+    output = _run(
+        ["live"],
+        settings={**REQUIRED_SETTINGS, "BACKUP_BUCKET": "b", "ALERT_TOPIC_ARN": LIVE_TOPIC},
+    ).stdout
 
     assert "airflow-values.yaml" in output
     assert "airflow-values-live.yaml" in output
@@ -162,6 +167,22 @@ def test_the_bucket_names_go_into_a_settings_object_that_holds_no_secret():
     assert "PLATFORM_LAKE_BUCKET=portfolio-dev-lake-123456789012" in settings_line
     assert "PLATFORM_WAREHOUSE=s3://portfolio-dev-lake-123456789012/warehouse" in settings_line
     assert "password" not in settings_line.lower()
+
+
+def test_airflow_is_told_its_environment_and_where_to_send_alerts():
+    output = _run(["dev"]).stdout
+
+    settings_line = next(line for line in output.splitlines() if "configmap" in line)
+    assert "PLATFORM_ENV=dev" in settings_line
+    assert f"PLATFORM_ALERT_TOPIC_ARN={REQUIRED_SETTINGS['ALERT_TOPIC_ARN']}" in settings_line
+
+
+def test_an_alert_topic_from_the_other_environment_is_refused():
+    result = _run(["dev"], settings={**REQUIRED_SETTINGS, "ALERT_TOPIC_ARN": LIVE_TOPIC})
+
+    assert result.returncode == 2
+    assert "ALERT_TOPIC_ARN" in result.stderr
+    assert "STEP" not in result.stdout
 
 
 def test_the_settings_object_is_made_before_airflow_needs_it():

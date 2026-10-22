@@ -18,7 +18,7 @@ These are the files that run on the session box, the one computer that runs the 
 
 1. The box starts at 10:00 UTC. `install.sh` installs pinned versions of k3s and Helm, and the Python tools the box scripts need.
 2. It reads the database password from Parameter Store and makes two Kubernetes secrets from it. The password is sent on standard input, so it is on no command line.
-3. It puts the bucket names in a settings object, because they hold the AWS account number and stay out of the repository.
+3. It puts the bucket names, the environment name and the run alerts topic in a settings object, because they hold the AWS account number and stay out of the repository. It refuses a topic from the other environment.
 4. It installs Airflow with the chart, using my image and my settings.
 5. It restores the newest database backup from S3, then restarts Airflow, so the run history is back.
 6. It starts the watchdog as a system service.
