@@ -1,0 +1,79 @@
+name: Deploy
+
+# A merge to main builds the Airflow image once, scans it, and deploys the site and the image
+# to dev, then to live. Each deploy waits for its GitHub environment's rules.
+# Every job skips until AWS is set up: see .github/workflows/README.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "pipelines/**"
+      - "platform/box/**"
+      - ".trivyignore"
+      - ".github/workflows/deploy*.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  image:
+    name: Build and scan the Airflow image
+    if: vars.TF_STATE_BUCKET != ''
+    # The session box is arm64, so the image is built on an arm64 runner, not emulated.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the image
+        run: docker build --file platform/box/Dockerfile.airflow --tag "portfolio-airflow:${GITHUB_SHA}" .
+
+      - name: Smoke test the image
+        run: bash platform/box/smoke_test_airflow_image.sh "portfolio-airflow:${GITHUB_SHA}"
+
+      # The same scan as CI. An image with a new critical finding is never deployed.
+      - name: Scan the image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: portfolio-airflow:${{ github.sha }}
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+
+      - name: Save the image
+        run: docker save "portfolio-airflow:${GITHUB_SHA}" | gzip > airflow-image.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: airflow-image
+          path: airflow-image.tar.gz
+          retention-days: 1
+
+  dev:
+    name: Deploy to dev
+    needs: image
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      env: dev
+    permissions:
+      contents: read
+      id-token: write
+
+  live:
+    name: Deploy to live
+    needs: dev
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      env: live
+    permissions:
+      contents: read
+      id-token: write
