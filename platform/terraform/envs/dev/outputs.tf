@@ -42,3 +42,28 @@ output "alert_topic_arn" {
   description = "Run alerts topic. The install script takes it as ALERT_TOPIC_ARN."
   value       = module.alerts.topic_arn
 }
+
+output "terraform_plan_role_arn" {
+  description = "Role for the plan on pull requests. GitHub repository variable TF_PLAN_ROLE_ARN_DEV."
+  value       = module.github_roles.plan_role_arn
+}
+
+output "terraform_apply_role_arn" {
+  description = "Role for the apply. Variable TF_APPLY_ROLE_ARN in the dev GitHub environment."
+  value       = module.github_roles.apply_role_arn
+}
+
+output "deploy_role_arn" {
+  description = "Role for the site and image deploy. Variable DEPLOY_ROLE_ARN in the dev GitHub environment."
+  value       = module.github_roles.deploy_role_arn
+}
+
+output "site_bucket_name" {
+  description = "Site bucket. Variable SITE_BUCKET in the dev GitHub environment."
+  value       = module.storage.bucket_names["site"]
+}
+
+output "site_distribution_id" {
+  description = "CloudFront distribution of the site. Variable SITE_DISTRIBUTION_ID in the dev GitHub environment."
+  value       = module.site.distribution_id
+}

@@ -83,3 +83,20 @@ run "rejects_an_unknown_environment" {
     var.env,
   ]
 }
+
+# The mock provider fills in IDs only on apply, so this run applies against the mock.
+run "the_deploy_can_find_the_distribution_to_clear_its_cache" {
+  command = apply
+
+  # The mock makes up an ARN for the function that the distribution refuses, so it is fixed here.
+  override_resource {
+    target = aws_cloudfront_function.block_published
+    values = {
+      arn = "arn:aws:cloudfront::123456789012:function/portfolio-dev-block-published"
+    }
+  }
+  assert {
+    condition     = output.distribution_id == aws_cloudfront_distribution.site.id
+    error_message = "The module must output the distribution ID, which the deploy workflow needs."
+  }
+}

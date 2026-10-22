@@ -26,3 +26,4 @@ I use the default `cloudfront.net` address and certificate for now. A custom dom
 |---|---|
 | `distribution_arn` | Pass to the storage module as `site_distribution_arn`. |
 | `domain_name` | Address of the site. |
+| `distribution_id` | ID of the distribution. The deploy workflow clears its cache. |

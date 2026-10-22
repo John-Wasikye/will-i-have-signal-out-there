@@ -115,3 +115,15 @@ module "registry" {
 
   env = local.env
 }
+
+# Roles that the GitHub workflows use: plan on pull requests, apply and deploy from the
+# live GitHub environment. See .github/workflows/README.md.
+module "github_roles" {
+  source = "../../modules/github_roles"
+
+  env              = local.env
+  github_repo      = var.github_repo
+  site_bucket_arn  = module.storage.bucket_arns["site"]
+  distribution_arn = module.site.distribution_arn
+  registry_arn     = module.registry.repository_arn
+}
