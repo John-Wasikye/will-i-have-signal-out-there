@@ -22,12 +22,6 @@ variable "size_alarm_bytes" {
   default     = 107374182400
 }
 
-variable "alarm_actions" {
-  description = "ARNs of SNS topics notified when a live bucket size alarm fires. Empty means the alarm only changes state."
-  type        = list(string)
-  default     = []
-}
-
 variable "budget_limit_usd" {
   description = "Monthly cost limit in US dollars for the whole AWS account."
   type        = number
@@ -35,7 +29,7 @@ variable "budget_limit_usd" {
 }
 
 variable "alert_emails" {
-  description = "Email addresses that receive budget alerts. Empty means the budget exists but sends no alerts."
+  description = "Email addresses that receive budget alerts and run alerts. Each must confirm the subscription email from AWS. Empty means nothing is emailed."
   type        = list(string)
   default     = []
 }

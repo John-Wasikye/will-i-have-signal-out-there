@@ -171,3 +171,18 @@ resource "aws_iam_role_policy" "registry_pull" {
     }
   }
 }
+
+# The box emails me about failed or late runs, and records each good run in CloudWatch.
+resource "aws_iam_role_policy" "alerts" {
+  name   = "run-alerts"
+  role   = aws_iam_role.box.id
+  policy = var.alert_policy_json
+
+  lifecycle {
+    # Guards against a dev box sending alerts through the live topic, or the reverse.
+    precondition {
+      condition     = strcontains(var.alert_policy_json, "portfolio-${var.env}-run-alerts")
+      error_message = "The alert policy must name the same environment's topic as the env variable."
+    }
+  }
+}

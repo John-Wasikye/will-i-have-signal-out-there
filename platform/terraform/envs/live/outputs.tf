@@ -37,3 +37,8 @@ output "airflow_image_repository" {
   description = "Address of the Airflow image repository. The install script takes it as IMAGE_REPOSITORY."
   value       = module.registry.repository_url
 }
+
+output "alert_topic_arn" {
+  description = "Run alerts topic. The install script takes it as ALERT_TOPIC_ARN."
+  value       = module.alerts.topic_arn
+}

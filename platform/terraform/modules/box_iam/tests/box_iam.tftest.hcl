@@ -18,6 +18,7 @@ variables {
   data_access_policy_json    = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
   parameter_read_policy_json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
   registry_arn               = "arn:aws:ecr:us-east-1:123456789012:repository/portfolio-dev-airflow"
+  alert_policy_json          = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sns:Publish\",\"Resource\":\"arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts\"}]}"
 }
 
 run "instance_role_is_assumed_only_by_ec2" {
@@ -326,5 +327,68 @@ run "refuses_a_live_registry_in_a_dev_configuration" {
 
   expect_failures = [
     aws_iam_role_policy.registry_pull,
+  ]
+}
+
+run "box_can_send_run_alerts" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.alerts.policy, "portfolio-dev-run-alerts")
+    error_message = "The box must be able to send alerts through this environment's topic."
+  }
+}
+
+run "refuses_a_live_alert_topic_in_a_dev_configuration" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  variables {
+    alert_policy_json = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sns:Publish\",\"Resource\":\"arn:aws:sns:us-east-1:123456789012:portfolio-live-run-alerts\"}]}"
+  }
+
+  expect_failures = [
+    aws_iam_role_policy.alerts,
   ]
 }

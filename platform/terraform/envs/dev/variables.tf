@@ -16,6 +16,12 @@ variable "pipeline_names" {
   default     = ["platform_skeleton"]
 }
 
+variable "alert_emails" {
+  description = "Email addresses that receive dev run alerts. Each must confirm the subscription email from AWS. Empty means nothing is emailed."
+  type        = list(string)
+  default     = []
+}
+
 variable "size_alarm_bytes" {
   description = "Bucket size in bytes that raises the size alarm on each dev bucket. The default is 100 GB."
   type        = number

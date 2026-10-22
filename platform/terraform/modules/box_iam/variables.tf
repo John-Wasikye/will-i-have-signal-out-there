@@ -27,3 +27,8 @@ variable "registry_arn" {
   description = "ARN of this environment's image repository, from the registry module. The box pulls the Airflow image from it."
   type        = string
 }
+
+variable "alert_policy_json" {
+  description = "Policy that lets the box send run alerts and record good runs, from the publish_policy_json output of the alerts module."
+  type        = string
+}

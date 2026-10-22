@@ -16,6 +16,16 @@ module "storage" {
 
   # Only this distribution can read the site bucket.
   site_distribution_arn = module.site.distribution_arn
+  alarm_actions         = [module.alerts.topic_arn]
+}
+
+# Dev has no nightly schedule, so no pipeline is watched for a missed run. A run I start by
+# hand still emails me when it fails.
+module "alerts" {
+  source = "../../modules/alerts"
+
+  env          = local.env
+  alert_emails = var.alert_emails
 }
 
 module "catalog" {
@@ -59,6 +69,7 @@ module "box_iam" {
   data_access_policy_json    = module.iam.data_access_policy_json
   parameter_read_policy_json = module.parameters.read_policy_json
   registry_arn               = module.registry.repository_arn
+  alert_policy_json          = module.alerts.publish_policy_json
 }
 
 module "session_box" {
