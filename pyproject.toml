@@ -32,6 +32,7 @@ testpaths = [
     "pipelines/platform/tests",
     "platform/box/tests",
     ".github/tests",
+    "checks/tests",
 ]
 pythonpath = [
     "platform/serving",
@@ -39,6 +40,7 @@ pythonpath = [
     "pipelines/platform/spark",
     "pipelines/platform/dags",
     "platform/box",
+    "checks",
 ]
 addopts = "-ra --strict-markers"
 filterwarnings = [

@@ -502,7 +502,7 @@ These were separate ADRs and are recorded here in full because each is a setting
 | The GPU quota is not approved | Request in step 0.1; CPU fallback for Project 5 [BD GPU access] |
 | An upstream source changes format | Weekly smoke test; contract diff before loading (Eng 5) |
 | Terraform state is lost or corrupted | Versioned, KMS-encrypted bucket with locking; never in the repository |
-| A project's Parameter Store path is misnamed | Path convention (section 7.9); CI check of the path list (to be decided, OQ-P10) |
+| A project's Parameter Store path is misnamed | Path convention (section 7.9); CI check of the path list (`checks/parameter_paths.py`, OQ-P10) |
 
 ## 16 Open questions
 
@@ -519,7 +519,7 @@ Each question has a matching GitHub issue (placeholder "issue: to be created"). 
 | OQ-P07 | Iceberg maintenance values: snapshot retention and orphan-file age. | Decision | Eng 7 | John's choice, after the first table sizes are measured |
 | OQ-P08 | Freshness targets and the status rule: is "late" the age of the last good run against each project's target, and how does status.json show it? | Decision | PR-13, QR-03 | John's choice |
 | OQ-P09 | API throttle values and per-key quotas for the REST type (Project 5) and HTTP type (other projects). | Decision | Section 10 | Project design |
-| OQ-P10 | A CI check that every Parameter Store path a project uses exists and follows the naming convention. Include it in step 0.1 or later? | Decision | Section 15 | John's choice |
+| OQ-P10 | **Answered (John, Oct 22, 2026): built with the platform skeleton.** Every path is listed in `checks/parameter_paths.yaml`; `checks/parameter_paths.py` checks the naming convention and the list against the code in CI, and the pull request plan checks that each listed parameter exists. A CI check that every Parameter Store path a project uses exists and follows the naming convention. Include it in step 0.1 or later? | Decision | Section 15 | Closed |
 
 Spikes that gate the skeleton: OQ-P02 (measured idle time), OQ-P04. Spikes that gate Project 1 Phase B: OQ-P03.
 

@@ -68,6 +68,15 @@ jobs:
           state-kms-key-arn: ${{ vars.TF_STATE_KMS_KEY_ARN }}
           region: ${{ vars.AWS_REGION }}
 
+      # Every parameter listed in checks/parameter_paths.yaml must exist before a change that
+      # uses it is merged. The check reads names only; the plan role is refused values.
+      - name: Check that the listed parameters exist
+        env:
+          ENV: ${{ matrix.env }}
+        run: |
+          python -m pip install --quiet "boto3==1.43.118" "pyyaml==6.0.3"
+          python checks/parameter_paths.py --check-aws --env "${ENV}"
+
       # The plan role can write nothing, so the plan takes no state lock. The alert addresses
       # are sensitive in Terraform, so this public log shows only how many there are.
       - name: Plan

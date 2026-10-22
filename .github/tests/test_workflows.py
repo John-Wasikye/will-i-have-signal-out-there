@@ -115,6 +115,13 @@ def test_the_plan_uses_the_plan_role_and_writes_nothing(terraform):
     assert "environment" not in plan
 
 
+def test_the_plan_checks_that_every_listed_parameter_exists(terraform):
+    plan = terraform["jobs"]["plan"]
+    check = next(step for step in plan["steps"] if "parameter_paths.py" in step.get("run", ""))
+    assert '--check-aws --env "${ENV}"' in check["run"]
+    assert check["env"]["ENV"] == "${{ matrix.env }}"
+
+
 def test_dev_is_applied_first_and_live_only_after_dev(terraform):
     jobs = terraform["jobs"]
     assert jobs["apply-dev"]["with"]["env"] == "dev"

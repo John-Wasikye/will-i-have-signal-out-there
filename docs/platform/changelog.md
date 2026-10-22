@@ -1,5 +1,9 @@
 # Changelog: Platform
 
+## Oct 22, 2026: Parameter Store check
+
+- OQ-P10 answered: the Parameter Store path check is built with the platform skeleton. The paths are listed in `checks/parameter_paths.yaml`, CI checks them against the naming convention and the code, and the pull request plan checks that each listed parameter exists.
+
 ## Oct 9, 2026: defaults confirmed
 
 - John confirmed ADR-0012 (10:00 UTC nightly start), ADR-0019 (30-day raw-file lock) and ADR-0032 (SHA-256 content hashes). Their status is now Accepted.

@@ -27,6 +27,7 @@ GitHub signs in to AWS through OIDC, so GitHub holds no AWS key. The roles come 
    - `live`: required reviewer is me, and deployment branches are limited to `main`.
    - `dev`: deployment branches limited to `main`. A required reviewer is optional; without one, dev applies and deploys as soon as a change is merged.
 4. Add the variables and the secrets below. None of the variables is secret: they are names, IDs and addresses, and the ARNs include the account number, which AWS does not treat as secret.
+5. Create every parameter listed under `parameters` in `checks/parameter_paths.yaml`, in dev and live, as SecureString in Parameter Store. The pull request plan fails until each one exists.
 
 ### Repository variables (Settings, Secrets and variables, Actions, Variables)
 
