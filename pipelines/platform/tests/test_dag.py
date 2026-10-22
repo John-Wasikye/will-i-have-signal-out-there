@@ -5,6 +5,8 @@ installed (CI, or the session box). The rules come from docs/platform/design-doc
 - the Iceberg sample is written before it is published
 - metrics and status come after publishing
 - iceberg_maintenance runs last, and runs even when earlier tasks fail
+- report_run emails about a late or failed pipeline once the outputs are in S3
+- a failed task records an incident and sends an email
 """
 
 import importlib
@@ -32,6 +34,7 @@ def test_every_task_is_in_the_dag(skeleton_dag):
         "emit_metrics",
         "publish_status",
         "upload_outputs",
+        "report_run",
         "iceberg_maintenance",
     }
 
@@ -51,6 +54,11 @@ def test_the_upload_waits_for_metrics_and_status(skeleton_dag):
     assert {"emit_metrics", "publish_status"} <= set(upload.upstream_task_ids)
 
 
+def test_the_run_is_reported_after_the_upload_from_the_status(skeleton_dag):
+    report = skeleton_dag.get_task("report_run")
+    assert {"upload_outputs", "publish_status"} <= set(report.upstream_task_ids)
+
+
 def test_maintenance_waits_for_the_upload(skeleton_dag):
     maintenance = skeleton_dag.get_task("iceberg_maintenance")
     assert "upload_outputs" in maintenance.upstream_task_ids
@@ -67,15 +75,49 @@ def test_every_task_records_an_incident_when_it_fails(skeleton_dag):
     assert skeleton_dag.default_args["on_failure_callback"] is module.record_failure_callback
 
 
-def test_the_failure_callback_writes_an_incident_file(monkeypatch, tmp_path):
-    module = importlib.import_module("platform_skeleton_dag")
-    monkeypatch.setenv("PLATFORM_INCIDENTS_DIR", str(tmp_path))
-    context = {
+class FakeSns:
+    def __init__(self):
+        self.published = []
+
+    def publish(self, **kwargs):
+        self.published.append(kwargs)
+
+
+@pytest.fixture
+def failure_context():
+    return {
         "dag": type("Dag", (), {"dag_id": "platform_skeleton_nightly"})(),
         "task_instance": type("TaskInstance", (), {"task_id": "publish_sample"})(),
         "exception": RuntimeError("disk full"),
     }
 
-    module.record_failure_callback(context)
+
+@pytest.fixture
+def fake_sns(monkeypatch, tmp_path):
+    """Point the callback at a temporary folder, a fake topic and a fake SNS client."""
+    module = importlib.import_module("platform_skeleton_dag")
+    sns = FakeSns()
+    monkeypatch.setenv("PLATFORM_INCIDENTS_DIR", str(tmp_path))
+    monkeypatch.setenv("PLATFORM_ENV", "dev")
+    monkeypatch.setenv(
+        "PLATFORM_ALERT_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts"
+    )
+    monkeypatch.setattr(module, "aws_client", lambda service: sns)
+    return sns
+
+
+def test_the_failure_callback_writes_an_incident_file(fake_sns, failure_context, tmp_path):
+    module = importlib.import_module("platform_skeleton_dag")
+
+    module.record_failure_callback(failure_context)
 
     assert len(list(tmp_path.glob("INC-*.parquet"))) == 1
+
+
+def test_the_failure_callback_sends_one_email(fake_sns, failure_context):
+    module = importlib.import_module("platform_skeleton_dag")
+
+    module.record_failure_callback(failure_context)
+
+    assert len(fake_sns.published) == 1
+    assert "publish_sample" in fake_sns.published[0]["Subject"]

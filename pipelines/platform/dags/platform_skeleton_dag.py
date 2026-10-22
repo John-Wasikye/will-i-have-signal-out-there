@@ -1,10 +1,13 @@
 """Skeleton nightly DAG: publish the sample with its metrics, status and Iceberg maintenance.
 
-The sample is written to Iceberg first, then published. Iceberg maintenance runs last.
+The sample is written to Iceberg first, then published. Once the outputs are in S3, the run
+is reported: an email for a late or failed pipeline, or a CloudWatch data point for a good
+one. Iceberg maintenance runs last. A task that fails records an incident and sends an email.
 
 Order follows docs/platform/design-doc.md section 7.4. The DAG only wires tasks together.
 The logic lives in modules that have their own tests:
 - pipelines/platform/publish/sample_flow.py
+- pipelines/platform/publish/alerts.py
 - pipelines/platform/publish/incidents.py
 - pipelines/platform/publish/uploads.py
 - pipelines/platform/spark/sample_iceberg_job.py
@@ -17,6 +20,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+import alerts
 import sample_flow
 import uploads
 from airflow.sdk import dag, task
@@ -33,12 +37,27 @@ ICEBERG_TABLE = "sample_answer"
 MAX_SPARK_ROWS = 1_000
 
 
-def record_failure_callback(context: dict) -> None:
-    """Record an incident for a task that failed. Airflow calls this with the task's context.
+def aws_client(service: str):  # noqa: ANN201
+    """Return a boto3 client. The Airflow image provides boto3. Tests replace this function."""
+    import boto3
 
-    The folder is read when the callback runs, so a test can point it somewhere else.
+    return boto3.client(service)
+
+
+def record_failure_callback(context: dict) -> None:
+    """Record an incident for a task that failed, then email about it.
+
+    Airflow calls this with the task's context. The incident is written first, so it is kept
+    even if the email cannot be sent. The settings are read when the callback runs, so a test
+    can point them somewhere else.
     """
     record_failure(context, Path(os.environ.get("PLATFORM_INCIDENTS_DIR", str(INCIDENTS_DIR))))
+    alerts.alert_failure(
+        context,
+        aws_client("sns"),
+        os.environ["PLATFORM_ALERT_TOPIC_ARN"],
+        os.environ["PLATFORM_ENV"],
+    )
 
 
 @dag(
@@ -106,6 +125,21 @@ def platform_skeleton_nightly():
             boto3.client("s3"), locations, PUBLISHED_DIR, METRICS_DIR, INCIDENTS_DIR
         )
 
+    @task
+    def report_run(status: dict) -> None:
+        """Email about a late or failed pipeline, or record a good run in CloudWatch.
+
+        It runs after the upload, so a good run is recorded only once its data is live.
+        """
+        alerts.report_status(
+            aws_client("sns"),
+            aws_client("cloudwatch"),
+            os.environ["PLATFORM_ALERT_TOPIC_ARN"],
+            status,
+            os.environ["PLATFORM_ENV"],
+            datetime.now(UTC),
+        )
+
     @task(trigger_rule="all_done")
     def iceberg_maintenance() -> None:
         """Compact, expire and clean up Iceberg tables. Runs even when earlier tasks fail."""
@@ -122,6 +156,7 @@ def platform_skeleton_nightly():
     status = publish_status(outcome)
     uploaded = upload_outputs()
     [metrics, status] >> uploaded
+    uploaded >> report_run(status)
     maintenance = iceberg_maintenance()
     uploaded >> maintenance
 
