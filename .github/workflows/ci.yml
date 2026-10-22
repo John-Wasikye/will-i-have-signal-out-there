@@ -1,6 +1,7 @@
 name: CI
 
 # Runs on every push and pull request. No job here touches AWS.
+# The runner image is pinned to Ubuntu 24.04 so a change of ubuntu-latest cannot change CI unannounced.
 on:
   push:
   pull_request:
@@ -11,10 +12,10 @@ permissions:
 jobs:
   python:
     name: Python lint and tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install dependencies
@@ -26,14 +27,14 @@ jobs:
 
   spark:
     name: Spark tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install dependencies
@@ -43,12 +44,12 @@ jobs:
 
   airflow:
     name: Airflow DAG tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       AIRFLOW_VERSION: "3.3.2"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install Airflow with its pinned dependency list
@@ -61,9 +62,9 @@ jobs:
 
   box-image:
     name: Airflow image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check the shell scripts
         run: shellcheck platform/box/*.sh
       - name: Build the image
@@ -81,13 +82,13 @@ jobs:
 
   site:
     name: Site build and tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -99,10 +100,10 @@ jobs:
 
   terraform:
     name: Terraform format and tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.16.4"
       - name: Format
@@ -122,13 +123,13 @@ jobs:
 
   security:
     name: Secret and vulnerability scans
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Scan for committed secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Scan dependencies and config
@@ -139,3 +140,13 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
+
+  workflows:
+    name: Workflow lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # actionlint also runs shellcheck on every run: block, so a broken workflow fails here
+      # instead of when it reaches AWS.
+      - name: Lint the workflows
+        run: docker run --rm --volume "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
