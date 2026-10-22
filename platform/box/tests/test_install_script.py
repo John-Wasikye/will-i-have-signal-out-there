@@ -13,7 +13,27 @@ from pathlib import Path
 import pytest
 
 SCRIPT = Path(__file__).resolve().parent.parent / "install.sh"
-BASH = shutil.which("bash")
+
+
+def _find_bash() -> str | None:
+    """Return a bash that can read this machine's file paths, or None.
+
+    On Windows, the first bash on PATH is often WSL's, which cannot read Windows paths. Git Bash
+    can, and it sits in the bin folder of the Git install, next to git itself.
+    """
+    if os.name != "nt":
+        return shutil.which("bash")
+    git = shutil.which("git")
+    if git is None:
+        return None
+    for folder in Path(git).resolve().parents:
+        candidate = folder / "bin" / "bash.exe"
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+BASH = _find_bash()
 
 pytestmark = pytest.mark.skipif(BASH is None, reason="bash is not available here")
 
