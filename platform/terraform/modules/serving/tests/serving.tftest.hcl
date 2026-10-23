@@ -61,6 +61,28 @@ run "concurrency_is_capped_so_traffic_cannot_run_up_a_bill" {
   }
 }
 
+# An account whose whole Lambda limit is 10 cannot reserve 10 for one function: AWS keeps at
+# least 10 unreserved. There the account limit is already the cap, so no reservation is set.
+run "no_reservation_where_the_account_limit_is_already_the_cap" {
+  command = plan
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  variables {
+    reserved_concurrency = null
+  }
+
+  assert {
+    condition     = aws_lambda_function.api.reserved_concurrent_executions == -1
+    error_message = "With no reservation the function must use the account's unreserved pool (-1)."
+  }
+}
+
 run "api_throttles_requests" {
   command = plan
 

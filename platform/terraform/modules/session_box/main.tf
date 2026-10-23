@@ -7,11 +7,36 @@ locals {
   is_burstable = startswith(var.instance_type, "t")
 }
 
+data "aws_subnet" "box" {
+  id = var.subnet_id
+}
+
+# The box's own security group. Without one, AWS gives the box the VPC's default group, which
+# lets in traffic from everything else in that group, other projects included. This group lets
+# nothing in: I reach the box through Session Manager, which needs no open port. The rules are
+# written here, so an inbound rule added by hand is removed by the next apply.
+resource "aws_security_group" "box" {
+  name        = local.name
+  description = "The ${var.env} session box: no inbound traffic, any outbound."
+  vpc_id      = data.aws_subnet.box.vpc_id
+
+  ingress = []
+
+  # Outbound only: the box pulls images, installs packages and calls AWS services.
+  egress {
+    description = "Any outbound traffic."
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_instance" "box" {
   ami                         = var.ami_id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
-  vpc_security_group_ids      = var.security_group_ids
+  vpc_security_group_ids      = concat([aws_security_group.box.id], var.security_group_ids)
   iam_instance_profile        = var.instance_profile_name
   associate_public_ip_address = true # No NAT gateway, so the box needs a public address to pull images.
 

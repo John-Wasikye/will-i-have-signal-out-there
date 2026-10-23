@@ -46,7 +46,7 @@ variable "timeout_seconds" {
 }
 
 variable "reserved_concurrency" {
-  description = "Most copies of the function that may run at once. It caps the cost of a traffic spike. A new AWS account with a low concurrency quota may need the quota raised before this can be set."
+  description = "Most copies of the function that may run at once. It caps the cost of a traffic spike. null sets no reservation: use it where the account's whole Lambda limit is 10, because AWS keeps at least 10 unreserved, and that limit is then the cap anyway."
   type        = number
   default     = 10
 }

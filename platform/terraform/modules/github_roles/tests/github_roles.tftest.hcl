@@ -32,7 +32,8 @@ variables {
   site_bucket_arn  = "arn:aws:s3:::portfolio-dev-site-123456789012"
   distribution_arn = "arn:aws:cloudfront::123456789012:distribution/EDFDVBD6EXAMPLE"
   registry_arn     = "arn:aws:ecr:us-east-1:123456789012:repository/portfolio-dev-airflow"
-  protected_arns   = ["arn:aws:*:*:*:*nfl-*", "arn:aws:iam::*:role/github-plan"]
+  protected_names  = ["nfl-"]
+  protected_arns   = ["arn:aws:iam::*:role/github-plan"]
 }
 
 # --- Plan role ------------------------------------------------------------------------------
@@ -105,7 +106,7 @@ run "dev_apply_role_is_refused_live_and_shared_resources" {
   command = plan
 
   assert {
-    condition = alltrue([for target in ["portfolio-live-", "portfolio_live", "portfolio-terraform-state-*/live/", "budgets:", "portfolio-dev-terraform-apply"] :
+    condition = alltrue([for target in ["arn:aws:s3:::*portfolio-live-*", "arn:aws:ecs:*:*:*portfolio-live-*", "arn:aws:glue:*:*:*portfolio_live*", "portfolio-terraform-state-*/live/", "budgets:", "portfolio-dev-terraform-apply"] :
     strcontains(aws_iam_role_policy.refuse_live[0].policy, target)])
     error_message = "The dev apply role must be refused live resources, the shared budget, and changes to itself."
   }
@@ -117,7 +118,7 @@ run "both_apply_roles_are_refused_other_projects_and_the_oidc_provider" {
   command = plan
 
   assert {
-    condition = alltrue([for target in ["arn:aws:*:*:*:*nfl-*", "arn:aws:iam::*:role/github-plan", "oidc-provider"] :
+    condition = alltrue([for target in ["arn:aws:s3:::*nfl-*", "arn:aws:ecs:*:*:*nfl-*", "arn:aws:iam::*:*nfl-*", "arn:aws:logs:*:*:*nfl-*", "arn:aws:cloudfront::*:*nfl-*", "arn:aws:iam::*:role/github-plan", "oidc-provider"] :
     strcontains(aws_iam_role_policy.refuse_other_projects.policy, target)])
     error_message = "The dev apply role must be refused the protected resources and the OIDC provider."
   }
@@ -144,7 +145,7 @@ run "live_apply_role_has_no_refusal_list" {
   }
 
   assert {
-    condition     = strcontains(aws_iam_role_policy.refuse_other_projects.policy, "arn:aws:*:*:*:*nfl-*") && strcontains(aws_iam_role_policy.refuse_other_projects.policy, "oidc-provider")
+    condition     = strcontains(aws_iam_role_policy.refuse_other_projects.policy, "arn:aws:s3:::*nfl-*") && strcontains(aws_iam_role_policy.refuse_other_projects.policy, "oidc-provider")
     error_message = "The live apply role must also be refused other projects and the OIDC provider."
   }
 
@@ -227,5 +228,28 @@ run "rejects_an_unknown_environment" {
 
   expect_failures = [
     var.env,
+  ]
+}
+
+# IAM refuses a policy whose ARN has a wildcard for the service (arn:aws:*:...). The first live
+# apply failed on exactly that, so every refusal names its services.
+run "no_refusal_uses_a_wildcard_service" {
+  command = plan
+
+  assert {
+    condition     = !strcontains(aws_iam_role_policy.refuse_live[0].policy, "arn:aws:*:") && !strcontains(aws_iam_role_policy.refuse_other_projects.policy, "arn:aws:*:")
+    error_message = "IAM refuses an ARN whose service is a wildcard, so every refused ARN must name its service."
+  }
+}
+
+run "rejects_a_protected_arn_with_a_wildcard_service" {
+  command = plan
+
+  variables {
+    protected_arns = ["arn:aws:*:*:*:*nfl-*"]
+  }
+
+  expect_failures = [
+    var.protected_arns,
   ]
 }

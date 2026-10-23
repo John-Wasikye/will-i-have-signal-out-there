@@ -16,7 +16,9 @@ Dev and live share one AWS account, so the dev apply role is also refused:
 - the budget, which `envs/live` owns
 - any change to itself, so it cannot remove these refusals. A change to this role in dev is applied by hand, from my own machine.
 
-The account also runs other projects, such as the NFL site. Both apply roles, dev and live, are refused every resource listed in `protected_arns` and any change to the OIDC provider, which another project owns. Each environment passes the NFL project's resources. A new project in the account must be added to that list.
+The account also runs other projects, such as the NFL site. Both apply roles, dev and live, are refused every resource whose name contains one of `protected_names` (each environment passes `nfl-` for the NFL site), the exact resources in `protected_arns` (its two GitHub roles and its CloudFront distribution), and any change to the OIDC provider, which another project owns. A new project in the account must be added to those lists.
+
+IAM refuses an ARN whose service is a wildcard (`arn:aws:*:...`), so "refuse anything named X" is written once per service the projects use; the list is `regional_services` in `main.tf`. A resource in a service missing from that list is not refused, so a project that starts using a new service must add it there. The first live apply failed on a wildcard service, so a test and a variable check now refuse one.
 
 Otherwise the live apply role has no refusals. Its GitHub environment allows only the main branch and waits for my approval.
 
@@ -31,7 +33,8 @@ The roles are created by the same Terraform they run, so the first apply of each
 | `site_bucket_arn` | string | none | This environment's site bucket. |
 | `distribution_arn` | string | none | This environment's CloudFront distribution. |
 | `registry_arn` | string | none | This environment's image repository. |
-| `protected_arns` | list(string) | `[]` | ARN patterns of other projects in the account. Both apply roles are refused them. |
+| `protected_names` | list(string) | `[]` | Name fragments of other projects in the account, for example `nfl-`. |
+| `protected_arns` | list(string) | `[]` | Exact ARNs of other projects' resources whose names carry no protected name. Each must name its service. |
 
 ## Outputs
 
