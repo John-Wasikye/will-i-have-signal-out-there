@@ -57,9 +57,10 @@ module "iam" {
   glue_database_name         = module.catalog.database_name
   parameter_read_policy_json = module.parameters.read_policy_json
 
-  # This configuration creates the GitHub OIDC provider. envs/dev relies on it, so apply this
-  # configuration before envs/dev the first time.
-  create_oidc_provider = true
+  # The account's GitHub OIDC provider already exists: the NFL project's Terraform
+  # (nfl-player-performance, infra/github.tf) created it, and an account can have only one.
+  # Both environments trust it and neither creates it.
+  create_oidc_provider = false
 }
 
 # The budget is account-wide, so it is created only from the live configuration.
@@ -133,4 +134,13 @@ module "github_roles" {
   site_bucket_arn  = module.storage.bucket_arns["site"]
   distribution_arn = module.site.distribution_arn
   registry_arn     = module.registry.repository_arn
+
+  # The NFL project (nfl-player-performance) runs in the same AWS account. Its resources are
+  # named nfl-* or jw-nfl-*, apart from its two GitHub roles and its CloudFront distribution.
+  protected_arns = [
+    "arn:aws:*:*:*:*nfl-*",
+    "arn:aws:iam::*:role/github-plan",
+    "arn:aws:iam::*:role/github-deploy",
+    "arn:aws:cloudfront::*:distribution/E1OZ5WDKRFMJ25",
+  ]
 }

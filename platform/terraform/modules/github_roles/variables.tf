@@ -33,3 +33,9 @@ variable "registry_arn" {
   description = "ARN of this environment's image repository. The deploy role pushes the Airflow image here."
   type        = string
 }
+
+variable "protected_arns" {
+  description = "ARN patterns of other projects in the same AWS account. Both apply roles are refused every action on them, because their broad rights would otherwise reach those projects."
+  type        = list(string)
+  default     = []
+}

@@ -1,6 +1,6 @@
 # iam module
 
-I use this module to create one least-privilege IAM role per pipeline. It also creates the GitHub OIDC provider, but only in the environment that owns it.
+I use this module to create one least-privilege IAM role per pipeline. It can also create the GitHub OIDC provider, for an account that has none yet.
 
 Roles are named `portfolio-<env>-<pipeline>`. GitHub Actions assumes them through OIDC. Each role can:
 
@@ -10,7 +10,7 @@ Roles are named `portfolio-<env>-<pipeline>`. GitHub Actions assumes them throug
 
 Trust rules: live roles accept only the `main` branch of `github_repo`. Dev roles accept any ref in that repository. This is a known gap that I accept for now: a dev role can be requested from any branch. The risk is limited, because dev roles cannot reach live data.
 
-Only one environment per AWS account should create the OIDC provider. In this repository, `envs/live` creates it and `envs/dev` does not. I apply `envs/live` before `envs/dev` the first time.
+An AWS account can have only one GitHub OIDC provider. In my account the NFL project's Terraform (`nfl-player-performance`, `infra/github.tf`) already owns it, so both `envs/live` and `envs/dev` set `create_oidc_provider` to false and trust it by its ARN. Removing that provider from the NFL project would cut off these roles too.
 
 ## Inputs
 

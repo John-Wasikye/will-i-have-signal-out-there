@@ -34,8 +34,9 @@ locals {
   github_subject = var.env == "live" ? "repo:${var.github_repo}:ref:refs/heads/main" : "repo:${var.github_repo}:*"
 }
 
-# GitHub OIDC provider. One per AWS account, so only one environment creates it.
-# envs/live creates it. envs/dev sets create_oidc_provider to false and relies on it.
+# GitHub OIDC provider. One per AWS account, so at most one configuration creates it. In
+# John's account the NFL project's Terraform already owns it, so both envs/ set
+# create_oidc_provider to false and trust it by its ARN.
 resource "aws_iam_openid_connect_provider" "github" {
   count = var.create_oidc_provider ? 1 : 0
 

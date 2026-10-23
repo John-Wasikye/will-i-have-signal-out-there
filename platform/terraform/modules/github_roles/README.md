@@ -1,6 +1,6 @@
 # github_roles module
 
-I use this module to give the GitHub workflows their AWS access, one set per environment. GitHub signs in through OIDC, so no AWS key is stored in GitHub (ADR-0007). The OIDC provider itself is created by the `iam` module in `envs/live`.
+I use this module to give the GitHub workflows their AWS access, one set per environment. GitHub signs in through OIDC, so no AWS key is stored in GitHub (ADR-0007). An account has one OIDC provider; in my account the NFL project's Terraform owns it, and these roles trust it by its ARN.
 
 GitHub writes the kind of job into the token it sends to AWS. A pull request job says `pull_request`. A job that names a GitHub environment says `environment:<name>`, and it only starts after that environment's rules let it, for example a required reviewer or a branch rule. Each role below trusts exactly one of those.
 
@@ -13,10 +13,12 @@ GitHub writes the kind of job into the token it sends to AWS. A pull request job
 Dev and live share one AWS account, so the dev apply role is also refused:
 
 - anything named `portfolio-live-*` or `portfolio_live*`, and the live state file
-- the budget and the OIDC provider, which `envs/live` owns
+- the budget, which `envs/live` owns
 - any change to itself, so it cannot remove these refusals. A change to this role in dev is applied by hand, from my own machine.
 
-The live apply role has no refusals. Its GitHub environment allows only the main branch and waits for my approval.
+The account also runs other projects, such as the NFL site. Both apply roles, dev and live, are refused every resource listed in `protected_arns` and any change to the OIDC provider, which another project owns. Each environment passes the NFL project's resources. A new project in the account must be added to that list.
+
+Otherwise the live apply role has no refusals. Its GitHub environment allows only the main branch and waits for my approval.
 
 The roles are created by the same Terraform they run, so the first apply of each environment is done by hand.
 
@@ -29,6 +31,7 @@ The roles are created by the same Terraform they run, so the first apply of each
 | `site_bucket_arn` | string | none | This environment's site bucket. |
 | `distribution_arn` | string | none | This environment's CloudFront distribution. |
 | `registry_arn` | string | none | This environment's image repository. |
+| `protected_arns` | list(string) | `[]` | ARN patterns of other projects in the account. Both apply roles are refused them. |
 
 ## Outputs
 
