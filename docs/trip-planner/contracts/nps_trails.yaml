@@ -1,0 +1,77 @@
+# Data contract (ODCS). Draft. ODCS version is a working placeholder (design-doc OQ-32).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-nps-trails
+name: nps_trails
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: National Park Service Public Trails ArcGIS service for Grand Canyon, giving trail polylines used to sample points every 50 meters. Phase A uses Bright Angel, South Kaibab and North Kaibab (ADR 0020).
+  limitations: GeoJSON output is supported, 2,000 records per request, so the pull pages. Other fields beyond TRLNAME and UNITCODE are not recorded (OQ-20). Public data from data.gov; credit on the page (OQ-22).
+  usage: Input to C3 (trail loader and sampler).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: nps-public-trails
+    type: api
+    description: NPS Public Trails ArcGIS service (polylines, GeoJSON, 2,000 records per request). Service URL to be fixed in the first-run check (OQ-8, OQ-20).
+    location: "Public NPS Public Trails ArcGIS service; query and UNITCODE fixed by OQ-20 and OQ-36. Raw pages: s3://{env}-signal-raw/nps/."
+slaProperties:
+  - property: frequency
+    value: refresh cadence open
+    description: See OQ-25.
+  - property: retention
+    value: raw files kept
+customProperties:
+  - property: openQuestions
+    value: OQ-8, OQ-20, OQ-22, OQ-25, OQ-36
+  - property: adr
+    value: adrs/0004, adrs/0018
+schema:
+  - name: nps_trail_line
+    physicalName: nps_trail_line
+    physicalType: table
+    description: One row per trail line. Partition per pull.
+    properties:
+      - name: trail_line_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Source key for the line (the service's object identifier, name to be confirmed, OQ-20).
+      - name: trlname
+        logicalType: string
+        required: false
+        description: Trail name (field TRLNAME).
+      - name: unitcode
+        logicalType: string
+        required: true
+        description: Park code (field UNITCODE). The value for Grand Canyon is confirmed in the first-run check (OQ-20).
+      - name: geometry_geojson
+        logicalType: object
+        required: true
+        description: Polyline geometry as GeoJSON (WGS 84 longitude and latitude is the expected reference; confirm, OQ-20).
+      - name: source_url
+        logicalType: string
+        required: true
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+      - name: content_sha256
+        logicalType: string
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_line_id
+            - fetched_at_utc

@@ -1,0 +1,87 @@
+# Data contract (ODCS). Draft. Published gold table (Parquet). Column names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-published-dim-trail-point
+name: dim_trail_point
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: One row per sampled trail point (every 50 meters) with its trail identity and location. The dimension for the trail page strip map.
+  limitations: Phase A covers Grand Canyon's main trails only (ADR 0001). The list of main trails is open (OQ-36).
+  usage: Read by the serving Lambda (DuckDB) behind the trail page.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: published-parquet
+    type: s3
+    description: Published gold Parquet in the site or lake bucket. Path set by the publisher (C10). Separate for dev and live.
+    location: "Published Parquet: s3://{env}-signal-lake/published/dim_trail_point/. Dev and live buckets are separate."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Rebuilt in each nightly run (10:00 UTC).
+  - property: retention
+    value: published data kept
+customProperties:
+  - property: openQuestions
+    value: OQ-21, OQ-36
+  - property: adr
+    value: adrs/0001, adrs/0004
+schema:
+  - name: dim_trail_point
+    physicalName: dim_trail_point
+    physicalType: table
+    description: One row per trail point.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: trail_id
+        logicalType: string
+        required: true
+      - name: trail_name
+        logicalType: string
+        required: false
+        description: From TRLNAME.
+      - name: unit_code
+        logicalType: string
+        required: true
+        description: From UNITCODE.
+      - name: seq
+        logicalType: integer
+        required: true
+        description: Order along the trail, starting at 0 (convention proposed).
+      - name: lon
+        logicalType: number
+        required: true
+      - name: lat
+        logicalType: number
+        required: true
+      - name: elevation_m
+        logicalType: number
+        required: true
+        description: From the surface model (EGM2008 datum).
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+        description: Resolution 9 cell containing the point (join key to FCC coverage).
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        description: Empty results are rejected by the publish gate.

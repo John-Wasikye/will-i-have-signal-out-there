@@ -1,0 +1,73 @@
+# Data contract (ODCS). Draft. Published gold table (Parquet). Column names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-published-fct-trail-point-coverage
+name: fct_trail_point_coverage
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Whether each trail point is covered for a carrier, according to the FCC modeled coverage (a claim, not a measurement).
+  limitations: Phase A has one carrier; Phase B adds every carrier for the park. The release identifier supports SCD Type 2 history in Snowflake (ADR 0015). The Phase A carrier is T-Mobile (ADR 0020); the Phase B carrier list is open (OQ-11).
+  usage: Read by the serving Lambda for the strip map.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: published-parquet
+    type: s3
+    description: Published gold Parquet. Separate for dev and live.
+    location: "Published Parquet: s3://{env}-signal-lake/published/fct_trail_point_coverage/. Dev and live buckets are separate."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Rebuilt in each nightly run; the FCC input changes only with a new release (OQ-25).
+  - property: retention
+    value: published data kept
+customProperties:
+  - property: openQuestions
+    value: OQ-11, OQ-21, OQ-25
+  - property: adr
+    value: adrs/0007, adrs/0015
+schema:
+  - name: fct_trail_point_coverage
+    physicalName: fct_trail_point_coverage
+    physicalType: table
+    description: One row per trail point and carrier.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: carrier
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+      - name: covered
+        logicalType: boolean
+        required: true
+        description: True when the point's H3 resolution 9 cell is in the carrier's FCC coverage.
+      - name: fcc_release
+        logicalType: string
+        required: true
+        description: FCC release used (format open, OQ-20).
+      - name: loaded_at_utc
+        logicalType: timestamp
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+            - carrier
+      - type: text
+        description: Every trail point has a coverage flag for the Phase A carrier (AC-1A.4).

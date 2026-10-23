@@ -1,0 +1,412 @@
+# OpenAPI 3 specification for Project 1. Draft.
+# - The OpenAPI version (3.0.3 here) is a working placeholder; pinned in ADR 0032.
+# - Paths, field names and operation ids are proposals (OQ-21).
+# - Phase A operations: listTrails, getTrailSignal (without confidence fields).
+# - Phase B operations: submitReport, getReportCounts, askTripQuestion, submitFeedback; confidence fields on getTrailSignal.
+# - API type: API Gateway HTTP API for public pages. The REST type is needed only where API keys and per-key usage plans are used; this project issues no API keys.
+# - Lambda memory, timeout, concurrency and throttling values are not recorded (OQ-28).
+openapi: 3.0.3
+info:
+  title: Will I have signal out there? API
+  version: 0.1.0
+  description: |
+    Serving API for the trail page, the hiker report endpoint and the trip-planning assistant.
+    All timestamps are UTC in ISO 8601 form and are converted to local time only on the page.
+    The first request after a period of inactivity may take up to 10 seconds while the service initializes.
+servers:
+  - url: https://TBD.example/
+    description: Placeholder host. The real base URLs for dev and live are Terraform outputs, in us-east-1 (OQ-42, ADR 0034).
+tags:
+  - name: trails
+    description: Phase A
+  - name: reports
+    description: Phase B
+  - name: assistant
+    description: Phase B
+paths:
+  /trails:
+    get:
+      tags: [trails]
+      operationId: listTrails
+      summary: List the main trails the page can show
+      responses:
+        '200':
+          description: Trails
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [trails]
+                properties:
+                  trails:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrailSummary'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /trails/{trail_id}/signal:
+    get:
+      tags: [trails]
+      operationId: getTrailSignal
+      summary: Coverage, satellite windows and (Phase B) confidence along one trail
+      description: |
+        Returns every sampled point of the trail with its coverage flag per carrier and its satellite windows.
+        The response carries the run's valid until time and the time of the last good run. When the data is late, the page still shows it with a visible late notice and does not hide it (ADR 0006, amended).
+      parameters:
+        - name: trail_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trail signal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrailSignal'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /reports:
+    post:
+      tags: [reports]
+      operationId: submitReport
+      summary: Submit one hiker signal report (Phase B)
+      description: |
+        The body holds only the H3 resolution 9 cell, the carrier, whether the hiker had signal and the time rounded to the hour.
+        Exact coordinates never reach the server. The random visitor ID is used only for rate limits and is not stored with the report.
+        Limits (Decided by John, Oct 9, 2026, ADR 0011): 10 reports a day per visitor ID, one per cell per visitor every 24 hours, and at most 50 reports a day for the whole system. They are applied by the hour the report was made (report_hour_utc), not by arrival time, so a batch sent after being offline is judged by the report hours.
+        The day boundary is midnight UTC; reports older than 48 hours are refused (ADR 0026).
+      parameters:
+        - $ref: '#/components/parameters/VisitorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportIn'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/LimitExceeded'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /report-counts:
+    get:
+      tags: [reports]
+      operationId: getReportCounts
+      summary: Report counts per area (Phase B)
+      description: An area is the H3 resolution 6 parent of the report cell; counts from fewer than 5 reports are not shown (ADR 0030).
+      parameters:
+        - name: trail_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [counts]
+                properties:
+                  counts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportCount'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /assistant/questions:
+    post:
+      tags: [assistant]
+      operationId: askTripQuestion
+      summary: Ask a plain-language trip question and get a cited check-in plan (Phase B)
+      description: |
+        Subject to a daily question cap and a token limit per answer (values open, OQ-17).
+        The answer cites the trail points and times it used and says so when the data cannot answer.
+        The assistant answers only within the prediction span and says so for later days (ADR 0021, Decided by John, Oct 9, 2026).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionIn'
+      responses:
+        '200':
+          description: A plan or a statement that the data cannot answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantAnswer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/LimitExceeded'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /feedback:
+    post:
+      tags: [assistant]
+      operationId: submitFeedback
+      summary: Thumbs-up or thumbs-down vote on an answer (Phase B)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackIn'
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/LimitExceeded'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  parameters:
+    VisitorId:
+      name: X-Visitor-Id
+      in: header
+      required: true
+      description: A 128-bit random value created on the phone, written as 32 hexadecimal characters. Used only for rate limits, and sent only over HTTPS (ADR 0025).
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: The request is invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Unknown trail
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    LimitExceeded:
+      description: A limit was exceeded (report limits, or the assistant daily cap)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unavailable:
+      description: Published data or a dependency is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      description: Error body. Codes are listed in design-doc.md, section 10 (proposed, OQ-21).
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    TrailSummary:
+      type: object
+      required: [trail_id, trail_name, unit_code]
+      properties:
+        trail_id:
+          type: string
+        trail_name:
+          type: string
+          nullable: true
+          description: From TRLNAME.
+        unit_code:
+          type: string
+          description: From UNITCODE.
+    TrailSignal:
+      type: object
+      required: [trail_id, run_logical_date, valid_until_utc, last_good_run_utc, min_elevation_deg, points]
+      properties:
+        trail_id:
+          type: string
+        run_logical_date:
+          type: string
+          format: date
+        valid_until_utc:
+          type: string
+          format: date-time
+          description: Predictions are not valid after this time (end of the 26-hour prediction span).
+        last_good_run_utc:
+          type: string
+          format: date-time
+          description: Start time of the last good run, shown in the late notice.
+        min_elevation_deg:
+          type: number
+          description: Minimum elevation used by the run.
+        carriers:
+          type: array
+          items:
+            type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/PointSignal'
+    PointSignal:
+      type: object
+      required: [trail_point_id, seq, lon, lat, coverage, windows]
+      properties:
+        trail_point_id:
+          type: string
+        seq:
+          type: integer
+        lon:
+          type: number
+        lat:
+          type: number
+        coverage:
+          type: array
+          items:
+            $ref: '#/components/schemas/CarrierCoverage'
+        windows:
+          type: array
+          items:
+            $ref: '#/components/schemas/WindowOut'
+    CarrierCoverage:
+      type: object
+      required: [carrier, covered]
+      properties:
+        carrier:
+          type: string
+        covered:
+          type: boolean
+          description: FCC modeled claim, not a measurement.
+        confidence:
+          type: object
+          nullable: true
+          description: Phase B only.
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [confidence_available, not_enough_measurements]
+            value:
+              type: number
+              nullable: true
+              description: Null when status is not_enough_measurements. The page then shows "Not enough measurements here; the coverage map's claim is unverified."
+    WindowOut:
+      type: object
+      required: [satellite_id, start_utc, end_utc]
+      properties:
+        satellite_id:
+          type: string
+        start_utc:
+          type: string
+          format: date-time
+        end_utc:
+          type: string
+          format: date-time
+    ReportIn:
+      type: object
+      required: [cell, carrier, had_signal, report_hour_utc]
+      additionalProperties: false
+      properties:
+        cell:
+          type: string
+          description: H3 resolution 9 cell index computed on the phone.
+        carrier:
+          type: string
+          description: Allowed values follow the carrier list (T-Mobile in Phase A, ADR 0020; Phase B list OQ-11).
+        had_signal:
+          type: boolean
+        report_hour_utc:
+          type: string
+          format: date-time
+          description: Time rounded to the hour, UTC.
+    ReportAccepted:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted]
+    ReportCount:
+      type: object
+      required: [area_id, carrier, had_signal, report_count]
+      properties:
+        area_id:
+          type: string
+        carrier:
+          type: string
+        had_signal:
+          type: boolean
+        report_count:
+          type: integer
+    QuestionIn:
+      type: object
+      required: [question]
+      additionalProperties: false
+      properties:
+        question:
+          type: string
+          description: Plain-language question. Maximum length is open (OQ-17).
+    AssistantAnswer:
+      type: object
+      required: [answerable, prompt_version]
+      properties:
+        answerable:
+          type: boolean
+          description: False when the data cannot answer.
+        message:
+          type: string
+          description: Explanation when answerable is false.
+        plan:
+          $ref: '#/components/schemas/CheckInPlan'
+        prompt_version:
+          type: string
+        answer_id:
+          type: string
+          description: Used for a later vote.
+    CheckInPlan:
+      type: object
+      required: [summary, citations]
+      properties:
+        summary:
+          type: string
+        citations:
+          type: array
+          items:
+            type: object
+            required: [trail_point_id]
+            properties:
+              trail_point_id:
+                type: string
+              time_utc:
+                type: string
+                format: date-time
+              satellite_id:
+                type: string
+              carrier:
+                type: string
+    FeedbackIn:
+      type: object
+      required: [answer_id, vote]
+      additionalProperties: false
+      properties:
+        answer_id:
+          type: string
+        vote:
+          type: string
+          enum: [up, down]

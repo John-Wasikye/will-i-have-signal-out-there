@@ -1,0 +1,85 @@
+# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-ookla-open-data
+name: ookla_open_data
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Ookla open mobile speed-test data for Arizona (quarterly, about 600-meter tiles, GPS-accurate tests only), used as measured evidence for the coverage confidence model.
+  limitations: License CC BY-NC-SA 4.0 (non-commercial, credit, share-alike). Derived data published here carries the same license. Speed tests exist only where phones had signal, so dead zones are missing. It is a public archive, so a manifest of URL, size and hash is stored instead of a full copy (engineering standard 1, which keeps a manifest for public archives). File size unknown (OQ-7).
+  usage: Input to C13 and C17.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: ookla-open-data-aws
+    type: s3
+    description: Ookla open data on AWS. Location to be fixed in the first-run check (OQ-10, OQ-20).
+    location: "Ookla open data on AWS; quarterly file list fixed by OQ-10 and OQ-20. Manifest: s3://{env}-signal-raw/ookla/manifest/. Lake table: {env}_signal.ookla_tile."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: quarter
+    description: Quarterly release.
+  - property: retention
+    value: manifest kept
+customProperties:
+  - property: license
+    value: "Includes data derived from Speedtest by Ookla® open data, licensed under CC BY-NC-SA 4.0. Derived data published here is shared under the same license."
+  - property: openQuestions
+    value: OQ-2, OQ-7, OQ-10, OQ-20
+  - property: adr
+    value: adrs/0007, adrs/0013
+schema:
+  - name: ookla_tile
+    physicalName: ookla_tile
+    physicalType: table
+    description: One row per tile and quarter, with the H3 resolution 8 cell assigned at load (engineering standard 9, which picks the H3 resolution from the source). Field names from the Ookla file are confirmed in the first-run check (OQ-10).
+    properties:
+      - name: quarter
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Quarter of the release.
+      - name: tile_key
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: Tile identifier from the source (name to be confirmed, OQ-20).
+      - name: h3_cell_res8
+        logicalType: string
+        required: true
+        description: H3 resolution 8 cell for the tile (assignment rule in the loader, ADR 0007).
+      - name: test_count
+        logicalType: integer
+        required: true
+        description: Number of tests in the tile; basis for "enough tests nearby" (threshold OQ-14).
+      - name: speed_metrics
+        logicalType: object
+        required: true
+        description: Measured speed fields as provided by the source (names to be confirmed, OQ-20).
+      - name: source_url
+        logicalType: string
+        required: true
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+      - name: content_sha256
+        logicalType: string
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - quarter
+            - tile_key

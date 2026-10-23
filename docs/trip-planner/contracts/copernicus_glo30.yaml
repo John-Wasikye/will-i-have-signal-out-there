@@ -1,0 +1,70 @@
+# Data contract (ODCS). Draft. ODCS version is a working placeholder (design-doc OQ-32).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-copernicus-glo30
+name: copernicus_glo30
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Copernicus GLO-30 elevation tiles on AWS, used to compute each trail point's terrain horizon.
+  limitations: 30 m grid; heights on the EGM2008 datum; a surface model that includes vegetation and buildings; water flattened. Free under the Copernicus licence with credit. Public archive that never changes, so only a manifest of URL, size and hash is stored (engineering standard 1, which keeps a manifest for public archives).
+  usage: Input to C4 (terrain horizon engine).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: copernicus-glo30-aws
+    type: s3
+    description: Copernicus GLO-30 on AWS open data. Bucket and key layout to be fixed in the first-run check (OQ-8, OQ-20).
+    location: "Public Copernicus GLO-30 tiles on AWS; tile list fixed by the first-run check (OQ-8, OQ-20). Manifest of URL, size and hash: s3://{env}-signal-raw/copernicus/manifest/."
+slaProperties:
+  - property: frequency
+    value: static archive
+    description: The archive never changes; the manifest is created once and re-verified on demand.
+  - property: retention
+    value: manifest kept
+customProperties:
+  - property: openQuestions
+    value: OQ-8, OQ-20, OQ-24
+  - property: adr
+    value: adrs/0004
+schema:
+  - name: glo30_tile_manifest
+    physicalName: glo30_tile_manifest
+    physicalType: table
+    description: One row per tile that covers the park plus the horizon range. Tile raster data is read from the source on demand; only the manifest is stored.
+    properties:
+      - name: tile_key
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Tile identifier (key in the source bucket).
+      - name: source_url
+        logicalType: string
+        required: true
+      - name: size_bytes
+        logicalType: integer
+        required: true
+      - name: content_sha256
+        logicalType: string
+        required: true
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+      - name: height_datum
+        logicalType: string
+        required: true
+        description: Vertical datum of heights. Expected value EGM2008 (confirmed fact).
+      - name: resolution_m
+        logicalType: integer
+        required: true
+        description: Expected value 30 (confirmed fact).
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: text
+        description: Every tile needed for the park plus about 15 km margin is listed; first-run check confirms the tiles open (OQ-8).

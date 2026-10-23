@@ -1,0 +1,77 @@
+# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32).
+# Field names and source location are to be confirmed in the first-run check (OQ-20).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-opencellid-towers
+name: opencellid_towers
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: OpenCelliD cell tower locations, used to compute the distance to the nearest tower, one input of the coverage confidence model (Decided by John, Oct 9, 2026, ADR 0024).
+  limitations: OpenCelliD is share-alike, so derived data carries the same license. This is recorded in the license register and on the page. Attribution text and terms are not recorded (OQ-22). File size, format and update cadence are not recorded (OQ-7, OQ-20).
+  usage: Input to C13 (loader) and C17 (confidence model features).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: opencellid-download
+    type: api
+    description: OpenCelliD download. Location, access method and any key (which would live in Parameter Store) to be fixed in the first-run check (OQ-20).
+    location: "Public OpenCelliD download; URL fixed by OQ-20. Raw copies: s3://{env}-signal-raw/opencellid/. Lake table: {env}_signal.opencellid_tower."
+slaProperties:
+  - property: frequency
+    value: refresh cadence open
+    description: See OQ-25.
+  - property: retention
+    value: raw files kept
+customProperties:
+  - property: license
+    value: Share-alike. Derived data carries the same license (credit wording in ADR 0037; OpenCelliD terms to verify).
+  - property: openQuestions
+    value: OQ-7, OQ-20, OQ-22, OQ-25
+  - property: adr
+    value: adrs/0024, adrs/0018
+schema:
+  - name: opencellid_tower
+    physicalName: opencellid_tower
+    physicalType: table
+    description: One row per tower record for the area around the park. Field names to be confirmed (OQ-20).
+    properties:
+      - name: tower_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Source key for the tower record (name to be confirmed).
+      - name: lon
+        logicalType: number
+        required: true
+      - name: lat
+        logicalType: number
+        required: true
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+        description: Resolution 9 cell of the tower (join key, ADR 0007).
+      - name: source_url
+        logicalType: string
+        required: true
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+      - name: content_sha256
+        logicalType: string
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - tower_id
+            - fetched_at_utc

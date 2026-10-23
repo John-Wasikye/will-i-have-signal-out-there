@@ -1,0 +1,100 @@
+# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32).
+# Table and attribute names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-hiker-signal-reports
+name: hiker_signal_reports
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Hiker reports "I had signal here" or "I had no signal here", written by Lambda to DynamoDB, copied nightly to the lake and Snowflake, used as labels for the confidence model and for per-area counts.
+  limitations: A report holds only the H3 resolution 9 cell, carrier, signal yes or no and the time rounded to the hour. It never carries a visitor ID or exact coordinates. Raw rows delete themselves 30 days after the nightly copy. Point-in-time recovery is OFF for this table, so deletion is final at 30 days (ADR 0022, Decided by John, Oct 9, 2026).
+  usage: Nightly copy (C23); model labels (C17); counts per area on the page.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: dynamodb-signal-reports
+    type: custom
+    description: DynamoDB, point-in-time recovery off for the reports table (ADR 0022), provisioned within the free tier. Table names and capacity are set in Terraform (proposed names).
+    location: "DynamoDB tables {env}-signal-reports (signal_reports) and {env}-signal-report-limits (report_limit_counters); names proposed (OQ-21). Lake copy: {env}_signal.signal_report."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Copied to the lake in each nightly run.
+  - property: retention
+    value: 30
+    unit: d
+    description: Raw rows expire 30 days after the nightly copy (ADR 0012).
+customProperties:
+  - property: openQuestions
+    value: OQ-12, OQ-26, OQ-29, OQ-35, OQ-38, OQ-41
+  - property: adr
+    value: adrs/0009, adrs/0010, adrs/0011, adrs/0012, adrs/0022, adrs/0023
+schema:
+  - name: signal_reports
+    physicalName: signal_reports
+    physicalType: table
+    description: One item per accepted report. No visitor ID is stored on this table.
+    properties:
+      - name: report_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Server-generated unique key. Not derived from the visitor ID (proposal).
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+        description: H3 resolution 9 cell computed on the phone.
+      - name: carrier
+        logicalType: string
+        required: true
+        description: Carrier the hiker reports on. Allowed values follow the carrier list (OQ-11).
+      - name: had_signal
+        logicalType: boolean
+        required: true
+        description: True for "I had signal here", false for "I had no signal here".
+      - name: report_hour_utc
+        logicalType: timestamp
+        required: true
+        description: Time of the report rounded to the hour, UTC.
+      - name: copied_at_utc
+        logicalType: timestamp
+        required: false
+        description: Set by the nightly copy.
+      - name: expires_at_epoch
+        logicalType: integer
+        required: false
+        description: Expiry attribute set by the nightly copy to 30 days after the copy.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.
+      - type: text
+        description: The h3_cell_res9 value is a valid resolution 9 H3 index; reports outside any mapped area are set aside by the nightly copy, not rejected at write time.
+  - name: report_limit_counters
+    physicalName: report_limit_counters
+    physicalType: table
+    description: Limit counters kept apart from reports. They hold the random visitor ID and expire 72 hours after their UTC day (ADR 0026). No report attribute is stored here besides what is needed for the one-per-cell-per-24-hours rule. One system-wide daily counter with no visitor ID enforces the 50 a day cap. Whether point-in-time recovery is off for this table is OQ-41.
+    properties:
+      - name: counter_key
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Visitor ID plus day (and cell), or the system-wide day key. Days are counted by the report's own hour, not arrival time (ADR 0011). Exact composition and day boundary are proposals (OQ-21, OQ-26, OQ-38).
+      - name: count
+        logicalType: integer
+        required: true
+      - name: expires_at_epoch
+        logicalType: integer
+        required: true
+        description: Expiry time, 72 hours after the end of the UTC day (ADR 0026).
+    quality:
+      - type: text
+        description: Limits enforced (Decided by John, Oct 9, 2026) - 10 reports a day per visitor ID, one per cell per visitor every 24 hours, and at most 50 reports a day for the whole system; caps are raised as traffic grows.

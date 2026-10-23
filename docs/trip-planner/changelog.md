@@ -1,0 +1,93 @@
+# Project 1 changelog
+
+This file records two things: changes to the documents, and, once code exists, changes to each phase of the project. The newest entry is first.
+
+---
+
+## Oct 9, 2026: defaults confirmed
+
+- John confirmed ADRs 0025 to 0033 (visitor ID, day boundary, late-data rule, refresh and time grain, limits, area counts, model family, versions, votes). Their status is now Accepted.
+
+## Documents
+
+### Oct 9, 2026: horizon defaults, credit wording, assistant spend limit
+
+- OQ-24 (horizon details) is decided in ADR 0036: 15 km range, 30 m ray step, 1.7 m eye height, Earth curvature applied, refraction not applied, the surface model kept, 36 sectors final, linear interpolation, and a 5-degree margin for AC-1A.2.
+- OQ-22 (credit wording) is decided in ADR 0037. Copernicus and NPS were checked against their own licence and policy text. CelesTrak has no terms, so a courtesy credit is used. OpenCelliD and FCC mobile data are unverified, because their primary pages returned HTTP 403 from the build environment. The page wording that coverage is a claim, and that satellite texts are not guaranteed, is also set there.
+- OQ-17 is decided in ADR 0038 by John: a monthly spend limit of $10, replacing $15 everywhere in the set. Derived limits: 20 questions a day, 2,500 input and 800 output tokens per answer, with a price check before the first call.
+- New contract: none in this step. The licence register and the credit wording were updated.
+- Open questions: 19 open and 1 partly answered (OQ-39). ADRs total 39.
+
+### Oct 9, 2026: remoteness source, report-cell contract, and the state of open questions
+
+- Remoteness (OQ-18) is decided by John: U.S. Census TIGER/Line roads plus NPS trail lines (ADR 0035). Before the first load, the licence of the exact Census vintage must be checked, because some files carry a rights flag, "otherRestrictions". The check is a first-run check.
+- New contracts: `tiger_roads` (the road source for remoteness) and `report_cell_day` (the daily per-cell counts that replace raw reports after 30 days, ADR 0034). Contracts now total 21.
+- New internal table in the design doc: `trail_point_remoteness`. New lake table: `tiger_road`.
+- Glossary and the licence register gained the Census source and the remoteness term.
+- Open questions: 16 answered, 1 partly answered (OQ-39, the provider's terms), and 22 open. The 22 open ones need measurements, real files or accounts, or a decision that only John can make (thresholds, caps, N, attribution wording). Each has a GitHub issue still to be created.
+- ADRs total 36 (0001 to 0035, with 0006a superseded).
+
+### Oct 9, 2026: minor open questions decided (security first)
+
+John asked for minor questions with an obvious best-practice answer to be decided, security first, and for major ones to be left for him. Thirteen questions were decided this way. Each has an ADR (0025 to 0033) marked as a default that John can change. Each answered row in design doc section 16 keeps its question and gains its answer, so existing references still resolve.
+
+- Decided: OQ-11, OQ-21 (names accepted as working names), OQ-23, OQ-25, OQ-26, OQ-28, OQ-29, OQ-30, OQ-32, OQ-33, OQ-35, OQ-38, OQ-41. Partly decided: OQ-18 (model family) and OQ-39 (votes and question text).
+- Decided by John, Oct 9, 2026 (ADR 0034): AWS region us-east-1 (OQ-42); report copies deleted 30 days after the copy in every store, with daily per-cell counts kept (OQ-43); model provider the Anthropic API on the cheapest Claude model (OQ-39, partly).
+- New ADRs: 0025 visitor ID; 0026 day boundary and counter lifetime; 0027 late-data rule; 0028 reference refresh, stream and time grain; 0029 limits, retention and log window; 0030 area counts; 0031 confidence model family and carriers; 0032 pinned versions; 0033 votes and assistant data.
+- Affected text was updated in the requirements, the design doc, ADRs 0001, 0008, 0011, 0016, 0018, 0020, 0022 and 0024, the contracts, the API file, the security document, the operations document and the model card.
+
+### Oct 9, 2026: review pass before coding
+
+Every item below was checked against the build plan, the Build Plan Decisions, the answered decisions and the open-question log.
+
+**Added**
+- [README.md](README.md): what the project is, the document map, the reading order, the build order by dependency and the accounts needed.
+- [../Platform/platform-requirements.md](../platform/platform-requirements.md): the platform parts Project 1 depends on, so the project can be built from the documents alone.
+- [operations.md](operations.md): schedules, freshness targets, monitoring, cost, 17 runbooks, incidents and backups.
+- [security-and-privacy.md](security-and-privacy.md): threat model, personal-data inventory with retention, access matrix, licence and attribution register.
+- [model-card.md](model-card.md): the confidence model and the trip assistant, with the evaluation plan and known failure cases. No results are claimed.
+- This changelog.
+
+**Changed**
+- ADR 0006 existed twice. The superseded version (0006a) was removed on Oct 9, 2026 as a duplicate old version. The amended version keeps the number 0006.
+- ADR 0005 said the window run covered 24 hours. It now says the 26-hour prediction span (ADR 0019).
+- ADR 0011 and ADR 0022 said the limit counters expire after 24 hours. The build plan gives that value. Whether it covers the offline delay is open (OQ-26).
+- ADR 0012 now says the 30-day rule covers DynamoDB only. The lake and Snowflake copies are open (OQ-43).
+- ADR 0023 had a stray reference to another project's step. Removed.
+- All 19 data contracts now have a server with a concrete storage location. Eleven contracts had `TBD`, and eight had no server block. The naming convention is in [design-doc.md](design-doc.md), section 9.1.
+- The design doc, requirements and API specification now link to [../Platform/platform-requirements.md](../platform/platform-requirements.md) instead of placeholder paths to a platform folder that does not exist.
+- The design doc gained: section 9.1 (storage names); section 10 (error codes, and a note that the vote endpoint's 429 has no recorded limit); section 14 (a table of where decisions changed the build plan); section 12.2 (a proposed rule that access logs exclude the visitor ID header); and open questions OQ-42 (AWS region) and OQ-43 (retention of report copies). OQ-39 was extended to cover vote limits.
+- Glossary: duplicate entries removed; ODCS, residual risk, runbook and threat model added.
+- Requirements: typos in the feature name "satellite window" corrected; FR-55 notes the open retention question.
+
+**Not changed**
+- Requirements, the 17-section design doc structure, the 24 ADRs, the 19 contracts' schemas, and the API paths and operations. These were already complete.
+- The root-level files `ANSWERED_DECISIONS.md` and `DECISIONS_NEEDED.md`. Each Project 1 item in `DECISIONS_NEEDED.md` is either answered in the design doc or narrowed to an open sub-question (design doc, section 16). Answers come from `ANSWERED_DECISIONS.md`.
+
+**Still open at this revision**
+- 24 open questions remain, counting the two partly decided ones (OQ-18 and OQ-39). Each has a GitHub issue still to be created.
+- The platform's own document set (not written).
+- The reference generated from code (written when the code exists).
+- John's approval of each document.
+
+### Oct 9, 2026: first complete set
+
+- Requirements (76 functional requirements, 22 quality requirements, acceptance criteria for every feature in Phases A and B).
+- Design doc, 17 sections, following the design doc template in the Documentation Plan.
+- ADRs 0001 to 0024.
+- Data contracts (ODCS v3.0.2 working version) for the 19 published, source and internal tables.
+- API specification (OpenAPI 3.0.3 working version) with six operations.
+- Status: draft for review.
+
+---
+
+## Phases
+
+| Phase | Status | Released |
+|---|---|---|
+| Platform skeleton (before Project 1) | Not started | Not released |
+| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | Not started | Not released |
+| Phase B: depth (every carrier, warehouse, confidence model, assistant, reports) | Not started | Not released |
+| Phase C: scale (second round) | Not started. Acceptance checks not yet written | Not released |
+
+Entries for each phase are added here when the phase ships. Each entry lists the features that went live, the checks that passed, and any known gaps.

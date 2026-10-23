@@ -1,0 +1,63 @@
+# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32). Names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-signal-report-set-aside
+name: signal_report_set_aside
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Reports set aside by the nightly copy as impossible patterns (outside any mapped area, bursts that contradict nearby reports) for review.
+  limitations: Excluded from counts and labels. Carries no visitor ID. Retention not recorded; follows the 30-day rule of raw reports unless John decides otherwise (recovery is off for the reports table, ADR 0022).
+  usage: Review by John; not published.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: iceberg-signal-report-set-aside
+    type: s3
+    description: Iceberg table in the lake, for review.
+    location: "Lake table {env}_signal.signal_report_set_aside in s3://{env}-signal-lake/ (table name proposed, OQ-21)."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Written or loaded in each nightly run unless stated otherwise.
+customProperties:
+  - property: openQuestions
+    value: OQ-35
+  - property: adr
+    value: adrs/0012
+schema:
+  - name: signal_report_set_aside
+    physicalName: signal_report_set_aside
+    physicalType: table
+    description: One row per set-aside report.
+    properties:
+      - name: report_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+      - name: carrier
+        logicalType: string
+        required: true
+      - name: had_signal
+        logicalType: boolean
+        required: true
+      - name: report_hour_utc
+        logicalType: timestamp
+        required: true
+      - name: reason
+        logicalType: string
+        required: true
+        description: Which rule set it aside.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.

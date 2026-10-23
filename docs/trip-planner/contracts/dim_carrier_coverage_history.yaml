@@ -1,0 +1,67 @@
+# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32). Names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-dim-carrier-coverage-history
+name: dim_carrier_coverage_history
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: SCD Type 2 history of carrier coverage per H3 cell across FCC releases, built by dbt on Snowflake.
+  limitations: Release identifiers must be identifiable in the FCC files (OQ-20). Business history is kept in rows, not Iceberg snapshots (engineering standard 8, which keeps business history in rows).
+  usage: Feeds fct_trail_point_coverage.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: snowflake-signal-marts
+    type: snowflake
+    description: Snowflake mart; reads Iceberg tables through the Glue catalog.
+    location: "Snowflake database SIGNAL_{ENV}, schema MARTS (names proposed, OQ-21), one per environment."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Written or loaded in each nightly run unless stated otherwise.
+customProperties:
+  - property: openQuestions
+    value: OQ-4, OQ-20
+  - property: adr
+    value: adrs/0015
+schema:
+  - name: dim_carrier_coverage_history
+    physicalName: dim_carrier_coverage_history
+    physicalType: table
+    description: One row per cell, carrier and validity range.
+    properties:
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: carrier
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+      - name: covered
+        logicalType: boolean
+        required: true
+      - name: valid_from_utc
+        logicalType: timestamp
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 3
+      - name: valid_to_utc
+        logicalType: timestamp
+        required: false
+        description: Null for the current row.
+      - name: fcc_release
+        logicalType: string
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.

@@ -1,0 +1,83 @@
+# Data contract (ODCS v3.0.2). Draft, Phase B. Lake table that replaces raw report rows after 30 days (ADR 0034).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-report-cell-day
+name: report_cell_day
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Daily counts of hiker reports per H3 resolution 9 cell. These counts are kept after the raw report rows are deleted 30 days after their nightly copy, and they are the input to the label rule (N reports in one cell on one day, ADR 0008).
+  limitations: Holds counts only. No visitor ID, no coordinates and no hour, so a count cannot identify one hiker. A cell-day with fewer reports than the label threshold N is still stored as a count, and only cell-days that pass the threshold become labels. Cells set aside as impossible are not counted.
+  usage: Label input for the confidence model (C17) and the source for area counts (C23).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: lake-report-cell-day
+    type: s3
+    description: Iceberg table in the lake, written by the nightly copy (C23).
+    location: "Lake table {env}_signal.report_cell_day in s3://{env}-signal-lake/. Table name proposed (OQ-21)."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Updated in each nightly run, after the report copy.
+  - property: retention
+    value: kept
+    description: Counts are kept. They contain no personal data (ADR 0034).
+customProperties:
+  - property: openQuestions
+    value: OQ-12, OQ-13, OQ-43
+  - property: adr
+    value: adrs/0034, adrs/0008, adrs/0012
+schema:
+  - name: report_cell_day
+    physicalName: report_cell_day
+    physicalType: table
+    description: One row per H3 resolution 9 cell and UTC day.
+    properties:
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: H3 resolution 9 cell computed on the phone.
+      - name: report_date_utc
+        logicalType: date
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: UTC day of the report's hour (ADR 0026).
+      - name: report_count
+        logicalType: integer
+        required: true
+        description: Number of accepted reports in the cell on that day.
+      - name: signal_yes_count
+        logicalType: integer
+        required: true
+        description: How many of those reports said the hiker had signal.
+      - name: signal_no_count
+        logicalType: integer
+        required: true
+        description: How many of those reports said the hiker had no signal.
+      - name: built_at_utc
+        logicalType: timestamp
+        required: true
+        description: When the nightly copy wrote this row.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - h3_cell_res9
+            - report_date_utc
+      - type: sql
+        description: The yes and no counts add up to the report count.
+        query: SELECT COUNT(*) FROM report_cell_day WHERE signal_yes_count + signal_no_count <> report_count
+        mustBe: 0

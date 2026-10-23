@@ -1,0 +1,55 @@
+# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32). Names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-orbit-update-stream
+name: orbit_update_stream
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Kafka topic of new CelesTrak element sets published by the nightly run, read by the availableNow Structured Streaming job to find changed satellites.
+  limitations: Low-rate stream with an explicit schema, S3 checkpoints, a watermark and dropDuplicatesWithinWatermark. Topic name, watermark and the meaning of changed are open.
+  usage: Input to C14 and the trigger for re-propagation in C5.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: kafka-orbit-element-sets
+    type: kafka
+    description: Kafka topic on the session box of each environment; low-rate (ADR 0016).
+    location: "Kafka topic orbit-element-sets on the session box (topic name proposed, OQ-30)."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Written or loaded in each nightly run unless stated otherwise.
+customProperties:
+  - property: openQuestions
+    value: OQ-30
+  - property: adr
+    value: adrs/0016
+schema:
+  - name: orbit_update_stream
+    physicalName: orbit_update_stream
+    physicalType: table
+    description: One message per element set. Fields mirror celestrak_gp plus the pull time.
+    properties:
+      - name: norad_cat_id
+        logicalType: integer
+        required: true
+      - name: epoch_utc
+        logicalType: timestamp
+        required: true
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+      - name: elements
+        logicalType: object
+        required: true
+        description: Orbital elements as in celestrak_gp (column list there).
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.
