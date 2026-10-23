@@ -30,7 +30,7 @@ variable "subnet_id" {
 }
 
 variable "security_group_ids" {
-  description = "Security groups for the box. Allow no inbound traffic from the internet."
+  description = "Extra security groups for the box, on top of its own group, which allows no inbound traffic. Usually empty."
   type        = list(string)
   default     = []
 }

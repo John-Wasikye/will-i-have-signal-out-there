@@ -19,6 +19,21 @@ locals {
   apply_role     = "portfolio-${var.env}-terraform-apply"
   state_bucket   = "arn:${local.partition}:s3:::portfolio-terraform-state-${local.account_id}"
   own_state_path = "${local.state_bucket}/${var.env}/*"
+
+  # IAM refuses an ARN whose service is a wildcard, so a "refuse anything named X" rule is
+  # written once per service. These are the services the projects in this account use.
+  # S3 ARNs have no region or account, and IAM and CloudFront have no region.
+  named_resource_arns = {
+    for name in distinct(concat(["portfolio-live-", "portfolio_live"], var.protected_names)) : name => concat(
+      ["arn:${local.partition}:s3:::*${name}*"],
+      [for service in ["iam", "cloudfront"] : "arn:${local.partition}:${service}::*:*${name}*"],
+      [for service in local.regional_services : "arn:${local.partition}:${service}:*:*:*${name}*"],
+    )
+  }
+  regional_services = [
+    "apigateway", "cloudtrail", "cloudwatch", "dynamodb", "ec2", "ecr", "ecs", "events", "glue",
+    "kms", "lambda", "logs", "scheduler", "secretsmanager", "sns", "sqs", "ssm", "states",
+  ]
 }
 
 data "aws_iam_policy_document" "plan_trust" {
@@ -173,11 +188,11 @@ data "aws_iam_policy_document" "refuse_live" {
     sid     = "RefuseLiveResources"
     effect  = "Deny"
     actions = ["*"]
-    resources = [
-      "arn:${local.partition}:*:*:*:*portfolio-live-*",
-      "arn:${local.partition}:*:*:*:*portfolio_live*",
-      "arn:${local.partition}:s3:::portfolio-terraform-state-*/live/*",
-    ]
+    resources = concat(
+      local.named_resource_arns["portfolio-live-"],
+      local.named_resource_arns["portfolio_live"],
+      ["arn:${local.partition}:s3:::portfolio-terraform-state-*/live/*"],
+    )
   }
 
   statement {
@@ -210,13 +225,16 @@ resource "aws_iam_role_policy" "refuse_live" {
 # project's Terraform owns and every project's roles trust.
 data "aws_iam_policy_document" "refuse_other_projects" {
   dynamic "statement" {
-    for_each = length(var.protected_arns) > 0 ? [1] : []
+    for_each = length(var.protected_names) + length(var.protected_arns) > 0 ? [1] : []
 
     content {
-      sid       = "RefuseOtherProjects"
-      effect    = "Deny"
-      actions   = ["*"]
-      resources = var.protected_arns
+      sid     = "RefuseOtherProjects"
+      effect  = "Deny"
+      actions = ["*"]
+      resources = concat(
+        flatten([for name in var.protected_names : local.named_resource_arns[name]]),
+        var.protected_arns,
+      )
     }
   }
 

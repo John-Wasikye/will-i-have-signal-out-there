@@ -7,6 +7,12 @@ mock_provider "aws" {
       name = "us-east-1"
     }
   }
+
+  mock_data "aws_subnet" {
+    defaults = {
+      vpc_id = "vpc-0123456789abcdef0"
+    }
+  }
 }
 
 variables {
@@ -232,5 +238,34 @@ run "dev_can_turn_the_nightly_schedule_off" {
   assert {
     condition     = aws_scheduler_schedule.hard_stop.state == "ENABLED"
     error_message = "The hard stop must stay on even when the nightly start is off, so a box I start by hand still stops."
+  }
+}
+
+# Without its own group, AWS gives the box the VPC's default security group, which lets in
+# traffic from anything else in that group. The first live apply showed it, and Terraform then
+# kept trying to remove it.
+run "the_box_has_its_own_security_group_with_no_inbound_rules" {
+  command = plan
+
+  variables {
+    env                   = "live"
+    ami_id                = "ami-0123456789abcdef0"
+    subnet_id             = "subnet-0123456789abcdef0"
+    instance_profile_name = "portfolio-live-session-box"
+  }
+
+  assert {
+    condition     = aws_security_group.box.name == "portfolio-live-session-box" && aws_security_group.box.vpc_id == "vpc-0123456789abcdef0"
+    error_message = "The box must get its own security group in its subnet's network."
+  }
+
+  assert {
+    condition     = length(aws_security_group.box.ingress) == 0
+    error_message = "The box must accept no inbound traffic; I reach it through Session Manager."
+  }
+
+  assert {
+    condition     = length(aws_security_group.box.egress) == 1 && one(aws_security_group.box.egress).protocol == "-1"
+    error_message = "The box must be able to reach out, to pull images and call AWS."
   }
 }

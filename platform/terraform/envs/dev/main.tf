@@ -99,6 +99,10 @@ module "serving" {
   lambda_zip_path   = var.lambda_zip_path
   lambda_zip_sha256 = var.lambda_zip_sha256
   allowed_origins   = ["https://${module.site.domain_name}"]
+
+  # The account's whole Lambda limit is 10, shared by dev and live, and AWS keeps 10
+  # unreserved, so no reservation can be set. The account limit is the cap until AWS raises it.
+  reserved_concurrency = null
 }
 
 module "registry" {
@@ -120,8 +124,8 @@ module "github_roles" {
 
   # The NFL project (nfl-player-performance) runs in the same AWS account. Its resources are
   # named nfl-* or jw-nfl-*, apart from its two GitHub roles and its CloudFront distribution.
+  protected_names = ["nfl-"]
   protected_arns = [
-    "arn:aws:*:*:*:*nfl-*",
     "arn:aws:iam::*:role/github-plan",
     "arn:aws:iam::*:role/github-deploy",
     "arn:aws:cloudfront::*:distribution/E1OZ5WDKRFMJ25",
