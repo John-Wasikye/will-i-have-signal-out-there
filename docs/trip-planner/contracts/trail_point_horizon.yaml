@@ -1,0 +1,66 @@
+# Data contract (ODCS). Draft. Internal Iceberg table, written by Spark (C4). Not a source or a published table;
+# included because the horizon is one of the four trickiest parts of the design.
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-trail-point-horizon
+name: trail_point_horizon
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: For every trail point, how high terrain rises in each compass direction out to about 15 km, stored as 36 horizon angles.
+  limitations: Built from a surface model that includes vegetation and buildings. Horizon details (range cutoff, curvature, observer height, direction convention) are open (OQ-24).
+  usage: Input to the satellite window engine (C5) through horizon_at.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: iceberg-trail-point-horizon
+    type: s3
+    description: Iceberg table in the lake, written by Spark.
+    location: "Lake table {env}_signal.trail_point_horizon in s3://{env}-signal-lake/."
+slaProperties:
+  - property: frequency
+    value: reference data
+    description: Recomputed when trail or elevation inputs change, or nightly if OQ-25 decides so. Partition overwrite makes either safe.
+customProperties:
+  - property: openQuestions
+    value: OQ-24, OQ-25
+  - property: adr
+    value: adrs/0004
+schema:
+  - name: trail_point_horizon
+    physicalName: trail_point_horizon
+    physicalType: table
+    description: One row per trail point.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: horizon_angles_deg
+        logicalType: array
+        required: true
+        description: Exactly 36 angles in degrees, one per 10-degree compass sector (sector 0 centered on north, clockwise; convention is a proposal, OQ-24).
+        quality:
+          - type: text
+            description: Array length is 36. Each value is between 0 and 90 degrees (expected range; confirm margin, OQ-24).
+      - name: computed_at_utc
+        logicalType: timestamp
+        required: true
+      - name: elevation_source_manifest_sha256
+        logicalType: string
+        required: true
+        description: Hash of the tile manifest used, so a result can be replayed.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id

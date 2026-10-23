@@ -1,0 +1,104 @@
+# Data contract (ODCS). Draft. Published gold table (Parquet). Column names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-published-fct-satellite-window
+name: fct_satellite_window
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: When a Direct-to-Cell satellite clears both the minimum elevation and the terrain horizon for each trail point, stored as start and end times (never one row per minute).
+  limitations: The run predicts 26 hours (24 plus the 2-hour nightly maximum, ADR 0019); the page says the next 24 hours. Predictions are valid until valid_until_utc (the end of the prediction span). When the data is late the page keeps showing it with a late notice and the time of the last good run (ADR 0006, amended); it does not hide it. A satellite window's edges are accurate to the 1-minute propagation step. The row limit is set from the measured size (OQ-1, OQ-15). The definition of "late" for the notice is OQ-23.
+  usage: Read by the serving Lambda; shown on the page with a late notice when late.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: published-parquet
+    type: s3
+    description: Published gold Parquet. Separate for dev and live.
+    location: "Published Parquet: s3://{env}-signal-lake/published/fct_satellite_window/. Dev and live buckets are separate."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Rebuilt in each nightly run at 10:00 UTC, hard maximum 2 hours.
+  - property: latency
+    value: 2
+    unit: h
+    description: Nightly maximum run time; usually about 45 minutes. Publish must complete inside it.
+  - property: retention
+    value: published data kept
+customProperties:
+  - property: openQuestions
+    value: OQ-1, OQ-9, OQ-15, OQ-21, OQ-23
+  - property: adr
+    value: adrs/0003, adrs/0005, adrs/0006, adrs/0019
+schema:
+  - name: fct_satellite_window
+    physicalName: fct_satellite_window
+    physicalType: table
+    description: One row per trail point, satellite and satellite window. Partition per run logical date (UTC); rerunning a day overwrites only that partition.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: satellite_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: Satellite catalog number as text.
+      - name: window_start_utc
+        logicalType: timestamp
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: First minute the satellite is reachable.
+      - name: window_end_utc
+        logicalType: timestamp
+        required: true
+        description: Last minute the satellite is reachable. Must be on or after window_start_utc.
+      - name: min_elevation_deg
+        logicalType: number
+        required: true
+        description: Minimum elevation used for this run (10 in the starting configuration, ADR 0003).
+      - name: run_logical_date
+        logicalType: date
+        required: true
+        description: Partition key.
+      - name: valid_until_utc
+        logicalType: timestamp
+        required: true
+        description: Time the run's predictions stop being valid (end of the 26-hour prediction span).
+      - name: run_started_utc
+        logicalType: timestamp
+        required: true
+        description: Start time of the last good run that produced these rows; shown in the late notice.
+      - name: loaded_at_utc
+        logicalType: timestamp
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+            - satellite_id
+            - window_start_utc
+            - run_logical_date
+      - type: sql
+        description: Window end is on or after satellite window start.
+        query: SELECT COUNT(*) FROM fct_satellite_window WHERE window_end_utc < window_start_utc
+        mustBe: 0
+      - type: sql
+        description: valid_until_utc is later than every satellite window start in the run.
+        query: SELECT COUNT(*) FROM fct_satellite_window WHERE valid_until_utc < window_start_utc
+        mustBe: 0

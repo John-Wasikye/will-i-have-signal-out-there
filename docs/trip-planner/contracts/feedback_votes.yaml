@@ -1,0 +1,60 @@
+# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32). Names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-feedback-votes
+name: feedback_votes
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Thumbs-up and thumbs-down votes on assistant answers, stored in DynamoDB and used for the A/B test of two prompt versions.
+  limitations: Whether a vote carries any visitor identity, and its retention, are not recorded.
+  usage: Eval and A/B analysis (C20).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: dynamodb-feedback-votes
+    type: custom
+    description: DynamoDB, always on; provisioned within the free tier.
+    location: "DynamoDB table {env}-signal-feedback (name proposed, OQ-21)."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Written or loaded in each nightly run unless stated otherwise.
+customProperties:
+  - property: openQuestions
+    value: OQ-39, OQ-38
+  - property: adr
+    value: adrs/0017
+schema:
+  - name: feedback_votes
+    physicalName: feedback_votes
+    physicalType: table
+    description: One item per vote. No visitor ID stored (ADR 0033).
+    properties:
+      - name: vote_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: answer_id
+        logicalType: string
+        required: true
+      - name: vote
+        logicalType: string
+        required: true
+        description: up or down.
+      - name: prompt_version
+        logicalType: string
+        required: true
+      - name: vote_hour_utc
+        logicalType: timestamp
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.

@@ -1,0 +1,53 @@
+# Data contract (ODCS). Draft. Published gold table (Parquet). The grain is not decided (OQ-33).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-published-dim-time
+name: dim_time
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Time dimension of the small star schema (trail point, time, coverage and satellite windows, build plan 1A.5).
+  limitations: The grain is one row per UTC minute (OQ-33, ADR 0028). Only the UTC value is defined here. Local time is computed on the page, never stored (engineering standard 15, which stores timestamps in UTC).
+  usage: Joined from fct_satellite_window.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: published-parquet
+    type: s3
+    description: Published gold Parquet. Separate for dev and live.
+    location: "s3://{env}-signal-lake/published/dim_time/"
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+customProperties:
+  - property: openQuestions
+    value: OQ-33
+schema:
+  - name: dim_time
+    physicalName: dim_time
+    physicalType: table
+    description: One row per time value at the grain decided in OQ-33.
+    properties:
+      - name: time_key
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: time_utc
+        logicalType: timestamp
+        required: true
+        description: UTC value of the time bucket.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - time_key

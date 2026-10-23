@@ -69,6 +69,7 @@ The module tests use a mock AWS provider and make no AWS calls. The IAM tests us
 - Every timestamp is stored in UTC. The page converts it to the reader's local time.
 - Every key lives in AWS Parameter Store. None is stored in this repository or in GitHub.
 - The platform design, decision records and data contracts are in [docs/platform](docs/platform).
+- The trip planner's own design, requirements, decision records and data contracts are in [docs/trip-planner](docs/trip-planner).
 
 ## License
 

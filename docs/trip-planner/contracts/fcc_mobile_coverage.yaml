@@ -1,0 +1,85 @@
+# Data contract (ODCS). Draft. ODCS version is a working placeholder (design-doc OQ-32).
+# FCC file layout beyond what the Documentation Plan confirms is open (OQ-20, OQ-7).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-fcc-mobile-coverage
+name: fcc_mobile_coverage
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Mobile coverage published by the FCC (U.S. Federal Communications Commission), downloaded per provider, state and technology as a Shapefile or GeoPackage; most datasets include H3 resolution 9 hexagons alongside the raw modeled coverage. Used to flag each trail point covered or not for a carrier.
+  limitations: Coverage is a modeled claim, not a measurement; the confidence model (Phase B) judges how far to trust it. Phase A loads one carrier in Arizona; Phase B loads every carrier for the park. The release cadence and terms are not recorded (OQ-20, OQ-22).
+  usage: Input to C6 (coverage flag) and C13 (all carriers); source of SCD Type 2 carrier coverage history in Snowflake (Phase B).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: fcc-coverage-download
+    type: api
+    description: FCC coverage file download per provider, state and technology. Exact location to be fixed in the first-run check (OQ-20).
+    location: "Public FCC download; file names fixed by OQ-20. Raw copies: s3://{env}-signal-raw/fcc/. Lake table: {env}_signal.fcc_coverage_cell."
+slaProperties:
+  - property: frequency
+    value: release cadence not recorded
+    description: Freshness target depends on the FCC release schedule (OQ-20). Reference data refresh cadence is OQ-25.
+  - property: retention
+    value: raw files kept
+customProperties:
+  - property: openQuestions
+    value: OQ-7, OQ-11, OQ-20, OQ-22, OQ-25
+  - property: adr
+    value: adrs/0007, adrs/0015
+schema:
+  - name: fcc_coverage_cell
+    physicalName: fcc_coverage_cell
+    physicalType: table
+    description: One row per H3 resolution 9 cell, carrier, technology and release. Partition per pull.
+    properties:
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: H3 resolution 9 cell index from the file's hexagons.
+      - name: carrier
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: Provider as named in the FCC file. The Phase A carrier is T-Mobile (ADR 0020); the provider name as written in the file is OQ-20.
+      - name: technology
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: Technology as named in the FCC file.
+      - name: release
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 4
+        description: FCC release identifier or date; basis for SCD Type 2 rows in Phase B. Format open (OQ-20).
+      - name: source_url
+        logicalType: string
+        required: true
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+      - name: content_sha256
+        logicalType: string
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - h3_cell_res9
+            - carrier
+            - technology
+            - release

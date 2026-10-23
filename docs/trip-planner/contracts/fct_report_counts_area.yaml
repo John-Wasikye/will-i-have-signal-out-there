@@ -1,0 +1,72 @@
+# Data contract (ODCS). Draft, Phase B. Published gold table (Parquet). Column names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-published-fct-report-counts-area
+name: fct_report_counts_area
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Counts of hiker signal reports per area, shown on the trail page.
+  limitations: An area is the H3 resolution 6 parent of the report cell (OQ-35, ADR 0030). Counts are shown only where at least 5 reports exist in 7 days. Reports set aside as impossible are not counted. No visitor identifiers exist in this table.
+  usage: Read by the serving Lambda and shown on the page.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: published-parquet
+    type: s3
+    description: Published gold Parquet. Separate for dev and live.
+    location: "s3://{env}-signal-lake/published/fct_report_counts_area/"
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Rebuilt after the nightly report copy.
+customProperties:
+  - property: openQuestions
+    value: OQ-35
+  - property: adr
+    value: adrs/0009, adrs/0012
+schema:
+  - name: fct_report_counts_area
+    physicalName: fct_report_counts_area
+    physicalType: table
+    description: One row per area, carrier and signal answer.
+    properties:
+      - name: area_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Area key, an H3 resolution 6 cell (ADR 0030).
+      - name: carrier
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+      - name: had_signal
+        logicalType: boolean
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 3
+      - name: report_count
+        logicalType: integer
+        required: true
+      - name: counted_through_utc
+        logicalType: timestamp
+        required: true
+        description: Latest report hour included.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - area_id
+            - carrier
+            - had_signal

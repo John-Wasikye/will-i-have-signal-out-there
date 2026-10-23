@@ -1,0 +1,104 @@
+# Data contract (ODCS v3.0.2). Draft, Phase B. Source for the remoteness input (ADR 0035).
+# Field names are the TIGER/Line names as published; they are confirmed against a real file in the first-run check (OQ-20).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-source-tiger-roads
+name: tiger_roads
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Road centre lines from the U.S. Census Bureau TIGER/Line All Roads county files, used to compute how far each trail point is from the nearest road (remoteness, ADR 0035).
+  limitations: Covers roads in the counties that contain the park and a buffer of 15 km around it. Roads are used only as distance targets; nothing from this file is published on its own. The file's rights field carries "otherRestrictions" on some county files. The licence of the exact vintage used is checked on the Census Bureau page before the first load (first-run check, ADR 0035).
+  usage: Input to the remoteness calculation (C17) only.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: census-tiger-all-roads
+    type: api
+    description: U.S. Census Bureau TIGER/Line All Roads county-based shapefiles, one file per county. Download URLs fixed by the first-run check (OQ-20).
+    location: "Public Census Bureau download. Raw copies with URL, fetch time and hash: s3://{env}-signal-raw/tiger/roads/. Lake table: {env}_signal.tiger_road (Glue catalog)."
+slaProperties:
+  - property: frequency
+    value: reference data
+    description: Downloaded when a new TIGER/Line vintage is chosen. Not nightly (ADR 0028).
+  - property: retention
+    value: raw files kept
+    description: Raw source files are kept. Live raw files are locked for 30 days.
+customProperties:
+  - property: openQuestions
+    value: OQ-20
+  - property: licence
+    value: "Declared CC0 1.0 public domain on data.gov, with a rights flag of otherRestrictions on some files. Checked on the Census Bureau page before the first load."
+  - property: adr
+    value: adrs/0035, adrs/0031
+schema:
+  - name: tiger_roads
+    physicalName: tiger_road
+    physicalType: table
+    description: One row per road segment per vintage. Partition per vintage year.
+    properties:
+      - name: tlid
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        customProperties:
+          - property: upstreamField
+            value: 'TLID (to be confirmed, OQ-20)'
+        description: Census permanent line identifier of the segment.
+      - name: vintage_year
+        logicalType: integer
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: TIGER/Line vintage the segment comes from.
+      - name: full_name
+        logicalType: string
+        required: false
+        customProperties:
+          - property: upstreamField
+            value: 'FULLNAME (to be confirmed, OQ-20)'
+        description: Road name as published. May be empty.
+      - name: feature_class_code
+        logicalType: string
+        required: true
+        customProperties:
+          - property: upstreamField
+            value: 'MTFCC (to be confirmed, OQ-20)'
+        description: Census feature class code, for example the code for a primary road or a local street.
+      - name: county_fips
+        logicalType: string
+        required: true
+        description: Five-digit county code that the file was downloaded for.
+      - name: geometry_wkt
+        logicalType: string
+        required: true
+        description: Segment geometry as well-known text, in the coordinate system the file publishes (NAD83). Converted to WGS84 before any distance is computed.
+      - name: source_url
+        logicalType: string
+        required: true
+        description: URL the raw file came from.
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+        description: Fetch time, UTC.
+      - name: content_sha256
+        logicalType: string
+        required: true
+        description: Hash of the raw file.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Required fields are never null.
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - tlid
+            - vintage_year
+        description: Unique per segment and vintage.

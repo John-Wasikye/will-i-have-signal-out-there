@@ -1,0 +1,80 @@
+# Data contract (ODCS). Draft, Phase B. Published gold table (Parquet). Column names are proposals (OQ-21).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-published-fct-coverage-confidence
+name: fct_coverage_confidence
+version: 0.1.0
+status: draft
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: How likely the FCC coverage claim is to be right at a trail point and carrier, or the statement that there are not enough measurements.
+  limitations: A confidence level exists only where enough Ookla tests exist nearby (threshold OQ-14). Elsewhere the status is not_enough_measurements and no number is shown. Derived from Ookla data (CC BY-NC-SA 4.0, ADR 0013) and OpenCelliD tower locations (share-alike, ADR 0024), so it carries both licenses. Inputs are terrain, distance to the nearest tower, remoteness (distance to the nearest TIGER/Line road or NPS trail line; ADR 0035).
+  usage: Read by the serving Lambda; shown on the trail page; used by the assistant through the metrics tools.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: published-parquet
+    type: s3
+    description: Published gold Parquet. Separate for dev and live.
+    location: "s3://{env}-signal-lake/published/fct_coverage_confidence/"
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Scored in each nightly run with the model copy in the repo.
+customProperties:
+  - property: license
+    value: "Includes data derived from Speedtest by Ookla® open data, licensed under CC BY-NC-SA 4.0. Derived data published here is shared under the same license."
+  - property: openQuestions
+    value: OQ-12, OQ-13, OQ-14, OQ-18, OQ-19
+  - property: adr
+    value: adrs/0008, adrs/0013, adrs/0014, adrs/0024
+schema:
+  - name: fct_coverage_confidence
+    physicalName: fct_coverage_confidence
+    physicalType: table
+    description: One row per trail point and carrier.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: carrier
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+      - name: status
+        logicalType: string
+        required: true
+        description: One of confidence_available or not_enough_measurements.
+      - name: confidence
+        logicalType: number
+        required: false
+        description: Probability that the FCC claim is right. Null when status is not_enough_measurements. Units and level labels are open (OQ-21).
+      - name: nearby_test_count
+        logicalType: integer
+        required: true
+        description: Number of tests that counted as nearby.
+      - name: model_version
+        logicalType: string
+        required: true
+        description: MLflow-tracked version of the model copy in the repo.
+      - name: scored_at_utc
+        logicalType: timestamp
+        required: true
+    quality:
+      - type: sql
+        description: Confidence is null exactly when status is not_enough_measurements.
+        query: SELECT COUNT(*) FROM fct_coverage_confidence WHERE (status = 'not_enough_measurements') <> (confidence IS NULL)
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+            - carrier
