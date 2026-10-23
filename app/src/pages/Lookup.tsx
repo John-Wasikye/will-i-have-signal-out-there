@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { AnswerCard, type SampleRow } from '../components/AnswerCard'
 import { ColdStartNotice } from '../components/ColdStartNotice'
 import { LateNotice } from '../components/LateNotice'
+import { sampleUrl } from '../lib/api'
 
 const NOT_FOUND_MESSAGE = 'No sample row with that key.'
 const GENERIC_ERROR_MESSAGE = 'Something went wrong. Try again.'
@@ -12,9 +13,7 @@ type LookupResult =
 
 async function fetchSample(key: string): Promise<LookupResult> {
   try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/sample?key=${encodeURIComponent(key)}`,
-    )
+    const response = await fetch(sampleUrl(import.meta.env.VITE_API_BASE_URL, key))
     if (response.status === 404) return { kind: 'error', message: NOT_FOUND_MESSAGE }
     if (!response.ok) return { kind: 'error', message: GENERIC_ERROR_MESSAGE }
     return { kind: 'row', row: (await response.json()) as SampleRow }
