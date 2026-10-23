@@ -141,6 +141,29 @@ run "idle_alarm_stops_the_box" {
     condition     = aws_cloudwatch_metric_alarm.idle.metric_name == "CPUUtilization"
     error_message = "The idle alarm must watch CPU use."
   }
+
+  # An alarm acts only when it moves into ALARM. If missing data counted as idle, a stopped
+  # box would leave the alarm in ALARM, and a box started and left idle would never be stopped.
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.idle.treat_missing_data == "missing"
+    error_message = "A stopped box must leave the idle alarm waiting for data, not already in ALARM."
+  }
+}
+
+run "tags_come_from_the_environment_except_the_name" {
+  command = plan
+
+  variables {
+    env                   = "dev"
+    ami_id                = "ami-0123456789abcdef0"
+    subnet_id             = "subnet-0123456789abcdef0"
+    instance_profile_name = "portfolio-dev-session-box"
+  }
+
+  assert {
+    condition     = keys(aws_instance.box.tags) == tolist(["Name"])
+    error_message = "The provider's default tags set Project, Environment and ManagedBy, so the box must not set its own."
+  }
 }
 
 run "rejects_an_instance_size_outside_the_plan" {

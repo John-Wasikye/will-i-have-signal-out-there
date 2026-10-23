@@ -46,11 +46,9 @@ resource "aws_instance" "box" {
     encrypted   = true
   }
 
+  # Project, Environment and ManagedBy come from the provider's default tags in envs/.
   tags = {
-    Name        = local.name
-    Project     = "portfolio-data-platform"
-    Environment = var.env
-    ManagedBy   = "terraform"
+    Name = local.name
   }
 }
 
@@ -95,6 +93,10 @@ resource "aws_scheduler_schedule" "hard_stop" {
 
 # Stops the box after the CPU has stayed below the idle threshold. The alarm action is the
 # built-in EC2 stop action, so no Lambda function is needed for this guard.
+#
+# An alarm acts only when it moves into ALARM. A stopped box sends no CPU data, so missing data
+# leaves the alarm waiting (INSUFFICIENT_DATA) rather than already in ALARM. After the next
+# boot, idle periods then move it into ALARM, and that move stops the box.
 resource "aws_cloudwatch_metric_alarm" "idle" {
   alarm_name          = "${local.name}-idle"
   alarm_description   = "Stops the session box when it has been idle. Budget alerts lag, so this is a real cost guard."
@@ -105,7 +107,7 @@ resource "aws_cloudwatch_metric_alarm" "idle" {
   evaluation_periods  = var.idle_evaluation_periods
   threshold           = var.idle_cpu_percent
   comparison_operator = "LessThanThreshold"
-  treat_missing_data  = "breaching"
+  treat_missing_data  = "missing"
   alarm_actions       = ["arn:aws:automate:${data.aws_region.current.name}:ec2:stop"]
 
   dimensions = {

@@ -7,7 +7,7 @@ What the module creates:
 - **The box:** a spot instance using a persistent request, so it can be stopped and started again. A spot interruption stops the box rather than ending it, because every job is safe to rerun. A `t4g` box runs in standard credit mode, so surplus CPU never bills. An `m7g` box is not burstable, so it has no credit setting.
 - **A start at 10:00 UTC:** an EventBridge Scheduler schedule starts the box every night. That is 3 a.m. in Arizona and 6 a.m. in US Eastern.
 - **A hard stop at 14:00 UTC:** a second schedule stops the box four hours after the start, whatever the pipelines are doing. This is my session limit.
-- **An idle stop:** a CloudWatch alarm stops the box when its CPU stays below a threshold. The alarm uses EC2's built-in stop action, so it needs no Lambda function.
+- **An idle stop:** a CloudWatch alarm stops the box when its CPU stays below a threshold. The alarm uses EC2's built-in stop action, so it needs no Lambda function. A stopped box sends no data, and the alarm treats that as missing rather than idle: an alarm acts only when it moves into ALARM, so if a stopped box left it already in ALARM, a box started and then left idle would never be stopped.
 
 What the module does not do yet: it does not install k3s, Airflow or Spark, it does not stop the box at the two-hour nightly maximum, and it does not handle the two-minute interruption warning beyond stopping the box. Those are the next steps.
 
