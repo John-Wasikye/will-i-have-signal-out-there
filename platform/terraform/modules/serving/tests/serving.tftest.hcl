@@ -1,6 +1,6 @@
 # Plan-only tests. No AWS calls are made.
-# The real provider runs so the policy documents build real JSON. Only the three lookups
-# that need an AWS account are overridden with fixed values.
+# The real provider runs so the policy documents build real JSON. Only the partition lookup,
+# which needs an AWS account, is overridden with a fixed value.
 # Run from the module folder: terraform init -backend=false, then terraform test.
 
 provider "aws" {
@@ -23,12 +23,6 @@ variables {
 run "function_runs_on_arm_with_the_fastapi_handler" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -37,12 +31,6 @@ run "function_runs_on_arm_with_the_fastapi_handler" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   assert {
     condition     = aws_lambda_function.api.architectures[0] == "arm64"
@@ -58,12 +46,6 @@ run "function_runs_on_arm_with_the_fastapi_handler" {
 run "concurrency_is_capped_so_traffic_cannot_run_up_a_bill" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -72,12 +54,6 @@ run "concurrency_is_capped_so_traffic_cannot_run_up_a_bill" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   assert {
     condition     = aws_lambda_function.api.reserved_concurrent_executions == 10
@@ -88,12 +64,6 @@ run "concurrency_is_capped_so_traffic_cannot_run_up_a_bill" {
 run "api_throttles_requests" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -102,12 +72,6 @@ run "api_throttles_requests" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   assert {
     condition     = aws_apigatewayv2_stage.default.default_route_settings[0].throttling_rate_limit == 20
@@ -123,12 +87,6 @@ run "api_throttles_requests" {
 run "function_can_only_read_published_files" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -137,12 +95,6 @@ run "function_can_only_read_published_files" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   assert {
     condition     = strcontains(aws_iam_role_policy.published_read.policy, "s3:GetObject")
@@ -163,12 +115,6 @@ run "function_can_only_read_published_files" {
 run "logs_are_kept_for_90_days" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -177,12 +123,6 @@ run "logs_are_kept_for_90_days" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   assert {
     condition     = aws_cloudwatch_log_group.api.retention_in_days == 90
@@ -193,12 +133,6 @@ run "logs_are_kept_for_90_days" {
 run "only_the_listed_origins_may_call_the_api_from_a_browser" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -207,12 +141,6 @@ run "only_the_listed_origins_may_call_the_api_from_a_browser" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   assert {
     condition     = contains(aws_apigatewayv2_api.http.cors_configuration[0].allow_origins, "https://example.com")
@@ -233,12 +161,6 @@ run "only_the_listed_origins_may_call_the_api_from_a_browser" {
 run "refuses_a_wildcard_origin" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -247,12 +169,6 @@ run "refuses_a_wildcard_origin" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   variables {
     allowed_origins = ["*"]
@@ -266,12 +182,6 @@ run "refuses_a_wildcard_origin" {
 run "rejects_an_unknown_environment" {
   command = plan
 
-  override_data {
-    target = data.aws_caller_identity.current
-    values = {
-      account_id = "123456789012"
-    }
-  }
 
   override_data {
     target = data.aws_partition.current
@@ -280,12 +190,6 @@ run "rejects_an_unknown_environment" {
     }
   }
 
-  override_data {
-    target = data.aws_region.current
-    values = {
-      name = "us-east-1"
-    }
-  }
 
   variables {
     env = "staging"

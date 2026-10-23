@@ -1,5 +1,5 @@
 # Plan-only tests. No AWS calls are made.
-# The real provider runs so the policy documents build real JSON. Only the three lookups
+# The real provider runs so the policy documents build real JSON. Only the two lookups
 # that need an AWS account are overridden with fixed values, for every run in this file.
 # Run from the module folder: terraform init -backend=false, then terraform test.
 
@@ -26,12 +26,6 @@ override_data {
   }
 }
 
-override_data {
-  target = data.aws_region.current
-  values = {
-    name = "us-east-1"
-  }
-}
 
 variables {
   env              = "dev"
