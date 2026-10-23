@@ -3,8 +3,8 @@
 Airflow's PostgreSQL database lives on the session box, which is switched off most of the
 time. The box saves the database to S3 after every run and at shutdown, and restores the
 newest copy at startup. The backup holds no key: Airflow reads its connection keys from
-Parameter Store, and the database password reaches these commands only through the
-PGPASSWORD environment variable, never on a command line.
+Parameter Store, and the database commands run inside the PostgreSQL pod, which already holds
+the password, so it never appears on a command line or leaves the pod.
 
 I keep the newest copy and one before it. That is the default for open question OQ-P06.
 """
@@ -114,25 +114,15 @@ def psql_restore_command(host: str, port: int, user: str, database: str) -> list
     ]
 
 
-def dump_to_file(
-    command: list[str],
-    target_path: Path,
-    environment: dict[str, str],
-    run=subprocess.run,  # noqa: ANN001
-) -> None:
+def dump_to_file(command: list[str], target_path: Path, run=subprocess.run) -> None:  # noqa: ANN001
     """Run the dump command and write its output as a gzip file."""
-    result = run(command, capture_output=True, env=environment, check=True)
+    result = run(command, capture_output=True, check=True)
     target_path.write_bytes(gzip.compress(result.stdout))
 
 
-def restore_from_file(
-    command: list[str],
-    source_path: Path,
-    environment: dict[str, str],
-    run=subprocess.run,  # noqa: ANN001
-) -> None:
+def restore_from_file(command: list[str], source_path: Path, run=subprocess.run) -> None:  # noqa: ANN001
     """Send the text inside a gzip dump to the restore command."""
-    run(command, input=gzip.decompress(source_path.read_bytes()), env=environment, check=True)
+    run(command, input=gzip.decompress(source_path.read_bytes()), check=True)
 
 
 def in_pod(command: list[str], namespace: str, pod: str, interactive: bool = False) -> list[str]:
@@ -175,7 +165,7 @@ def main(argv: list[str], client=None, run=subprocess.run, now: datetime | None 
         dump_path = Path(folder) / "airflow.sql.gz"
         if args.action == "save":
             command = in_pod(pg_dump_command(**connection), args.namespace, args.pod)
-            dump_to_file(command, dump_path, None, run=run)
+            dump_to_file(command, dump_path, run=run)
             key = save_backup(client, args.bucket, args.prefix, dump_path, now)
             print(f"Saved the database to s3://{args.bucket}/{key}")
             return 0
@@ -184,7 +174,7 @@ def main(argv: list[str], client=None, run=subprocess.run, now: datetime | None 
             print("No backup found, so Airflow starts with an empty database.")
             return 0
         command = in_pod(psql_restore_command(**connection), args.namespace, args.pod, True)
-        restore_from_file(command, dump_path, None, run=run)
+        restore_from_file(command, dump_path, run=run)
         print("Restored the newest database backup.")
         return 0
 

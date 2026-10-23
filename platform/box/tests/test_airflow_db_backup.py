@@ -194,11 +194,12 @@ def test_dumping_writes_the_database_text_as_a_gzip_file(tmp_path):
     run = FakeRun(stdout=b"CREATE TABLE dag;\n")
     target = tmp_path / "dump.sql.gz"
 
-    dump_to_file(["pg_dump", "airflow"], target, {"PGPASSWORD": "from-parameter-store"}, run=run)
+    dump_to_file(["pg_dump", "airflow"], target, run=run)
 
     assert gzip.decompress(target.read_bytes()) == b"CREATE TABLE dag;\n"
     assert run.command == ["pg_dump", "airflow"]
-    assert run.env == {"PGPASSWORD": "from-parameter-store"}
+    # The password stays inside the database pod (see in_pod), so the box passes none.
+    assert run.env is None
 
 
 def test_restoring_sends_the_decompressed_text_to_the_database(tmp_path):
@@ -210,10 +211,11 @@ def test_restoring_sends_the_decompressed_text_to_the_database(tmp_path):
     source.write_bytes(gzip.compress(b"CREATE TABLE dag;\n"))
     run = FakeRun()
 
-    restore_from_file(["psql", "airflow"], source, {"PGPASSWORD": "x"}, run=run)
+    restore_from_file(["psql", "airflow"], source, run=run)
 
     assert run.input == b"CREATE TABLE dag;\n"
     assert run.command == ["psql", "airflow"]
+    assert run.env is None
 
 
 def test_a_command_runs_inside_the_database_pod_and_reads_the_password_there():
