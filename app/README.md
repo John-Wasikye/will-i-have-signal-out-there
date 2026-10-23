@@ -12,6 +12,8 @@ Run these commands from this `app` folder:
 - `npm run preview` serves the built `dist` folder on my machine.
 - `npm test` runs the unit tests with Vitest.
 - `npm run typecheck` runs the TypeScript check without writing files.
+- `npm run lint` runs ESLint, mainly for the React hooks rules. Any warning fails it.
+- `npm audit` checks the packages, including the build tools, for published advisories.
 
 ## Environment
 

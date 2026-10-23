@@ -41,6 +41,8 @@ You should see `All checks passed!` from ruff. Pytest should report the tests pa
 ```powershell
 cd app
 npm ci
+npm audit
+npm run lint
 npm run typecheck
 npm test
 npm run build

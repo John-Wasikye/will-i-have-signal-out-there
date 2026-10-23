@@ -81,7 +81,7 @@ jobs:
           trivyignores: .trivyignore
 
   site:
-    name: Site build and tests
+    name: Site lint, build and tests
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -94,6 +94,10 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
+      # Trivy skips development packages, and the build tools are all development packages.
+      - name: Audit the packages
+        run: npm audit --audit-level=moderate
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

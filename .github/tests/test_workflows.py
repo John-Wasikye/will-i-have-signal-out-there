@@ -217,3 +217,14 @@ def test_the_image_is_tagged_with_the_commit(deploy_environment):
     runs = _runs(deploy_environment["jobs"]["deploy"])
     assert "docker push" in runs
     assert "${GITHUB_SHA}" in runs
+
+
+# --- CI -------------------------------------------------------------------------------------
+
+
+def test_the_site_job_lints_and_audits_its_packages():
+    site = _load(WORKFLOWS / "ci.yml")["jobs"]["site"]
+    runs = _runs(site)
+    assert "npm run lint" in runs
+    # Trivy skips development packages, so npm audit is what covers the build tools.
+    assert "npm audit" in runs
