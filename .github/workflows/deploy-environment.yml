@@ -64,9 +64,16 @@ jobs:
           name: airflow-image
 
       # Each image tag is the commit it was built from. The repository refuses to overwrite a
-      # tag, so a deployed version always means the same image.
+      # tag, so a deployed version always means the same image, and a rerun of this deploy
+      # skips the push when the commit is already there. If the check itself fails, the push
+      # runs and reports the real error.
       - name: Push the Airflow image
         run: |
+          if aws ecr describe-images --repository-name "${AIRFLOW_REPOSITORY#*/}" \
+              --image-ids "imageTag=${GITHUB_SHA}" > /dev/null 2>&1; then
+            echo "The image for ${GITHUB_SHA} is already in the repository."
+            exit 0
+          fi
           gunzip --stdout airflow-image.tar.gz | docker load
           aws ecr get-login-password | docker login --username AWS --password-stdin "${AIRFLOW_REPOSITORY%%/*}"
           docker tag "portfolio-airflow:${GITHUB_SHA}" "${AIRFLOW_REPOSITORY}:${GITHUB_SHA}"

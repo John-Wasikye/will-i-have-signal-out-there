@@ -241,3 +241,10 @@ def test_the_terraform_job_runs_tflint_with_the_repository_settings():
     assert "tflint" in runs
     assert "platform/terraform/.tflint.hcl" in runs
     assert (GITHUB.parent / "platform" / "terraform" / ".tflint.hcl").is_file()
+
+
+def test_a_rerun_deploy_skips_an_image_that_is_already_pushed(deploy_environment):
+    # The repository refuses to overwrite a tag, so a second push of the same commit fails.
+    runs = _runs(deploy_environment["jobs"]["deploy"])
+    assert "aws ecr describe-images" in runs
+    assert runs.index("aws ecr describe-images") < runs.index("docker push")
