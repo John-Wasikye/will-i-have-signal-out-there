@@ -1,0 +1,164 @@
+name: CI
+
+# Runs on every push and pull request. No job here touches AWS.
+# The runner image is pinned to Ubuntu 24.04 so a change of ubuntu-latest cannot change CI unannounced.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python lint and tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Test
+        run: pytest
+
+  spark:
+    name: Spark tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev,spark]"
+      - name: Run the Spark job and maintenance on real Spark
+        run: pytest pipelines/platform/tests/test_spark_integration.py -v
+
+  airflow:
+    name: Airflow DAG tests
+    runs-on: ubuntu-24.04
+    env:
+      AIRFLOW_VERSION: "3.3.2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Airflow with its pinned dependency list
+        run: |
+          python -m pip install \
+            "apache-airflow==${AIRFLOW_VERSION}" pyarrow pytest \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
+      - name: Run the DAG tests
+        run: pytest pipelines/platform/tests/test_dag.py -v
+
+  box-image:
+    name: Airflow image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the shell scripts
+        run: shellcheck platform/box/*.sh
+      - name: Build the image
+        run: docker build --file platform/box/Dockerfile.airflow --tag portfolio-airflow:ci .
+      - name: Smoke test the image
+        run: bash platform/box/smoke_test_airflow_image.sh portfolio-airflow:ci
+      - name: Scan the image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: portfolio-airflow:ci
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+
+  site:
+    name: Site lint, build and tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      # Trivy skips development packages, and the build tools are all development packages.
+      - name: Audit the packages
+        run: npm audit --audit-level=moderate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  terraform:
+    name: Terraform format, lint and tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.4"
+      - name: Format
+        run: terraform fmt -check -recursive platform/terraform
+      # tflint finds unused variables, locals and lookups, and missing version settings.
+      - name: Lint
+        run: |
+          docker run --rm --volume "$PWD:/data" --workdir /data/platform/terraform \
+            ghcr.io/terraform-linters/tflint:v0.59.1 \
+            --config /data/platform/terraform/.tflint.hcl --recursive
+      - name: Module tests
+        run: |
+          for module in platform/terraform/modules/*/; do
+            if [ -d "$module/tests" ]; then
+              (cd "$module" && terraform init -backend=false -input=false && terraform test)
+            fi
+          done
+      - name: Validate environments
+        run: |
+          for env in dev live; do
+            (cd "platform/terraform/envs/$env" && terraform init -backend=false -input=false && terraform validate)
+          done
+
+  security:
+    name: Secret and vulnerability scans
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Scan for committed secrets
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan dependencies and config
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+  workflows:
+    name: Workflow lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # actionlint also runs shellcheck on every run: block, so a broken workflow fails here
+      # instead of when it reaches AWS.
+      - name: Lint the workflows
+        run: docker run --rm --volume "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color

@@ -1,0 +1,13 @@
+# Keep the build context small and keep local files out of images.
+.git
+.venv
+.pytest_cache
+.ruff_cache
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/.terraform
+**/tests
+app/dist
+platform/serving/build
+docs

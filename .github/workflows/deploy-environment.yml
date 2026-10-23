@@ -1,0 +1,80 @@
+name: Deploy to one environment
+
+# Called by deploy.yml. The job names its GitHub environment, so it starts only after that
+# environment's rules allow it, and only then can it use the deploy role.
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: dev or live.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.env }}
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.env }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SITE_BUCKET: ${{ vars.SITE_BUCKET }}
+      SITE_DISTRIBUTION_ID: ${{ vars.SITE_DISTRIBUTION_ID }}
+      AIRFLOW_REPOSITORY: ${{ vars.AIRFLOW_REPOSITORY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # The API address differs between dev and live, so the site is built here.
+      - name: Build the site
+        working-directory: app
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # --delete removes files the new build no longer has. The box writes published/ and
+      # status.json, so the upload leaves them alone, and the deploy role is refused them anyway.
+      - name: Upload the site
+        run: |
+          aws s3 sync app/dist "s3://${SITE_BUCKET}" --delete --exclude "published/*" --exclude "status.json"
+          aws cloudfront create-invalidation --distribution-id "${SITE_DISTRIBUTION_ID}" --paths "/*"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: airflow-image
+
+      # Each image tag is the commit it was built from. The repository refuses to overwrite a
+      # tag, so a deployed version always means the same image, and a rerun of this deploy
+      # skips the push when the commit is already there. If the check itself fails, the push
+      # runs and reports the real error.
+      - name: Push the Airflow image
+        run: |
+          if aws ecr describe-images --repository-name "${AIRFLOW_REPOSITORY#*/}" \
+              --image-ids "imageTag=${GITHUB_SHA}" > /dev/null 2>&1; then
+            echo "The image for ${GITHUB_SHA} is already in the repository."
+            exit 0
+          fi
+          gunzip --stdout airflow-image.tar.gz | docker load
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${AIRFLOW_REPOSITORY%%/*}"
+          docker tag "portfolio-airflow:${GITHUB_SHA}" "${AIRFLOW_REPOSITORY}:${GITHUB_SHA}"
+          docker push "${AIRFLOW_REPOSITORY}:${GITHUB_SHA}"

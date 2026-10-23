@@ -1,0 +1,61 @@
+name: Terraform init
+description: >-
+  Builds the API package that Terraform deploys, then initialises Terraform for one
+  environment against the state bucket. AWS access must already be set up by the job.
+
+inputs:
+  env:
+    description: dev or live.
+    required: true
+  state-bucket:
+    description: The Terraform state bucket, from the bootstrap output state_bucket_name.
+    required: true
+  state-kms-key-arn:
+    description: The state key, from the bootstrap output state_kms_key_arn.
+    required: true
+  region:
+    description: AWS region of the state bucket.
+    required: true
+
+outputs:
+  lambda-zip-sha256:
+    description: Base64 SHA-256 of the API package, for the lambda_zip_sha256 variable.
+    value: ${{ steps.package.outputs.sha256 }}
+
+runs:
+  using: composite
+  steps:
+    # The Lambda runtime is Python 3.12, so the package is built with it.
+    - uses: actions/setup-python@v7
+      with:
+        python-version: "3.12"
+
+    - name: Build the API package
+      id: package
+      shell: bash
+      run: |
+        sha="$(python platform/serving/build_package.py | sed -n 's/^lambda_zip_sha256 = //p')"
+        test -n "${sha}"
+        echo "sha256=${sha}" >> "${GITHUB_OUTPUT}"
+
+    # Same version as the CI job. The wrapper is off so plan output reaches the log unchanged.
+    - uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: "1.16.4"
+        terraform_wrapper: false
+
+    # The inputs reach the shell as environment variables, never pasted into the script.
+    - name: Terraform init
+      shell: bash
+      working-directory: platform/terraform/envs/${{ inputs.env }}
+      env:
+        ENV: ${{ inputs.env }}
+        STATE_BUCKET: ${{ inputs.state-bucket }}
+        STATE_KMS_KEY_ARN: ${{ inputs.state-kms-key-arn }}
+        REGION: ${{ inputs.region }}
+      run: |
+        terraform init -input=false \
+          -backend-config="bucket=${STATE_BUCKET}" \
+          -backend-config="key=${ENV}/terraform.tfstate" \
+          -backend-config="region=${REGION}" \
+          -backend-config="kms_key_id=${STATE_KMS_KEY_ARN}"

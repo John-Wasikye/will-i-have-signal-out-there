@@ -1,0 +1,12 @@
+{
+  "generated_at_utc": "2026-10-08T06:05:00Z",
+  "pipelines": [
+    {
+      "name": "sample_pipeline",
+      "state": "ok",
+      "last_good_run_utc": "2026-10-08T06:00:00Z",
+      "freshness_target_hours": 26,
+      "last_row_count": 3
+    }
+  ]
+}

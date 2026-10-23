@@ -1,0 +1,13 @@
+# Vulnerabilities in the Airflow image that I have looked at and accepted for now.
+# Each entry expires, so the scan fails again on the expiry date and I have to look again.
+# Reviewed on 2026-10-10.
+
+# netty-handler 4.1.96, bundled in PySpark 3.5.9. The flaw is in how a Netty server routes
+# TLS connections by server name. Spark runs here in local mode, with no TLS server and no
+# open port, and the box accepts no inbound traffic. No PySpark release ships a fixed Netty.
+CVE-2026-75595 exp:2027-01-08
+
+# avro 1.7.7, shaded inside hadoop-client-runtime 3.3.4, bundled in PySpark 3.5.9. The flaw
+# needs a program to parse an untrusted Avro schema. My pipelines read no Avro files, and the
+# copy in Hadoop is not called. PySpark's own avro jar is already the fixed 1.11.5.
+CVE-2024-47561 exp:2027-01-08

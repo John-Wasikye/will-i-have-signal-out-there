@@ -1,0 +1,227 @@
+:root {
+  --color-bg: #f6f6f3;
+  --color-text: #1c1c1a;
+  --color-muted: #55554f;
+  --color-accent: #2b5d8a;
+  --color-card: #ffffff;
+  --color-border: #d4d4cc;
+  --color-notice-bg: #fff3d1;
+  --color-notice-border: #b07a00;
+  --color-error: #9b2226;
+  --color-badge-bg: #e7e7e1;
+  --color-badge-active-bg: #dbe9f6;
+  --color-map-line: #b8c4cf;
+  --color-map-bg: #eef3f7;
+  --gutter: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #151614;
+    --color-text: #ecebe6;
+    --color-muted: #aaa9a2;
+    --color-accent: #8ab8e6;
+    --color-card: #1f201e;
+    --color-border: #3a3b37;
+    --color-notice-bg: #3a2f10;
+    --color-notice-border: #d9a520;
+    --color-error: #ff8a8f;
+    --color-badge-bg: #2c2d2a;
+    --color-badge-active-bg: #1d3247;
+    --color-map-line: #3d4f60;
+    --color-map-bg: #1a2530;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+
+.nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  list-style: none;
+  margin: 0 auto;
+  padding: 12px var(--gutter);
+  max-width: 960px;
+}
+
+.nav-list a {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav-list a.active {
+  text-decoration: underline;
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px var(--gutter) 48px;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin-top: 0;
+}
+
+.cards {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card h2 {
+  font-size: 1.15rem;
+  margin: 4px 0 8px;
+}
+
+.card-number {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.badge {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-badge-bg);
+  font-size: 0.9rem;
+}
+
+.badge-active {
+  background: var(--color-badge-active-bg);
+  font-weight: 600;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--color-muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.notice {
+  border: 1px solid var(--color-notice-border);
+  background: var(--color-notice-bg);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+}
+
+.notice p {
+  margin: 0;
+}
+
+.error-text {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.lookup-form {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.lookup-form input {
+  width: 100%;
+  padding: 10px;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.lookup-form button {
+  justify-self: start;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: var(--color-card);
+  cursor: pointer;
+}
+
+.lookup-form button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.map {
+  margin: 16px 0;
+  max-width: 320px;
+}
+
+.map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.map-bg {
+  fill: var(--color-map-bg);
+}
+
+.map-line {
+  stroke: var(--color-map-line);
+  stroke-width: 1;
+}
+
+.map figcaption {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin-top: 8px;
+}

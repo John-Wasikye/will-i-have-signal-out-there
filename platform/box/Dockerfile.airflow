@@ -1,0 +1,43 @@
+# Image for Airflow on the session box.
+#
+# It starts from the official Airflow image, pinned to the same version my DAG tests use,
+# and builds for both amd64 and arm64. It adds Java and PySpark for the Spark jobs and my
+# pipeline code. It never runs as root. The database backup runs on the box, not in this image.
+#
+# Build from the repository root:
+#   docker build --file platform/box/Dockerfile.airflow --tag portfolio-airflow:local .
+FROM apache/airflow:3.3.2-python3.11
+
+USER root
+# Apply Debian's security updates first, then add Java.
+RUN apt-get update \
+    && apt-get upgrade --yes \
+    && apt-get install --yes --no-install-recommends openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+COPY --chown=airflow:root platform/box/requirements-airflow.txt /tmp/requirements-airflow.txt
+RUN pip install --no-cache-dir --requirement /tmp/requirements-airflow.txt \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.11.txt"
+
+# The certificate lists in certifi, in the copy of certifi inside pip, and in uv trust emSign
+# authorities whose keys were compromised (GHSA-6q48-6c7w-9gw2, GHSA-hq85-5cpj-mr62). These are
+# the first fixed versions, or newer. They go in after the constrained install, because Airflow's
+# constraint file pins the older certifi. Remove this step when the base image ships them.
+# prek is a code check tool for people who work on Airflow itself, nothing here runs it, and it
+# carries its own old uv, so I remove it.
+RUN pip install --no-cache-dir "pip==26.2.2" "certifi==2026.10.19" "uv==0.13.5" \
+    && uv tool uninstall prek
+
+# PySpark ships Derby and ZooKeeper, which only a Hive metastore and a Spark cluster use.
+# I use neither, and both have known critical vulnerabilities, so I delete them. The Spark
+# tests run in this image, so a missing class would make them fail.
+RUN spark_jars="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')" \
+    && rm -f "${spark_jars}"/derby-*.jar "${spark_jars}"/zookeeper-*.jar
+
+COPY --chown=airflow:root pipelines/platform /opt/airflow/pipelines/platform
+
+# The DAG imports the shared pipeline modules, so their folders go on the import path.
+# Airflow reads the DAG straight from the pipeline folder, so the file exists only once.
+ENV PYTHONPATH=/opt/airflow/pipelines/platform/publish:/opt/airflow/pipelines/platform/spark:/opt/airflow/pipelines/platform/dags
+ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/pipelines/platform/dags

@@ -1,0 +1,25 @@
+# Every Parameter Store path the projects use (design doc section 7.9).
+# <env> stands for dev and live. Each path must look like /portfolio/<env>/<project>/<name>.
+# checks/parameter_paths.py fails if the code uses a path that is not here, or if a path here
+# is used nowhere. Values never go in this file: they are set by hand in Parameter Store.
+
+# Single parameters. The pull request plan checks that each one exists in dev and live.
+parameters:
+  - path: /portfolio/<env>/platform/airflow-db-password
+    used_by: platform/box/install.sh
+    description: >-
+      Password of Airflow's PostgreSQL database on the session box. At least 16 letters and
+      digits, because it goes into a connection address.
+
+# Folders that Airflow reads its settings from. Airflow looks up <prefix>/<id> when it needs
+# one, so a folder can be empty, and its existence is not checked.
+prefixes:
+  - path: /portfolio/<env>/airflow/connections
+    used_by: platform/box/airflow-values.yaml, platform/box/airflow-values-live.yaml
+    description: Airflow connections, one parameter per connection ID.
+  - path: /portfolio/<env>/airflow/variables
+    used_by: platform/box/airflow-values.yaml, platform/box/airflow-values-live.yaml
+    description: Airflow variables, one parameter per variable.
+  - path: /portfolio/<env>/airflow/config
+    used_by: platform/box/airflow-values.yaml, platform/box/airflow-values-live.yaml
+    description: Airflow settings read from Parameter Store instead of the chart values.

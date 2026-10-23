@@ -1,0 +1,123 @@
+name: Terraform
+
+# A pull request gets a plan for dev and live, shown in the job summary. A merge to main
+# applies dev, then live. Each apply waits for its GitHub environment's rules.
+# Every job skips until AWS is set up: see .github/workflows/README.md.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "platform/terraform/**"
+      - "platform/serving/**"
+      - ".github/workflows/terraform*.yml"
+      - ".github/actions/terraform-init/**"
+  push:
+    branches: [main]
+    paths:
+      - "platform/terraform/**"
+      - "platform/serving/**"
+      - ".github/workflows/terraform*.yml"
+      - ".github/actions/terraform-init/**"
+
+permissions:
+  contents: read
+
+# Applies queue one at a time and are never cancelled halfway. Plans for a pull request
+# replace each other.
+concurrency:
+  group: terraform-${{ github.event_name == 'push' && 'apply' || github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: Plan (${{ matrix.env }})
+    # A pull request from a fork gets no AWS token, so it is skipped rather than failed.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && vars.TF_STATE_BUCKET != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: dev
+            suffix: DEV
+          - env: live
+            suffix: LIVE
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars[format('TF_PLAN_ROLE_ARN_{0}', matrix.suffix)] }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: init
+        uses: ./.github/actions/terraform-init
+        with:
+          env: ${{ matrix.env }}
+          state-bucket: ${{ vars.TF_STATE_BUCKET }}
+          state-kms-key-arn: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+          region: ${{ vars.AWS_REGION }}
+
+      # Every parameter listed in checks/parameter_paths.yaml must exist before a change that
+      # uses it is merged. The check reads names only; the plan role is refused values.
+      - name: Check that the listed parameters exist
+        env:
+          ENV: ${{ matrix.env }}
+        run: |
+          python -m pip install --quiet "boto3==1.43.118" "pyyaml==6.0.3"
+          python checks/parameter_paths.py --check-aws --env "${ENV}"
+
+      # The plan role can write nothing, so the plan takes no state lock. The alert addresses
+      # are sensitive in Terraform, so this public log shows only how many there are.
+      - name: Plan
+        working-directory: platform/terraform/envs/${{ matrix.env }}
+        env:
+          ENV: ${{ matrix.env }}
+          TF_VAR_region: ${{ vars.AWS_REGION }}
+          TF_VAR_lambda_zip_sha256: ${{ steps.init.outputs.lambda-zip-sha256 }}
+          TF_VAR_box_ami_id: ${{ vars[format('BOX_AMI_ID_{0}', matrix.suffix)] }}
+          TF_VAR_box_subnet_id: ${{ vars[format('BOX_SUBNET_ID_{0}', matrix.suffix)] }}
+          TF_VAR_alert_emails: ${{ secrets[format('ALERT_EMAILS_{0}', matrix.suffix)] || '[]' }}
+        run: |
+          terraform plan -input=false -lock=false -no-color | tee plan.txt
+          {
+            echo "### Terraform plan for ${ENV}"
+            echo '```'
+            cat plan.txt
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  apply-dev:
+    name: Apply (dev)
+    if: github.event_name == 'push' && vars.TF_STATE_BUCKET != ''
+    uses: ./.github/workflows/terraform-apply.yml
+    with:
+      env: dev
+      suffix: DEV
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+
+  apply-live:
+    name: Apply (live)
+    needs: apply-dev
+    if: github.event_name == 'push' && vars.TF_STATE_BUCKET != ''
+    uses: ./.github/workflows/terraform-apply.yml
+    with:
+      env: live
+      suffix: LIVE
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit

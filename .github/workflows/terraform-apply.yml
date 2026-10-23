@@ -1,0 +1,60 @@
+name: Terraform apply
+
+# Called by terraform.yml for one environment at a time. The job names its GitHub environment,
+# so it starts only after that environment's rules allow it, and only then can it use the
+# apply role, which trusts nothing else.
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: dev or live.
+        required: true
+        type: string
+      suffix:
+        description: DEV or LIVE, the ending of this environment's repository variables.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  apply:
+    name: Apply ${{ inputs.env }}
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.env }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.TF_APPLY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: init
+        uses: ./.github/actions/terraform-init
+        with:
+          env: ${{ inputs.env }}
+          state-bucket: ${{ vars.TF_STATE_BUCKET }}
+          state-kms-key-arn: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+          region: ${{ vars.AWS_REGION }}
+
+      # The plan is saved and applied as it is, so nothing changes between the two.
+      - name: Plan and apply
+        working-directory: platform/terraform/envs/${{ inputs.env }}
+        env:
+          TF_VAR_region: ${{ vars.AWS_REGION }}
+          TF_VAR_lambda_zip_sha256: ${{ steps.init.outputs.lambda-zip-sha256 }}
+          TF_VAR_box_ami_id: ${{ vars[format('BOX_AMI_ID_{0}', inputs.suffix)] }}
+          TF_VAR_box_subnet_id: ${{ vars[format('BOX_SUBNET_ID_{0}', inputs.suffix)] }}
+          TF_VAR_alert_emails: ${{ secrets[format('ALERT_EMAILS_{0}', inputs.suffix)] || '[]' }}
+        run: |
+          terraform plan -input=false -no-color -out=tfplan
+          terraform apply -input=false -no-color tfplan
