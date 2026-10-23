@@ -7,7 +7,8 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
 
   github_host = "token.actions.githubusercontent.com"
-  # envs/live creates the provider (iam module). Building the ARN lets dev trust it too.
+  # The account has one provider, owned by the NFL project's Terraform. Building its ARN lets
+  # these roles trust it without managing it.
   oidc_provider_arn = "arn:${local.partition}:iam::${local.account_id}:oidc-provider/${local.github_host}"
 
   # GitHub puts the event in the token subject. A pull request job gets ...:pull_request. A job
@@ -165,7 +166,7 @@ resource "aws_iam_role_policy_attachment" "apply_admin" {
 }
 
 # Dev and live share one account, so the dev apply role is refused everything live, the
-# account-wide pieces that envs/live owns, and changes to itself. That last one means a change
+# budget that envs/live owns, and changes to itself. That last one means a change
 # to this role in dev is applied by hand, from my own machine.
 data "aws_iam_policy_document" "refuse_live" {
   statement {
@@ -188,20 +189,6 @@ data "aws_iam_policy_document" "refuse_live" {
     ]
   }
 
-  statement {
-    sid    = "RefuseTheOidcProvider"
-    effect = "Deny"
-    actions = [
-      "iam:CreateOpenIDConnectProvider",
-      "iam:DeleteOpenIDConnectProvider",
-      "iam:UpdateOpenIDConnectProviderThumbprint",
-      "iam:AddClientIDToOpenIDConnectProvider",
-      "iam:RemoveClientIDFromOpenIDConnectProvider",
-      "iam:TagOpenIDConnectProvider",
-      "iam:UntagOpenIDConnectProvider",
-    ]
-    resources = ["arn:${local.partition}:iam::${local.account_id}:oidc-provider/*"]
-  }
 
   statement {
     sid       = "RefuseChangesToItself"
@@ -217,6 +204,42 @@ resource "aws_iam_role_policy" "refuse_live" {
   name   = "refuse-live"
   role   = aws_iam_role.apply.id
   policy = data.aws_iam_policy_document.refuse_live.json
+}
+# The account also runs other projects, such as the NFL site, and AdministratorAccess would
+# reach them. Both apply roles are refused them, and the GitHub OIDC provider, which another
+# project's Terraform owns and every project's roles trust.
+data "aws_iam_policy_document" "refuse_other_projects" {
+  dynamic "statement" {
+    for_each = length(var.protected_arns) > 0 ? [1] : []
+
+    content {
+      sid       = "RefuseOtherProjects"
+      effect    = "Deny"
+      actions   = ["*"]
+      resources = var.protected_arns
+    }
+  }
+
+  statement {
+    sid    = "RefuseTheOidcProvider"
+    effect = "Deny"
+    actions = [
+      "iam:CreateOpenIDConnectProvider",
+      "iam:DeleteOpenIDConnectProvider",
+      "iam:UpdateOpenIDConnectProviderThumbprint",
+      "iam:AddClientIDToOpenIDConnectProvider",
+      "iam:RemoveClientIDFromOpenIDConnectProvider",
+      "iam:TagOpenIDConnectProvider",
+      "iam:UntagOpenIDConnectProvider",
+    ]
+    resources = ["arn:${local.partition}:iam::${local.account_id}:oidc-provider/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "refuse_other_projects" {
+  name   = "refuse-other-projects"
+  role   = aws_iam_role.apply.name
+  policy = data.aws_iam_policy_document.refuse_other_projects.json
 }
 
 # --- Deploy role: site files and the Airflow image ------------------------------------------

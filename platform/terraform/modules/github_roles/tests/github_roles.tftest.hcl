@@ -32,6 +32,7 @@ variables {
   site_bucket_arn  = "arn:aws:s3:::portfolio-dev-site-123456789012"
   distribution_arn = "arn:aws:cloudfront::123456789012:distribution/EDFDVBD6EXAMPLE"
   registry_arn     = "arn:aws:ecr:us-east-1:123456789012:repository/portfolio-dev-airflow"
+  protected_arns   = ["arn:aws:*:*:*:*nfl-*", "arn:aws:iam::*:role/github-plan"]
 }
 
 # --- Plan role ------------------------------------------------------------------------------
@@ -104,9 +105,26 @@ run "dev_apply_role_is_refused_live_and_shared_resources" {
   command = plan
 
   assert {
-    condition = alltrue([for target in ["portfolio-live-", "portfolio_live", "portfolio-terraform-state-*/live/", "budgets:", "oidc-provider", "portfolio-dev-terraform-apply"] :
+    condition = alltrue([for target in ["portfolio-live-", "portfolio_live", "portfolio-terraform-state-*/live/", "budgets:", "portfolio-dev-terraform-apply"] :
     strcontains(aws_iam_role_policy.refuse_live[0].policy, target)])
-    error_message = "The dev apply role must be refused live resources, the shared budget and OIDC provider, and changes to itself."
+    error_message = "The dev apply role must be refused live resources, the shared budget, and changes to itself."
+  }
+}
+
+# The account also runs other projects (the NFL site). Both apply roles have broad rights, so
+# both are refused those projects and the OIDC provider that another project owns.
+run "both_apply_roles_are_refused_other_projects_and_the_oidc_provider" {
+  command = plan
+
+  assert {
+    condition = alltrue([for target in ["arn:aws:*:*:*:*nfl-*", "arn:aws:iam::*:role/github-plan", "oidc-provider"] :
+    strcontains(aws_iam_role_policy.refuse_other_projects.policy, target)])
+    error_message = "The dev apply role must be refused the protected resources and the OIDC provider."
+  }
+
+  assert {
+    condition     = aws_iam_role_policy.refuse_other_projects.role == "portfolio-dev-terraform-apply"
+    error_message = "The refusal must be attached to the apply role."
   }
 }
 
@@ -123,6 +141,11 @@ run "live_apply_role_has_no_refusal_list" {
   assert {
     condition     = length(aws_iam_role_policy.refuse_live) == 0
     error_message = "Live owns the shared resources, so its apply role is not refused them."
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.refuse_other_projects.policy, "arn:aws:*:*:*:*nfl-*") && strcontains(aws_iam_role_policy.refuse_other_projects.policy, "oidc-provider")
+    error_message = "The live apply role must also be refused other projects and the OIDC provider."
   }
 
   assert {

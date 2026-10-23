@@ -57,7 +57,7 @@ module "iam" {
   glue_database_name         = module.catalog.database_name
   parameter_read_policy_json = module.parameters.read_policy_json
 
-  # envs/live creates the OIDC provider. Apply envs/live before envs/dev the first time.
+  # The NFL project's Terraform owns the account's GitHub OIDC provider. See envs/live.
   create_oidc_provider = false
 }
 
@@ -117,4 +117,13 @@ module "github_roles" {
   site_bucket_arn  = module.storage.bucket_arns["site"]
   distribution_arn = module.site.distribution_arn
   registry_arn     = module.registry.repository_arn
+
+  # The NFL project (nfl-player-performance) runs in the same AWS account. Its resources are
+  # named nfl-* or jw-nfl-*, apart from its two GitHub roles and its CloudFront distribution.
+  protected_arns = [
+    "arn:aws:*:*:*:*nfl-*",
+    "arn:aws:iam::*:role/github-plan",
+    "arn:aws:iam::*:role/github-deploy",
+    "arn:aws:cloudfront::*:distribution/E1OZ5WDKRFMJ25",
+  ]
 }
