@@ -18,6 +18,13 @@ describe('pipelinesNeedingNotice', () => {
     ]
     expect(pipelinesNeedingNotice(pipelines).map((p) => p.name)).toEqual(['late_one', 'failed_one'])
   })
+
+  it('accepts a pipeline with no good run, written as the pipeline writes it', () => {
+    // pipelines/platform/publish/status.py leaves out the run time and row count until a
+    // run succeeds, as the status_json contract allows.
+    const neverRan: Pipeline = { name: 'new_pipeline', state: 'failed', freshness_target_hours: 26 }
+    expect(pipelinesNeedingNotice([neverRan])).toEqual([neverRan])
+  })
 })
 
 describe('formatUtc', () => {

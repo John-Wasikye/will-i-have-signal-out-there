@@ -1,11 +1,13 @@
-export type PipelineState = 'ok' | 'late' | 'failed'
+type PipelineState = 'ok' | 'late' | 'failed'
 
+/** One pipeline in status.json (docs/platform/contracts/status_json.yaml). */
 export interface Pipeline {
   name: string
   state: PipelineState
-  last_good_run_utc: string | null
+  // Left out until a run succeeds.
+  last_good_run_utc?: string
   freshness_target_hours: number
-  last_row_count: number | null
+  last_row_count?: number
   incident_url?: string
 }
 

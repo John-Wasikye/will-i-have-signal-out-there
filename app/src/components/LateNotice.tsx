@@ -1,7 +1,8 @@
 import { formatUtc } from '../lib/status'
 
 interface LateNoticeProps {
-  lastGoodRunUtc: string | null
+  // Missing or null when no run has succeeded yet: status.json leaves it out, the API sends null.
+  lastGoodRunUtc?: string | null
   pipelineName?: string
 }
 
