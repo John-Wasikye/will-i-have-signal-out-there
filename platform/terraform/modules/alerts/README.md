@@ -2,10 +2,11 @@
 
 I use this module to get an email when a run goes wrong (ADR-0024, PR-14). It creates one SNS topic per environment, named `portfolio-<env>-run-alerts`, and subscribes each address in `alert_emails` to it. AWS sends each address a confirmation email, and nothing arrives until the link in it is clicked.
 
-Three things send an email through the topic:
+Four things send an email through the topic:
 
 - **A task fails.** Airflow's failure callback records the incident and then emails me (`pipelines/platform/publish/alerts.py`).
 - **A run leaves a pipeline late or failed.** The `report_run` task reads `status.json` after the upload. The publish gate can refuse a run without any task failing, so the failure callback alone would miss this.
+- **The box watchdog stops a run** at the 2-hour maximum or for a spot warning. The box powers off, so no task fails and the run never reports; the watchdog sends the email itself (`platform/box/box_watchdog.py`).
 - **No good run arrives in time.** Each good run records one data point, `GoodRunPublished` in the `Portfolio/Platform` namespace, for each pipeline that is ok. For each pipeline in `watched_pipelines`, an alarm fires when no data point arrives for `freshness_target_hours` hours in a row. Missing data counts as a missed run, so the alarm also catches a box that never started, which nothing on the box can report. The bucket size alarms use the same topic.
 
 `watched_pipelines` is empty by default, because dev has no nightly schedule and the alarm would fire every day. `envs/live` watches every pipeline in `pipeline_names`.

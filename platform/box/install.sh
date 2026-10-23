@@ -148,7 +148,7 @@ After=network-online.target
 [Service]
 Environment=KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 Environment=PYTHONPATH=${repo_dir}/pipelines/platform/publish:${script_dir}
-ExecStart=/usr/bin/python3.11 ${script_dir}/box_watchdog.py --bucket ${BACKUP_BUCKET}
+ExecStart=/usr/bin/python3.11 ${script_dir}/box_watchdog.py --bucket ${BACKUP_BUCKET} --env ${environment} --alert-topic-arn ${ALERT_TOPIC_ARN}
 Restart=on-failure
 RestartSec=10
 

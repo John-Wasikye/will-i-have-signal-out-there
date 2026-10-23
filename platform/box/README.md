@@ -31,9 +31,9 @@ The watchdog checks every 30 seconds and stops the box for the first of these re
 
 1. **AWS is taking the box back.** AWS puts a notice in the instance metadata two minutes ahead. This applies to every boot.
 2. **The nightly run finished,** whether it succeeded or failed.
-3. **The box has been up for 2 hours.** It records an incident for this, and for a spot warning.
+3. **The box has been up for 2 hours.** It records an incident for this, and for a spot warning, and emails me through the run alerts topic, because a run stopped this way never reports anything itself.
 
-To stop, it saves the database to S3 first, because that is the step with a deadline. It then records the incident if there is one, and powers the box off last. Powering off always runs, even if a save fails, so a broken step cannot leave a server billing.
+To stop, it saves the database to S3 first, because that is the step with a deadline. It then records the incident and sends the email if there is one, and powers the box off last. Powering off always runs, even if a save fails, so a broken step cannot leave a server billing.
 
 Only the scheduled boot, within 30 minutes after 10:00 UTC, counts as the nightly run. A box that I start by hand is a work session, and only a spot warning stops it. Work sessions end by the 4-hour hard stop and the idle alarm. If the watchdog cannot reach Airflow, it keeps going and still stops the box at 2 hours.
 

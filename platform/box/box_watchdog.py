@@ -28,6 +28,7 @@ from enum import Enum
 from pathlib import Path
 
 import airflow_db_backup
+import alerts
 from incidents import build_incident, write_incident
 from nightly_limit import reached_maximum
 from timeutil import format_utc, require_utc
@@ -181,14 +182,16 @@ def carry_out_stop(
     decision: Decision,
     save_database: Callable[[], None],
     record_incident: Callable[[Decision], None],
+    send_alert: Callable[[Decision], None],
     power_off: Callable[[], None],
 ) -> list[str]:
     """Run the stop steps in order and return the errors from the steps that failed.
 
     The database is saved first, because it is the step with a deadline. An incident is
-    recorded only for the maximum and for a spot warning. Powering off is last and always
-    runs, so a failed save can never leave a billing server on. If powering off itself fails,
-    the error is raised, because nothing else can be done about it.
+    recorded and an email sent only for the maximum and for a spot warning: the run did not
+    finish, so nothing else reports it. Each step runs even if the one before it failed.
+    Powering off is last and always runs, so a failed save can never leave a billing server on.
+    If powering off itself fails, the error is raised, because nothing else can be done about it.
     """
     errors: list[str] = []
     try:
@@ -197,10 +200,11 @@ def carry_out_stop(
         errors.append(f"save_database failed: {error}")
 
     if decision.action in (Action.STOP_MAXIMUM, Action.STOP_SPOT_WARNING):
-        try:
-            record_incident(decision)
-        except Exception as error:  # noqa: BLE001, a failed record must not stop the power-off
-            errors.append(f"record_incident failed: {error}")
+        for name, step in (("record_incident", record_incident), ("send_alert", send_alert)):
+            try:
+                step(decision)
+            except Exception as error:  # noqa: BLE001, a failed step must not stop the power-off
+                errors.append(f"{name} failed: {error}")
 
     power_off()
     return errors
@@ -300,6 +304,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     """Read the command line."""
     parser = argparse.ArgumentParser(description="Stop the session box when its work is done.")
     parser.add_argument("--bucket", required=True, help="the lake bucket for backups and incidents")
+    parser.add_argument(
+        "--env", required=True, choices=["dev", "live"], help="this box's environment"
+    )
+    parser.add_argument("--alert-topic-arn", required=True, help="the run alerts SNS topic")
     parser.add_argument("--namespace", default="airflow", help="Kubernetes namespace of Airflow")
     parser.add_argument("--dag-id", default="platform_skeleton_nightly", help="the nightly DAG")
     parser.add_argument("--poll-seconds", type=float, default=30, help="time between checks")
@@ -319,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
     import boto3  # Installed on the box by install.sh.
 
     client = boto3.client("s3")
+    sns = boto3.client("sns")
 
     def now() -> datetime:
         return datetime.now(UTC)
@@ -346,12 +355,17 @@ def main(argv: list[str] | None = None) -> int:
             write_incident(incident, Path(folder))
             upload_tree(client, args.bucket, "platform/incidents/", Path(folder))
 
+    def send_alert(decision: Decision) -> None:
+        alerts.send_alert(sns, args.alert_topic_arn, alerts.stop_alert(decision.reason, args.env))
+
     def power_off() -> None:
         subprocess.run(["systemctl", "poweroff"], check=True)
 
     def on_stop(decision: Decision) -> None:
         logger.info("Stopping the box. %s", decision.reason)
-        for error in carry_out_stop(decision, save_database, record_incident, power_off):
+        for error in carry_out_stop(
+            decision, save_database, record_incident, send_alert, power_off
+        ):
             logger.error(error)
 
     watch(

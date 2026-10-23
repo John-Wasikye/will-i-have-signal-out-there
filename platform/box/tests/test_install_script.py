@@ -239,6 +239,13 @@ def test_the_watchdog_service_knows_the_bucket_the_cluster_and_where_the_code_is
     assert "platform/box" in watchdog
 
 
+def test_the_watchdog_can_email_me_when_it_stops_a_run():
+    watchdog = _section(_run(["dev"]).stdout, "start the watchdog")
+
+    assert "--env dev" in watchdog
+    assert f"--alert-topic-arn {REQUIRED_SETTINGS['ALERT_TOPIC_ARN']}" in watchdog
+
+
 def test_helm_and_kubectl_are_pointed_at_the_k3s_cluster():
     text = SCRIPT.read_text(encoding="utf-8")
 

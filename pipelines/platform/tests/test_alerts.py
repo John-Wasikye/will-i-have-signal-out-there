@@ -20,6 +20,7 @@ from alerts import (
     report_status,
     send_alert,
     status_alert,
+    stop_alert,
 )
 
 TOPIC = "arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts"
@@ -211,3 +212,14 @@ def test_the_failure_callback_emails_about_the_task_in_the_airflow_context():
     assert len(sns.published) == 1
     assert "publish_sample" in sns.published[0]["Subject"]
     assert "disk full" in sns.published[0]["Message"]
+
+
+# --- The watchdog stopping a nightly run ----------------------------------------------------
+
+
+def test_a_stopped_nightly_run_gets_an_alert_with_the_reason():
+    alert = stop_alert("The nightly run reached its 2 hour maximum.", "live")
+
+    assert alert.subject.startswith("[live]")
+    assert "stopped" in alert.subject
+    assert "2 hour maximum" in alert.message

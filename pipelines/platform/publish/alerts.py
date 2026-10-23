@@ -73,6 +73,22 @@ def alert_failure(context: Mapping, client, topic_arn: str, env: str) -> None:  
     send_alert(client, topic_arn, alert)
 
 
+def stop_alert(reason: str, env: str) -> Alert:
+    """Build the alert for a nightly run the box watchdog stopped before it finished.
+
+    The box powers off, so no task fails and the run never reports. The watchdog sends this.
+    """
+    _require_environment(env)
+    return Alert(
+        subject=f"[{env}] The nightly run was stopped before it finished",
+        message=(
+            f"The box watchdog stopped the nightly run in the {env} environment.\n\n"
+            f"Reason: {reason}\n\n"
+            "An incident record was written to the lake. The next nightly run catches up."
+        ),
+    )
+
+
 def status_alert(status: Mapping, env: str) -> Alert | None:
     """Build the alert for a status.json document, or return None when every pipeline is ok."""
     _require_environment(env)

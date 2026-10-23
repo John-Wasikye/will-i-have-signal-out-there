@@ -233,6 +233,9 @@ class Steps:
     def record_incident(self, decision):
         self._step("record_incident")
 
+    def send_alert(self, decision):
+        self._step("send_alert")
+
     def power_off(self):
         self._step("power_off")
 
@@ -242,6 +245,7 @@ def _stop(steps, action):
         Decision(action, "reason"),
         save_database=steps.save_database,
         record_incident=steps.record_incident,
+        send_alert=steps.send_alert,
         power_off=steps.power_off,
     )
 
@@ -255,13 +259,13 @@ def test_a_finished_run_saves_the_database_then_powers_off_with_no_incident():
     assert errors == []
 
 
-def test_the_maximum_and_a_spot_warning_also_record_an_incident():
+def test_the_maximum_and_a_spot_warning_also_record_an_incident_and_email_me():
     for action in (Action.STOP_MAXIMUM, Action.STOP_SPOT_WARNING):
         steps = Steps()
 
         _stop(steps, action)
 
-        assert steps.order == ["save_database", "record_incident", "power_off"]
+        assert steps.order == ["save_database", "record_incident", "send_alert", "power_off"]
 
 
 def test_powering_off_is_last_even_when_saving_the_database_fails():
@@ -269,7 +273,7 @@ def test_powering_off_is_last_even_when_saving_the_database_fails():
 
     errors = _stop(steps, Action.STOP_MAXIMUM)
 
-    assert steps.order == ["save_database", "record_incident", "power_off"]
+    assert steps.order == ["save_database", "record_incident", "send_alert", "power_off"]
     assert errors == ["save_database failed: save_database broke"]
 
 
@@ -280,6 +284,23 @@ def test_powering_off_still_happens_when_the_incident_cannot_be_recorded():
 
     assert steps.order[-1] == "power_off"
     assert errors == ["record_incident failed: record_incident broke"]
+
+
+def test_the_email_is_still_sent_when_the_incident_cannot_be_recorded():
+    steps = Steps(fail={"record_incident"})
+
+    _stop(steps, Action.STOP_MAXIMUM)
+
+    assert "send_alert" in steps.order
+
+
+def test_powering_off_still_happens_when_the_email_cannot_be_sent():
+    steps = Steps(fail={"send_alert"})
+
+    errors = _stop(steps, Action.STOP_SPOT_WARNING)
+
+    assert steps.order[-1] == "power_off"
+    assert errors == ["send_alert failed: send_alert broke"]
 
 
 def test_if_powering_off_fails_the_error_is_not_hidden():
@@ -532,16 +553,25 @@ def test_the_whole_spot_check_works_against_a_local_stand_in_for_the_metadata_se
     assert stop == datetime(2026, 10, 10, 11, 32, tzinfo=UTC)
 
 
+TOPIC = "arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts"
+
+
 def test_the_command_line_needs_a_bucket_and_has_sensible_defaults():
-    args = parse_args(["--bucket", "lake"])
+    args = parse_args(["--bucket", "lake", "--env", "dev", "--alert-topic-arn", TOPIC])
 
     assert args.bucket == "lake"
+    assert args.env == "dev"
+    assert args.alert_topic_arn == TOPIC
     assert args.namespace == "airflow"
     assert args.dag_id == "platform_skeleton_nightly"
     assert args.poll_seconds == 30
 
     with pytest.raises(SystemExit):
         parse_args([])
+    with pytest.raises(SystemExit):
+        parse_args(["--bucket", "lake", "--env", "dev"])
+    with pytest.raises(SystemExit):
+        parse_args(["--bucket", "lake", "--env", "staging", "--alert-topic-arn", TOPIC])
 
 
 def test_a_boot_at_the_scheduled_time_is_the_nightly_run():
