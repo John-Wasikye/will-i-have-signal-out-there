@@ -60,6 +60,8 @@ class RunMetric:
         require_utc(self.data_interval_start_utc, "data_interval_start_utc")
         require_utc(self.data_interval_end_utc, "data_interval_end_utc")
         require_utc(self.emitted_at_utc, "emitted_at_utc")
+        if self.freshest_event_time_utc is not None:
+            require_utc(self.freshest_event_time_utc, "freshest_event_time_utc")
 
 
 def write_run_metric(metric: RunMetric, table_dir: Path) -> Path:

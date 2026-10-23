@@ -107,6 +107,15 @@ def test_run_metric_rejects_naive_timestamps():
         _metric(emitted_at_utc=datetime(2026, 10, 9, 10, 0))
 
 
+def test_run_metric_rejects_a_naive_freshest_event_time():
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _metric(freshest_event_time_utc=datetime(2026, 10, 9, 9, 0))
+
+
+def test_run_metric_accepts_no_freshest_event_time():
+    assert _metric(freshest_event_time_utc=None).freshest_event_time_utc is None
+
+
 def test_write_run_metric_writes_one_row_per_partition_file(tmp_path):
     path = write_run_metric(_metric(), tmp_path)
     assert path.parent.name == "run_id=run-1"
