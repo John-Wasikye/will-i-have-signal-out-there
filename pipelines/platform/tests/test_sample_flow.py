@@ -6,11 +6,18 @@ from datetime import UTC, datetime
 import pyarrow.parquet as pq
 import sample_flow
 from fastapi.testclient import TestClient
-from sample_flow import run_sample_flow
 
 import app as serving_app
 
 NOW = datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
+
+
+def run_sample_flow(now_utc, published_dir, status_path, metrics_dir):
+    """Run the three tasks in the order the DAG runs them, and return the published files."""
+    outcome = sample_flow.publish_sample(now_utc, published_dir)
+    sample_flow.emit_sample_metric(now_utc, outcome, metrics_dir)
+    sample_flow.publish_sample_status(now_utc, outcome, status_path)
+    return list(outcome.published)
 
 
 def test_flow_publishes_sample_table_and_status_ok(tmp_path):

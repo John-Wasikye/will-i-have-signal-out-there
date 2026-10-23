@@ -1,9 +1,8 @@
 """Skeleton flow: sample rows -> gate -> publish -> run metric -> status.
 
 The flow is split into three tasks so the DAG can run each one on its own:
-publish_sample, emit_sample_metric and publish_sample_status. run_sample_flow runs them
-in that order. The Spark job (pipelines/platform/spark) writes the same rows to Iceberg
-before this flow publishes them.
+publish_sample, emit_sample_metric and publish_sample_status. The Spark job
+(pipelines/platform/spark) writes the same rows to Iceberg before this flow publishes them.
 """
 
 from __future__ import annotations
@@ -125,16 +124,3 @@ def publish_sample_status(now_utc: datetime, outcome: PublishOutcome, status_pat
         now_utc,
         status_path,
     )
-
-
-def run_sample_flow(
-    now_utc: datetime,
-    published_dir: Path,
-    status_path: Path,
-    metrics_dir: Path,
-) -> list[Path]:
-    """Run the three tasks in order and return the published file paths."""
-    outcome = publish_sample(now_utc, published_dir)
-    emit_sample_metric(now_utc, outcome, metrics_dir)
-    publish_sample_status(now_utc, outcome, status_path)
-    return list(outcome.published)
