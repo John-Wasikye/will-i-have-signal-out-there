@@ -1,9 +1,10 @@
 import { formatUtc } from '../lib/status'
 
+/** One answer from GET /sample (SampleAnswer in docs/platform/openapi-serving-template.yaml). */
 export interface SampleRow {
   key: string
-  value: string | number | null
-  last_good_run_utc: string | null
+  value: string
+  last_good_run_utc: string
   late: boolean
 }
 
@@ -19,7 +20,7 @@ export function AnswerCard({ row }: AnswerCardProps) {
         <dt>Key</dt>
         <dd>{row.key}</dd>
         <dt>Value</dt>
-        <dd>{row.value === null ? 'No value' : String(row.value)}</dd>
+        <dd>{row.value}</dd>
         <dt>Last good run</dt>
         <dd>{formatUtc(row.last_good_run_utc)}</dd>
         <dt>Late</dt>
