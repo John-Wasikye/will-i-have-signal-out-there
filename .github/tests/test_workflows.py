@@ -228,3 +228,16 @@ def test_the_site_job_lints_and_audits_its_packages():
     assert "npm run lint" in runs
     # Trivy skips development packages, so npm audit is what covers the build tools.
     assert "npm audit" in runs
+
+
+def test_the_python_job_checks_the_formatting_too():
+    runs = _runs(_load(WORKFLOWS / "ci.yml")["jobs"]["python"])
+    assert "ruff check ." in runs
+    assert "ruff format --check ." in runs
+
+
+def test_the_terraform_job_runs_tflint_with_the_repository_settings():
+    runs = _runs(_load(WORKFLOWS / "ci.yml")["jobs"]["terraform"])
+    assert "tflint" in runs
+    assert "platform/terraform/.tflint.hcl" in runs
+    assert (GITHUB.parent / "platform" / "terraform" / ".tflint.hcl").is_file()

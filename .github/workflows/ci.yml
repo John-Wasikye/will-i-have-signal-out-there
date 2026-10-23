@@ -21,7 +21,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -e ".[dev]"
       - name: Lint
-        run: ruff check .
+        run: |
+          ruff check .
+          ruff format --check .
       - name: Test
         run: pytest
 
@@ -103,7 +105,7 @@ jobs:
       - run: npm run build
 
   terraform:
-    name: Terraform format and tests
+    name: Terraform format, lint and tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -112,6 +114,12 @@ jobs:
           terraform_version: "1.16.4"
       - name: Format
         run: terraform fmt -check -recursive platform/terraform
+      # tflint finds unused variables, locals and lookups, and missing version settings.
+      - name: Lint
+        run: |
+          docker run --rm --volume "$PWD:/data" --workdir /data/platform/terraform \
+            ghcr.io/terraform-linters/tflint:v0.59.1 \
+            --config /data/platform/terraform/.tflint.hcl --recursive
       - name: Module tests
         run: |
           for module in platform/terraform/modules/*/; do
