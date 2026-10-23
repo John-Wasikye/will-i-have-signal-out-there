@@ -35,7 +35,7 @@ The watchdog checks every 30 seconds and stops the box for the first of these re
 
 To stop, it saves the database to S3 first, because that is the step with a deadline. It then records the incident and sends the email if there is one, and powers the box off last. Powering off always runs, even if a save fails, so a broken step cannot leave a server billing.
 
-Only the scheduled boot, within 30 minutes after 10:00 UTC, counts as the nightly run. A box that I start by hand is a work session, and only a spot warning stops it. Work sessions end by the 4-hour hard stop and the idle alarm. If the watchdog cannot reach Airflow, it keeps going and still stops the box at 2 hours.
+Only the scheduled boot, within 30 minutes after 10:00 UTC, counts as the nightly run. A box that I start by hand is a work session. The watchdog stops it for a spot warning or at the 4-hour session limit, counted from its boot, and the idle alarm stops it after 30 idle minutes. The 14:00 UTC hard stop only bounds the nightly run, so without the session limit a box started in the evening would run until the next afternoon. If the watchdog cannot reach Airflow, it keeps going and still stops the box at 2 hours.
 
 ## Checking it
 

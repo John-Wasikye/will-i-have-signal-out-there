@@ -608,6 +608,29 @@ def test_a_work_session_is_never_stopped_for_finishing_or_for_the_nightly_maximu
         assert decision.action is Action.KEEP_WAITING
 
 
+def test_a_work_session_stops_at_the_four_hour_session_limit():
+    # The 14:00 UTC hard stop only bounds the nightly run. A session I start at another
+    # time would otherwise run until the next 14:00 UTC (ADR-0013: 4 hours per session).
+    decision = decide(
+        now_utc=WORK_SESSION_START + timedelta(hours=4),
+        box_started_utc=WORK_SESSION_START,
+        progress=RunProgress.WAITING,
+        spot_stop_utc=None,
+        nightly=False,
+    )
+
+    assert decision.action is Action.STOP_SESSION_LIMIT
+
+
+def test_the_session_limit_saves_and_powers_off_without_an_incident_or_an_email():
+    steps = Steps()
+
+    errors = _stop(steps, Action.STOP_SESSION_LIMIT)
+
+    assert steps.order == ["save_database", "power_off"]
+    assert errors == []
+
+
 def test_a_work_session_still_stops_for_a_spot_warning():
     decision = decide(
         now_utc=WORK_SESSION_START + timedelta(hours=1),

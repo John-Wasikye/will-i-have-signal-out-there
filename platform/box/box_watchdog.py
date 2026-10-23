@@ -7,6 +7,9 @@ are three reasons to stop, and this is their order of priority:
 2. The nightly run has finished, whether it succeeded or failed.
 3. The box has been up for the 2-hour nightly maximum.
 
+A box I start by hand is a work session. Only a spot warning or the 4-hour session limit stops
+it here; the idle alarm can stop it too.
+
 A run that finished is never called a timeout, even if the watchdog notices it late.
 """
 
@@ -55,6 +58,12 @@ class Action(Enum):
     STOP_FINISHED = "stop: the run finished"
     STOP_MAXIMUM = "stop: the 2 hour maximum"
     STOP_SPOT_WARNING = "stop: AWS is taking the box back"
+    STOP_SESSION_LIMIT = "stop: the 4 hour session limit"
+
+
+# ADR-0013: every box session lasts at most 4 hours. The 14:00 UTC hard stop bounds only the
+# nightly run, so the watchdog enforces this for a session I start at any other time.
+WORK_SESSION_LIMIT = timedelta(hours=4)
 
 
 @dataclass(frozen=True)
@@ -102,9 +111,8 @@ def decide(
 ) -> Decision:
     """Choose the next action. ``spot_stop_utc`` is set only when AWS has sent its notice.
 
-    ``nightly`` is False for a work session that I start by hand. A work session ends by
-    its own limits (the 4-hour hard stop and the idle alarm), so only a spot warning stops it
-    here.
+    ``nightly`` is False for a work session that I start by hand. A work session is stopped
+    here only by a spot warning or the 4-hour session limit.
     """
     now = require_utc(now_utc, "now_utc")
     started = require_utc(box_started_utc, "box_started_utc")
@@ -115,6 +123,8 @@ def decide(
             f"AWS will stop the box at {format_utc(require_utc(spot_stop_utc, 'spot_stop_utc'))}.",
         )
     if not nightly:
+        if now - started >= WORK_SESSION_LIMIT:
+            return Decision(Action.STOP_SESSION_LIMIT, "The work session reached its 4 hour limit.")
         return Decision(Action.KEEP_WAITING, "This is a work session, not the nightly run.")
     if progress in (RunProgress.SUCCEEDED, RunProgress.FAILED):
         return Decision(Action.STOP_FINISHED, f"The nightly run {progress.value}.")
@@ -232,7 +242,7 @@ def watch(
 
     A read that fails counts as "nothing new". If Airflow cannot be reached, the watchdog
     still stops the box at the 2-hour maximum. A box that booted outside the nightly window is
-    a work session, and only a spot warning stops it here.
+    a work session, and only a spot warning or the 4-hour session limit stops it here.
     """
     nightly = is_nightly_boot(box_started_utc)
     while True:
