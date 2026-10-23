@@ -67,3 +67,7 @@ output "site_distribution_id" {
   description = "CloudFront distribution of the site. Variable SITE_DISTRIBUTION_ID in the live GitHub environment."
   value       = module.site.distribution_id
 }
+output "audit_log_bucket" {
+  description = "Bucket that holds the account's CloudTrail security logs for one year."
+  value       = module.audit_trail.bucket_name
+}

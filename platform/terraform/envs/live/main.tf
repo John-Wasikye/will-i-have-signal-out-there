@@ -70,6 +70,13 @@ module "budget" {
   alert_emails = var.alert_emails
 }
 
+# The CloudTrail trail is account-wide too, so it is created only here. It logs dev and live.
+module "audit_trail" {
+  source = "../../modules/audit_trail"
+
+  alarm_actions = [module.alerts.topic_arn]
+}
+
 module "box_iam" {
   source = "../../modules/box_iam"
 
