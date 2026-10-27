@@ -90,7 +90,11 @@ dagProcessor:
         cpu: 200m
         memory: 256Mi
 
+# install.sh runs helm with --wait, and Helm runs post-install hooks only after the wait. The
+# scheduler, API server and DAG processor wait for the migration, so as a hook the job never
+# ran and the first install timed out. As a plain resource it runs with everything else.
 migrateDatabaseJob:
+  useHelmHooks: false
   resources:
     requests:
       cpu: 250m
