@@ -327,3 +327,51 @@ run "rejects_a_repository_without_its_ids" {
     var.github_repo,
   ]
 }
+
+# Glue checks a table action against the catalog, the database and the table. On the first real
+# box, Iceberg's GetTable was refused on the catalog when only the table ARN was listed.
+run "glue_table_actions_cover_the_catalog_database_and_tables" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  variables {
+    env                        = "dev"
+    raw_bucket_arn             = "arn:aws:s3:::portfolio-dev-raw-123456789012"
+    lake_bucket_arn            = "arn:aws:s3:::portfolio-dev-lake-123456789012"
+    glue_database_name         = "portfolio_dev"
+    parameter_read_policy_json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
+    create_oidc_provider       = false
+  }
+
+  assert {
+    condition = toset(flatten([
+      for statement in jsondecode(output.data_access_policy_json).Statement :
+      statement.Resource if statement.Sid == "GlueTables"
+      ])) == toset([
+      "arn:aws:glue:us-east-1:123456789012:catalog",
+      "arn:aws:glue:us-east-1:123456789012:database/portfolio_dev",
+      "arn:aws:glue:us-east-1:123456789012:table/portfolio_dev/*",
+    ])
+    error_message = "Glue table actions must name the catalog, the database and its tables."
+  }
+}
