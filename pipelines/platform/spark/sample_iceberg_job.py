@@ -15,12 +15,24 @@ from datetime import date, datetime
 
 from sample_rows import build_sample_rows
 
-ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1"
+ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0"
+ICEBERG_AWS_PACKAGE = "org.apache.iceberg:iceberg-aws-bundle:1.12.0"
 CATALOG_NAME = "portfolio"
 
 
 class RowLimitExceeded(RuntimeError):
     """Raised before writing when the job would read or write too many rows."""
+
+
+def spark_packages(use_glue: bool) -> str:
+    """Return the Maven packages Spark downloads at start.
+
+    The Iceberg runtime leaves out the AWS SDK, so the Glue catalog and S3FileIO need the
+    Iceberg AWS bundle beside it.
+    """
+    if use_glue:
+        return f"{ICEBERG_PACKAGE},{ICEBERG_AWS_PACKAGE}"
+    return ICEBERG_PACKAGE
 
 
 def build_spark_session(app_name: str, warehouse: str, use_glue: bool = False):  # noqa: ANN201
@@ -33,7 +45,7 @@ def build_spark_session(app_name: str, warehouse: str, use_glue: bool = False): 
 
     builder = (
         SparkSession.builder.appName(app_name)
-        .config("spark.jars.packages", ICEBERG_PACKAGE)
+        .config("spark.jars.packages", spark_packages(use_glue))
         .config(
             "spark.sql.extensions",
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
@@ -59,18 +71,21 @@ def run_sample_iceberg_job(
     table_name: str,
     run_date: date,
     now_utc: datetime,
+    *,
+    namespace: str,
     max_rows: int,
 ) -> int:
     """Write one partition of the sample table and return the number of rows written.
 
     The table is partitioned by ``run_date``. Only that day's partition is replaced.
+    ``namespace`` is the Glue database on the box; the Glue catalog refuses a table without one.
     """
     rows = build_sample_rows(now_utc, run_date)
     if len(rows) > max_rows:
         raise RowLimitExceeded(f"{len(rows)} rows is over the limit of {max_rows}")
 
     frame = spark.createDataFrame(rows)
-    full_name = f"{CATALOG_NAME}.{table_name}"
+    full_name = f"{CATALOG_NAME}.{namespace}.{table_name}"
     if spark.catalog.tableExists(full_name):
         frame.writeTo(full_name).overwritePartitions()
     else:

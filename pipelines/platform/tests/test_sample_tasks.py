@@ -74,3 +74,15 @@ def test_status_task_marks_the_pipeline_ok_after_a_pass(tmp_path):
 
     assert document["pipelines"][0]["state"] == "ok"
     assert json.loads((tmp_path / "status.json").read_text(encoding="utf-8")) == document
+
+
+def test_a_scheduled_run_ends_at_its_data_interval_end():
+    run_after = datetime(2026, 10, 9, 10, 5, tzinfo=UTC)
+
+    assert sample_flow.run_end(NOW, run_after) == NOW
+
+
+def test_a_run_started_by_hand_ends_when_it_was_started():
+    run_after = datetime(2026, 10, 9, 16, 38, tzinfo=UTC)
+
+    assert sample_flow.run_end(None, run_after) == run_after

@@ -3,7 +3,8 @@
 For each table, in order:
 1. rewrite_data_files merges small files so reads stay fast.
 2. expire_snapshots removes snapshots older than the retention window.
-3. remove_orphan_files deletes files that no snapshot points to.
+3. remove_orphan_files deletes files that no snapshot points to. It lists the table's folder
+   with the table's own FileIO (prefix_listing), so S3 needs no Hadoop file system driver.
 
 The default windows are placeholders until John sets them after measuring table sizes
 (open question OQ-P07).
@@ -25,23 +26,26 @@ def maintain_tables(
     spark,  # noqa: ANN001, a pyspark SparkSession, typed loosely to avoid importing pyspark
     table_names: list[str],
     now_utc: datetime,
+    *,
+    namespace: str,
     snapshot_retention_days: int = DEFAULT_SNAPSHOT_RETENTION_DAYS,
     orphan_age_days: int = DEFAULT_ORPHAN_AGE_DAYS,
 ) -> None:
     """Run the three maintenance steps for each table, in the order listed above.
 
-    Every table name is checked before the first statement runs, so one bad name stops the
-    whole task without changing any table.
+    The tables live in ``namespace``, the Glue database on the box. Every name is checked
+    before the first statement runs, so one bad name stops the whole task without changing
+    any table.
     """
     now_utc = require_utc(now_utc, "now_utc")
-    for name in table_names:
+    for name in [namespace, *table_names]:
         if not TABLE_NAME.match(name):
             raise ValueError(f"table name {name!r} must be lowercase letters, digits and _")
 
     snapshot_cutoff = _sql_timestamp(now_utc - timedelta(days=snapshot_retention_days))
     orphan_cutoff = _sql_timestamp(now_utc - timedelta(days=orphan_age_days))
     for name in table_names:
-        full_name = f"{CATALOG_NAME}.{name}"
+        full_name = f"{CATALOG_NAME}.{namespace}.{name}"
         spark.sql(f"CALL {CATALOG_NAME}.system.rewrite_data_files(table => '{full_name}')")
         spark.sql(
             f"CALL {CATALOG_NAME}.system.expire_snapshots("
@@ -49,7 +53,8 @@ def maintain_tables(
         )
         spark.sql(
             f"CALL {CATALOG_NAME}.system.remove_orphan_files("
-            f"table => '{full_name}', older_than => TIMESTAMP '{orphan_cutoff}')"
+            f"table => '{full_name}', older_than => TIMESTAMP '{orphan_cutoff}', "
+            "prefix_listing => true)"
         )
 
 

@@ -33,6 +33,7 @@ METRICS_DIR = Path(os.environ.get("PLATFORM_METRICS_DIR", "/data/metrics"))
 INCIDENTS_DIR = Path(os.environ.get("PLATFORM_INCIDENTS_DIR", "/data/incidents"))
 WAREHOUSE = os.environ.get("PLATFORM_WAREHOUSE", "/data/warehouse")
 USE_GLUE = os.environ.get("PLATFORM_USE_GLUE") == "1"
+ICEBERG_NAMESPACE = os.environ.get("PLATFORM_ICEBERG_NAMESPACE", "platform")
 ICEBERG_TABLE = "sample_answer"
 MAX_SPARK_ROWS = 1_000
 
@@ -72,39 +73,52 @@ def platform_skeleton_nightly():
     """Nightly run of the skeleton. The schedule is 10:00 UTC (design doc section 2)."""
 
     @task
-    def write_iceberg_sample(data_interval_end: datetime) -> None:
+    def write_iceberg_sample(dag_run=None, data_interval_end: datetime | None = None) -> None:  # noqa: ANN001
         """Overwrite today's partition of the sample Iceberg table."""
+        end = sample_flow.run_end(data_interval_end, dag_run.run_after)
         spark = build_spark_session("platform_skeleton", WAREHOUSE, use_glue=USE_GLUE)
         try:
             run_sample_iceberg_job(
                 spark,
                 ICEBERG_TABLE,
-                run_date=data_interval_end.date(),
-                now_utc=data_interval_end,
+                run_date=end.date(),
+                now_utc=end,
+                namespace=ICEBERG_NAMESPACE,
                 max_rows=MAX_SPARK_ROWS,
             )
         finally:
             spark.stop()
 
     @task
-    def publish_sample(data_interval_end: datetime) -> dict:
+    def publish_sample(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
         """Run the publish gate and publish the sample Parquet file."""
-        outcome = sample_flow.publish_sample(data_interval_end, PUBLISHED_DIR)
+        end = sample_flow.run_end(data_interval_end, dag_run.run_after)
+        outcome = sample_flow.publish_sample(end, PUBLISHED_DIR)
         return sample_flow.outcome_to_dict(outcome)
 
     @task
-    def emit_metrics(outcome: dict, data_interval_end: datetime) -> str:
+    def emit_metrics(
+        outcome: dict,
+        dag_run=None,  # noqa: ANN001
+        data_interval_end: datetime | None = None,
+    ) -> str:
         """Write the run metric row and return its file path."""
+        end = sample_flow.run_end(data_interval_end, dag_run.run_after)
         path = sample_flow.emit_sample_metric(
-            data_interval_end, sample_flow.outcome_from_dict(outcome), METRICS_DIR
+            end, sample_flow.outcome_from_dict(outcome), METRICS_DIR
         )
         return str(path)
 
     @task
-    def publish_status(outcome: dict, data_interval_end: datetime) -> dict:
+    def publish_status(
+        outcome: dict,
+        dag_run=None,  # noqa: ANN001
+        data_interval_end: datetime | None = None,
+    ) -> dict:
         """Write status.json for the status page."""
+        end = sample_flow.run_end(data_interval_end, dag_run.run_after)
         return sample_flow.publish_sample_status(
-            data_interval_end,
+            end,
             sample_flow.outcome_from_dict(outcome),
             PUBLISHED_DIR / "status.json",
         )
@@ -145,7 +159,7 @@ def platform_skeleton_nightly():
         """Compact, expire and clean up Iceberg tables. Runs even when earlier tasks fail."""
         spark = build_spark_session("platform_skeleton_maintenance", WAREHOUSE, use_glue=USE_GLUE)
         try:
-            maintain_tables(spark, [ICEBERG_TABLE], datetime.now(UTC))
+            maintain_tables(spark, [ICEBERG_TABLE], datetime.now(UTC), namespace=ICEBERG_NAMESPACE)
         finally:
             spark.stop()
 

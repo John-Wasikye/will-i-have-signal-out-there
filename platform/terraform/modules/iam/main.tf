@@ -143,7 +143,7 @@ data "aws_iam_policy_document" "data_access" {
       "glue:DeletePartition",
       "glue:BatchDeletePartition",
     ]
-    resources = [local.glue_tables_arn]
+    resources = [local.glue_catalog_arn, local.glue_database_arn, local.glue_tables_arn]
   }
 }
 

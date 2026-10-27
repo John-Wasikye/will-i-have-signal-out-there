@@ -293,3 +293,10 @@ def test_the_region_comes_from_the_alert_topic():
     output = _run(["dev"], settings=settings).stdout
 
     assert "AWS_DEFAULT_REGION=eu-west-2" in output
+
+
+def test_spark_writes_iceberg_tables_into_the_environments_glue_database():
+    output = _run(["dev"]).stdout
+
+    settings_line = next(line for line in output.splitlines() if "configmap" in line)
+    assert "PLATFORM_ICEBERG_NAMESPACE=portfolio_dev" in settings_line
