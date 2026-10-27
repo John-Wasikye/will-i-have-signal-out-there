@@ -1,7 +1,6 @@
 """Tests for building the Lambda zip package."""
 
 import base64
-import hashlib
 import re
 import zipfile
 
@@ -9,9 +8,9 @@ from build_package import (
     LOCK_PATH,
     REQUIREMENTS_PATH,
     build_zip,
+    contents_sha256_base64,
     install_dependencies,
     serving_source_files,
-    sha256_base64,
 )
 
 
@@ -90,15 +89,6 @@ def test_the_same_inputs_give_the_same_zip_every_time(tmp_path):
     assert (tmp_path / "first.zip").read_bytes() == (tmp_path / "second.zip").read_bytes()
 
 
-def test_the_checksum_matches_the_format_terraform_expects(tmp_path):
-    path = tmp_path / "file.bin"
-    path.write_bytes(b"hello")
-
-    expected = base64.b64encode(hashlib.sha256(b"hello").digest()).decode("ascii")
-
-    assert sha256_base64(path) == expected
-
-
 # --- The same package from every machine, on every day --------------------------------------
 #
 # A build on 2026-10-22 and one on 2026-10-27 differed: requirements.txt pinned only the four
@@ -162,3 +152,53 @@ def test_files_that_depend_on_the_machine_stay_out_of_the_zip(tmp_path):
     assert "fastapi-0.143.0.dist-info/RECORD" not in names
     # Packages read their own version from METADATA, so it stays.
     assert "fastapi-0.143.0.dist-info/METADATA" in names
+
+
+# --- The checksum Terraform sees comes from the files in the zip -----------------------------
+#
+# The same files zipped on Windows and on Linux gave different zip bytes (zlib differs), while
+# every file inside was identical. Terraform's source_code_hash is only a trigger for a new
+# upload, so it is computed from the names and bytes inside the zip, not from the zip itself.
+
+
+def _zip_with(path, files, level):
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=level) as archive:
+        for name, data in files.items():
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, data, compresslevel=level)
+
+
+def test_the_same_files_give_the_same_checksum_however_they_were_compressed(tmp_path):
+    files = {"app.py": b"print('hi')\n" * 200, "duckdb/__init__.py": b"# duckdb\n" * 200}
+    _zip_with(tmp_path / "fast.zip", files, level=1)
+    _zip_with(tmp_path / "small.zip", files, level=9)
+
+    assert (tmp_path / "fast.zip").read_bytes() != (tmp_path / "small.zip").read_bytes()
+    assert contents_sha256_base64(tmp_path / "fast.zip") == contents_sha256_base64(
+        tmp_path / "small.zip"
+    )
+
+
+def test_a_changed_file_or_name_changes_the_checksum(tmp_path):
+    _zip_with(tmp_path / "a.zip", {"app.py": b"one"}, level=6)
+    _zip_with(tmp_path / "b.zip", {"app.py": b"two"}, level=6)
+    _zip_with(tmp_path / "c.zip", {"api.py": b"one"}, level=6)
+
+    checksums = {contents_sha256_base64(tmp_path / f"{n}.zip") for n in "abc"}
+
+    assert len(checksums) == 3
+
+
+def test_moving_bytes_between_the_name_and_the_file_changes_the_checksum(tmp_path):
+    # Each name and each file is length-prefixed, so "ab" + "c" never equals "a" + "bc".
+    _zip_with(tmp_path / "a.zip", {"ab": b"c"}, level=6)
+    _zip_with(tmp_path / "b.zip", {"a": b"bc"}, level=6)
+
+    assert contents_sha256_base64(tmp_path / "a.zip") != contents_sha256_base64(tmp_path / "b.zip")
+
+
+def test_the_contents_checksum_is_base64_sha256_like_terraform_expects(tmp_path):
+    _zip_with(tmp_path / "a.zip", {"app.py": b"one"}, level=6)
+
+    assert len(base64.b64decode(contents_sha256_base64(tmp_path / "a.zip"))) == 32

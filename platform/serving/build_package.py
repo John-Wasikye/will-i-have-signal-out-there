@@ -74,9 +74,21 @@ def build_zip(serving_dir: Path, dependencies_dir: Path, output_path: Path) -> N
             archive.writestr(info, entries[name].read_bytes())
 
 
-def sha256_base64(path: Path) -> str:
-    """Return the file's SHA-256 as base64, the format Terraform's source_code_hash uses."""
-    return base64.b64encode(hashlib.sha256(path.read_bytes()).digest()).decode("ascii")
+def contents_sha256_base64(zip_path: Path) -> str:
+    """Return a base64 SHA-256 of the names and bytes inside the zip, for source_code_hash.
+
+    The zip's own bytes depend on the zlib build that compressed it: the same files gave
+    different zips on Windows and Linux. Terraform needs only a value that changes when the
+    code changes, so it gets this one. Each name and file is length-prefixed, so moving bytes
+    from one to the other changes the checksum.
+    """
+    digest = hashlib.sha256()
+    with zipfile.ZipFile(zip_path) as archive:
+        for info in sorted(archive.infolist(), key=lambda entry: entry.filename):
+            for part in (info.filename.encode("utf-8"), archive.read(info)):
+                digest.update(len(part).to_bytes(8, "big"))
+                digest.update(part)
+    return base64.b64encode(digest.digest()).decode("ascii")
 
 
 def install_dependencies(lock: Path, target_dir: Path) -> None:
@@ -120,7 +132,7 @@ def main() -> None:
     install_dependencies(LOCK_PATH, dependencies_dir)
     build_zip(SERVING_DIR, dependencies_dir, ZIP_PATH)
     print(f"Built {ZIP_PATH}")
-    print(f"lambda_zip_sha256 = {sha256_base64(ZIP_PATH)}")
+    print(f"lambda_zip_sha256 = {contents_sha256_base64(ZIP_PATH)}")
 
 
 if __name__ == "__main__":

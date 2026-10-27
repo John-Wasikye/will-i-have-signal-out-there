@@ -19,7 +19,7 @@ variable "lambda_zip_path" {
 }
 
 variable "lambda_zip_sha256" {
-  description = "Base64 SHA-256 of the zip file. A change in the file changes this value, which tells Terraform to update the function."
+  description = "Base64 SHA-256 of the files inside the zip, from build_package.py. A change in the code changes this value, which tells Terraform to update the function."
   type        = string
 }
 
