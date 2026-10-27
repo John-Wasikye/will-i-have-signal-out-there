@@ -47,6 +47,7 @@ The 14:00 UTC hard stop only bounds the nightly run, so without these limits a b
 To start a work session, in PowerShell (the instance ID is the `session_box_instance_id` Terraform output):
 
 ```powershell
+$env:AWS_PROFILE = "nfl_player_stats"
 $box = "<instance id>"
 $until = (Get-Date).ToUniversalTime().AddHours(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
 aws ec2 create-tags --resources $box --tags "Key=WorkSessionUntil,Value=$until"
