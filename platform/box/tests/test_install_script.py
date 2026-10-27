@@ -113,8 +113,9 @@ def test_the_steps_run_in_a_safe_order():
         "create the database secrets from Parameter Store",
         "create the platform settings",
         "install airflow",
+        "stop airflow so nothing writes during the restore",
         "restore the database backup",
-        "restart airflow",
+        "start airflow",
         "start the watchdog",
     ]
 
@@ -168,8 +169,9 @@ def test_the_backup_is_restored_after_airflow_is_installed_and_before_it_restart
 
     install = output.index("install airflow")
     restore = output.index("restore the database backup")
-    restart = output.index("restart airflow")
-    assert install < restore < restart
+    stop = output.index("stop airflow so nothing writes during the restore")
+    start = output.index("STEP 11: start airflow")
+    assert install < stop < restore < start
     assert "airflow_db_backup.py restore --bucket portfolio-dev-lake-123456789012" in output
 
 
@@ -300,3 +302,32 @@ def test_spark_writes_iceberg_tables_into_the_environments_glue_database():
 
     settings_line = next(line for line in output.splitlines() if "configmap" in line)
     assert "PLATFORM_ICEBERG_NAMESPACE=portfolio_dev" in settings_line
+
+
+def test_every_airflow_part_that_writes_to_the_database_is_stopped_before_the_restore():
+    """On the first real box, the scheduler wrote a heartbeat mid-restore and broke a key."""
+    output = _run(["dev"]).stdout
+    stop = output.split("stop airflow so nothing writes during the restore", 1)[1]
+    stop = stop.split("restore the database backup", 1)[0]
+
+    for part in (
+        "statefulset/airflow-scheduler",
+        "deployment/airflow-api-server",
+        "deployment/airflow-dag-processor",
+    ):
+        assert part in stop
+    assert "--replicas=0" in stop
+    assert "kubectl wait --for=delete pod" in stop
+
+
+def test_airflow_starts_again_after_the_restore():
+    output = _run(["dev"]).stdout
+    start = output.split("STEP 11: start airflow", 1)[1].split("STEP 12", 1)[0]
+
+    for part in (
+        "statefulset/airflow-scheduler",
+        "deployment/airflow-api-server",
+        "deployment/airflow-dag-processor",
+    ):
+        assert part in start
+    assert "--replicas=1" in start
