@@ -54,6 +54,32 @@ run() {
   fi
 }
 
+step "let k3s sign in to the image registry"
+# The image is in a private ECR repository, and an ECR password lasts 12 hours. A service
+# writes a fresh one before k3s starts, at every boot. It runs here before k3s is installed,
+# so k3s can pull the image on its very first start.
+registry="${IMAGE_REPOSITORY%%/*}"
+login_unit_path="/etc/systemd/system/ecr-registry-login.service"
+login_unit_text="[Unit]
+Description=Write a fresh ECR password where k3s reads it
+Wants=network-online.target
+After=network-online.target
+Before=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=${script_dir}/ecr_registry_login.sh ${registry}
+
+[Install]
+WantedBy=multi-user.target"
+echo "+ write ${login_unit_path}"
+echo "${login_unit_text}"
+if [[ "${dry_run}" != "1" ]]; then
+  printf '%s\n' "${login_unit_text}" > "${login_unit_path}"
+fi
+run systemctl daemon-reload
+run systemctl enable --now ecr-registry-login
+
 step "install k3s"
 # The k3s installer is not checksummed, so I pin the version it installs.
 run env INSTALL_K3S_VERSION="${K3S_VERSION}" \
