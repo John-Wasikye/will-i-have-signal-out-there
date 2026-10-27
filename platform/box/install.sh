@@ -36,6 +36,11 @@ done
 # A dev box must never email through the live topic, or the reverse.
 [[ "${ALERT_TOPIC_ARN}" == *":portfolio-${environment}-run-alerts" ]] \
   || fail "ALERT_TOPIC_ARN must be the ${environment} run alerts topic."
+# boto3 does not read the region from the instance metadata, as the AWS CLI does, so the
+# watchdog and the Airflow pods are told it. The alert topic is in the box's region.
+[[ "${ALERT_TOPIC_ARN}" =~ ^arn:aws:sns:([a-z0-9-]+): ]] \
+  || fail "ALERT_TOPIC_ARN must be an SNS topic ARN."
+export AWS_DEFAULT_REGION="${BASH_REMATCH[1]}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dry_run="${DRY_RUN:-0}"
@@ -138,6 +143,7 @@ settings_command+=" --from-literal PLATFORM_LAKE_BUCKET=${BACKUP_BUCKET}"
 settings_command+=" --from-literal PLATFORM_WAREHOUSE=s3://${BACKUP_BUCKET}/warehouse"
 settings_command+=" --from-literal PLATFORM_ENV=${environment}"
 settings_command+=" --from-literal PLATFORM_ALERT_TOPIC_ARN=${ALERT_TOPIC_ARN}"
+settings_command+=" --from-literal AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}"
 settings_command+=" --dry-run=client --output yaml | kubectl apply -f -"
 run bash -c "${settings_command}"
 
@@ -173,6 +179,7 @@ After=network-online.target
 
 [Service]
 Environment=KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+Environment=AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
 Environment=PYTHONPATH=${repo_dir}/pipelines/platform/publish:${script_dir}
 ExecStart=/usr/bin/python3.11 ${script_dir}/box_watchdog.py --bucket ${BACKUP_BUCKET} --env ${environment} --alert-topic-arn ${ALERT_TOPIC_ARN}
 Restart=on-failure

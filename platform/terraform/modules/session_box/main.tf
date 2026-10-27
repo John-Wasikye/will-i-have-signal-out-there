@@ -59,13 +59,16 @@ resource "aws_instance" "box" {
     }
   }
 
-  # Require IMDSv2, so a request from inside a container cannot read instance credentials.
-  # Tags are readable there too: the watchdog reads WorkSessionUntil to tell a work session I
-  # planned from a start nobody planned.
+  # Require IMDSv2, which blocks the simple request forgeries that read instance credentials.
+  # The pipelines run in k3s pods, one network hop further away, and reach AWS with the box's
+  # role, so the hop limit is 2: every pod on the box can use the box's role. Amazon Linux 2023
+  # also defaults to 2, but another image might not. Tags are readable there too: the watchdog
+  # reads WorkSessionUntil to tell a work session I planned from a start nobody planned.
   metadata_options {
-    http_endpoint          = "enabled"
-    http_tokens            = "required"
-    instance_metadata_tags = "enabled"
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+    instance_metadata_tags      = "enabled"
   }
 
   root_block_device {

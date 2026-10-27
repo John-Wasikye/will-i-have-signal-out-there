@@ -265,3 +265,31 @@ def test_k3s_can_sign_in_to_the_image_registry_from_its_first_start():
     assert "ecr_registry_login.sh 123456789012.dkr.ecr.us-east-1.amazonaws.com" in login
     assert "systemctl enable --now ecr-registry-login" in login
     assert "get-login-password" not in login
+
+
+# boto3 does not read the region from the instance metadata, as the AWS CLI does. On the first
+# real box the watchdog crashed with NoRegionError, and boto3 in the Airflow pods had no region
+# either. The install takes the region from the alert topic's ARN and hands it to both.
+
+
+def test_airflow_pods_are_told_the_aws_region():
+    settings_line = next(line for line in _run(["dev"]).stdout.splitlines() if "configmap" in line)
+
+    assert "AWS_DEFAULT_REGION=us-east-1" in settings_line
+
+
+def test_the_watchdog_is_told_the_aws_region():
+    watchdog = _section(_run(["dev"]).stdout, "start the watchdog")
+
+    assert "Environment=AWS_DEFAULT_REGION=us-east-1" in watchdog
+
+
+def test_the_region_comes_from_the_alert_topic():
+    settings = {
+        **REQUIRED_SETTINGS,
+        "ALERT_TOPIC_ARN": REQUIRED_SETTINGS["ALERT_TOPIC_ARN"].replace("us-east-1", "eu-west-2"),
+    }
+
+    output = _run(["dev"], settings=settings).stdout
+
+    assert "AWS_DEFAULT_REGION=eu-west-2" in output
