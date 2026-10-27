@@ -118,7 +118,7 @@ run "both_apply_roles_are_refused_other_projects_and_the_oidc_provider" {
   command = plan
 
   assert {
-    condition = alltrue([for target in ["arn:aws:s3:::*nfl-*", "arn:aws:ecs:*:*:*nfl-*", "arn:aws:iam::*:*nfl-*", "arn:aws:logs:*:*:*nfl-*", "arn:aws:cloudfront::*:*nfl-*", "arn:aws:iam::*:role/github-plan", "oidc-provider"] :
+    condition = alltrue([for target in ["arn:aws:s3:::*nfl-*", "arn:aws:ecs:*:*:*nfl-*", "arn:aws:iam::*:role/*nfl-*", "arn:aws:iam::*:user/*nfl-*", "arn:aws:iam::*:policy/*nfl-*", "arn:aws:logs:*:*:*nfl-*", "arn:aws:cloudfront::*:*nfl-*", "arn:aws:iam::*:role/github-plan", "oidc-provider"] :
     strcontains(aws_iam_role_policy.refuse_other_projects.policy, target)])
     error_message = "The dev apply role must be refused the protected resources and the OIDC provider."
   }
@@ -239,6 +239,22 @@ run "no_refusal_uses_a_wildcard_service" {
   assert {
     condition     = !strcontains(aws_iam_role_policy.refuse_live[0].policy, "arn:aws:*:") && !strcontains(aws_iam_role_policy.refuse_other_projects.policy, "arn:aws:*:")
     error_message = "IAM refuses an ARN whose service is a wildcard, so every refused ARN must name its service."
+  }
+}
+
+# IAM also refuses an IAM ARN whose resource part does not start with a type such as role/ or
+# user/. The second live apply failed on arn:aws:iam::*:*nfl-*, so IAM names are refused by type.
+run "no_refusal_uses_an_iam_arn_without_a_resource_type" {
+  command = plan
+
+  assert {
+    condition     = length(regexall("arn:aws:iam::[^:]*:[*]", aws_iam_role_policy.refuse_live[0].policy)) == 0 && length(regexall("arn:aws:iam::[^:]*:[*]", aws_iam_role_policy.refuse_other_projects.policy)) == 0
+    error_message = "IAM refuses an IAM ARN whose resource part starts with a wildcard, so each one must name its type, such as role/."
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.refuse_live[0].policy, "arn:aws:iam::*:role/*portfolio-live-*")
+    error_message = "The dev apply role must still be refused the live roles."
   }
 }
 
