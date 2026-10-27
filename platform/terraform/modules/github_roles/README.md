@@ -14,7 +14,7 @@ Dev and live share one AWS account, so the dev apply role is also refused:
 
 - anything named `portfolio-live-*` or `portfolio_live*`, and the live state file
 - the budget, which `envs/live` owns
-- any change to itself, so it cannot remove these refusals. A change to this role in dev is applied by hand, from my own machine.
+- any change to itself, so it cannot remove these refusals. It may still read itself (`iam:Get*`, `iam:List*`), because Terraform reads every resource before it plans. A change to this role in dev is applied by hand, from my own machine.
 
 The account also runs other projects, such as the NFL site. Both apply roles, dev and live, are refused every resource whose name contains one of `protected_names` (each environment passes `nfl-` for the NFL site), the exact resources in `protected_arns` (its two GitHub roles and its CloudFront distribution), and any change to the OIDC provider, which another project owns. A new project in the account must be added to those lists.
 

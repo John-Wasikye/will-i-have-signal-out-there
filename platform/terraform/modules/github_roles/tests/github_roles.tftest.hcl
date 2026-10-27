@@ -283,3 +283,22 @@ run "rejects_a_repository_without_its_ids" {
     var.github_repo,
   ]
 }
+
+# Terraform reads every resource before it plans, including the dev apply role itself. A refusal
+# of iam:* on the role also refused iam:GetRole, so the first dev apply from GitHub failed. The
+# role may read itself, and is refused every other action on itself.
+run "dev_apply_role_can_read_itself_but_change_nothing_about_itself" {
+  command = plan
+
+  assert {
+    condition = anytrue([
+      for statement in jsondecode(aws_iam_role_policy.refuse_live[0].policy).Statement :
+      statement.Sid == "RefuseChangesToItself"
+      && statement.Effect == "Deny"
+      && !contains(keys(statement), "Action")
+      && toset(flatten([statement.NotAction])) == toset(["iam:Get*", "iam:List*"])
+      && endswith(statement.Resource, ":role/portfolio-dev-terraform-apply")
+    ])
+    error_message = "The dev apply role must be refused every action on itself except reading it (iam:Get*, iam:List*)."
+  }
+}

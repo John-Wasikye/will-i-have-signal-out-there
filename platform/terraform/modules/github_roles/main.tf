@@ -209,11 +209,14 @@ data "aws_iam_policy_document" "refuse_live" {
   }
 
 
+  # Terraform reads this role on every plan, so reading is allowed: refusing iam:* also refused
+  # iam:GetRole, and every dev apply from GitHub failed. Every other action on it is refused, so
+  # it can never loosen its own refusals.
   statement {
-    sid       = "RefuseChangesToItself"
-    effect    = "Deny"
-    actions   = ["iam:*"]
-    resources = ["arn:${local.partition}:iam::${local.account_id}:role/${local.apply_role}"]
+    sid         = "RefuseChangesToItself"
+    effect      = "Deny"
+    not_actions = ["iam:Get*", "iam:List*"]
+    resources   = ["arn:${local.partition}:iam::${local.account_id}:role/${local.apply_role}"]
   }
 }
 
