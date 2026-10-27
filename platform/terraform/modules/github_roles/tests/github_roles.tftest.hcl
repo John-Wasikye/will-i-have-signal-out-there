@@ -42,7 +42,7 @@ run "plan_role_is_used_only_by_pull_requests_in_this_repository" {
   command = plan
 
   assert {
-    condition     = strcontains(aws_iam_role.plan.assume_role_policy, "repo:John-Wasikye/will-i-have-signal-out-there:pull_request")
+    condition     = strcontains(aws_iam_role.plan.assume_role_policy, "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:pull_request")
     error_message = "The plan role must trust pull requests in this repository only."
   }
 
@@ -92,7 +92,7 @@ run "apply_role_is_used_only_by_the_approved_environment" {
   command = plan
 
   assert {
-    condition     = strcontains(aws_iam_role.apply.assume_role_policy, "repo:John-Wasikye/will-i-have-signal-out-there:environment:dev")
+    condition     = strcontains(aws_iam_role.apply.assume_role_policy, "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:environment:dev")
     error_message = "The apply role must trust only jobs in the dev GitHub environment."
   }
 
@@ -161,7 +161,7 @@ run "deploy_role_is_used_only_by_the_approved_environment" {
   command = plan
 
   assert {
-    condition     = strcontains(aws_iam_role.deploy.assume_role_policy, "repo:John-Wasikye/will-i-have-signal-out-there:environment:dev")
+    condition     = strcontains(aws_iam_role.deploy.assume_role_policy, "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:environment:dev")
     error_message = "The deploy role must trust only jobs in the dev GitHub environment."
   }
 }
@@ -267,5 +267,19 @@ run "rejects_a_protected_arn_with_a_wildcard_service" {
 
   expect_failures = [
     var.protected_arns,
+  ]
+}
+# GitHub signs this repository's tokens with its permanent owner and repository IDs
+# (repo:owner@id/name@id:...). A trust written with the plain owner/name never matches, and the
+# first deploy failed on exactly that, so the plain form is refused.
+run "rejects_a_repository_without_its_ids" {
+  command = plan
+
+  variables {
+    github_repo = "John-Wasikye/will-i-have-signal-out-there"
+  }
+
+  expect_failures = [
+    var.github_repo,
   ]
 }

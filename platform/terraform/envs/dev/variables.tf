@@ -5,9 +5,9 @@ variable "region" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository allowed to assume the dev pipeline roles, in owner/name form."
+  description = "GitHub repository allowed to assume the dev pipeline roles, as owner@owner_id/name@repo_id, the form GitHub puts in its tokens."
   type        = string
-  default     = "John-Wasikye/will-i-have-signal-out-there"
+  default     = "John-Wasikye@171445038/will-i-have-signal-out-there@1412828974"
 }
 
 variable "pipeline_names" {

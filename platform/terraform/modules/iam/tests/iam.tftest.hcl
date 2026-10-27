@@ -85,7 +85,7 @@ run "dev_role_trusts_any_ref_in_the_repository" {
   }
 
   assert {
-    condition     = strcontains(aws_iam_role.pipeline["platform_skeleton"].assume_role_policy, "repo:John-Wasikye/will-i-have-signal-out-there:*")
+    condition     = strcontains(aws_iam_role.pipeline["platform_skeleton"].assume_role_policy, "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:*")
     error_message = "Dev roles must trust any ref in the repository."
   }
 }
@@ -123,7 +123,7 @@ run "live_role_trusts_only_the_main_branch" {
   }
 
   assert {
-    condition     = output.github_subject == "repo:John-Wasikye/will-i-have-signal-out-there:ref:refs/heads/main"
+    condition     = output.github_subject == "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:ref:refs/heads/main"
     error_message = "Live roles must trust only the main branch."
   }
 }
@@ -285,4 +285,45 @@ run "exposes_the_data_access_policy_for_reuse" {
     condition     = !strcontains(output.data_access_policy_json, "live")
     error_message = "A dev policy must not mention any live resource."
   }
+}
+
+# GitHub signs this repository's tokens with its permanent owner and repository IDs, so a trust
+# written with the plain owner/name never matches.
+run "rejects_a_repository_without_its_ids" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  variables {
+    env                        = "dev"
+    github_repo                = "John-Wasikye/will-i-have-signal-out-there"
+    raw_bucket_arn             = "arn:aws:s3:::portfolio-dev-raw-123456789012"
+    lake_bucket_arn            = "arn:aws:s3:::portfolio-dev-lake-123456789012"
+    glue_database_name         = "portfolio_dev"
+    parameter_read_policy_json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
+    create_oidc_provider       = false
+  }
+
+  expect_failures = [
+    var.github_repo,
+  ]
 }

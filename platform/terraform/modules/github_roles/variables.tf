@@ -9,13 +9,15 @@ variable "env" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository whose workflows may use these roles, in owner/name form."
+  description = "GitHub repository whose workflows may use these roles, as owner@owner_id/name@repo_id, the form GitHub puts in its tokens."
   type        = string
-  default     = "John-Wasikye/will-i-have-signal-out-there"
+  default     = "John-Wasikye@171445038/will-i-have-signal-out-there@1412828974"
 
+  # GitHub signs this repository's tokens with the permanent owner and repository IDs, so a
+  # trust written as plain owner/name never matches.
   validation {
-    condition     = can(regex("^[^/]+/[^/]+$", var.github_repo))
-    error_message = "The github_repo variable must look like owner/name."
+    condition     = can(regex("^[^/@]+@[0-9]+/[^/@]+@[0-9]+$", var.github_repo))
+    error_message = "The github_repo variable must look like owner@owner_id/name@repo_id."
   }
 }
 
