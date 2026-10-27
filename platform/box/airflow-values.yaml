@@ -90,7 +90,11 @@ dagProcessor:
         cpu: 200m
         memory: 256Mi
 
+# install.sh runs helm with --wait, and Helm runs post-install hooks only after the wait. The
+# scheduler, API server and DAG processor wait for the migration, so as a hook the job never
+# ran and the first install timed out. As a plain resource it runs with everything else.
 migrateDatabaseJob:
+  useHelmHooks: false
   resources:
     requests:
       cpu: 250m
@@ -126,7 +130,8 @@ env:
 
 # The bucket names and the alerts topic include the AWS account number, so they are not written
 # here. The install script puts them in this settings object: PLATFORM_SITE_BUCKET,
-# PLATFORM_LAKE_BUCKET, PLATFORM_WAREHOUSE, PLATFORM_ENV and PLATFORM_ALERT_TOPIC_ARN.
+# PLATFORM_LAKE_BUCKET, PLATFORM_WAREHOUSE, PLATFORM_ENV and PLATFORM_ALERT_TOPIC_ARN, and
+# AWS_DEFAULT_REGION, because boto3 does not read the region from the instance metadata.
 extraEnvFrom: |
   - configMapRef:
       name: platform-settings

@@ -36,6 +36,11 @@ done
 # A dev box must never email through the live topic, or the reverse.
 [[ "${ALERT_TOPIC_ARN}" == *":portfolio-${environment}-run-alerts" ]] \
   || fail "ALERT_TOPIC_ARN must be the ${environment} run alerts topic."
+# boto3 does not read the region from the instance metadata, as the AWS CLI does, so the
+# watchdog and the Airflow pods are told it. The alert topic is in the box's region.
+[[ "${ALERT_TOPIC_ARN}" =~ ^arn:aws:sns:([a-z0-9-]+): ]] \
+  || fail "ALERT_TOPIC_ARN must be an SNS topic ARN."
+export AWS_DEFAULT_REGION="${BASH_REMATCH[1]}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dry_run="${DRY_RUN:-0}"
@@ -53,6 +58,32 @@ run() {
     "$@"
   fi
 }
+
+step "let k3s sign in to the image registry"
+# The image is in a private ECR repository, and an ECR password lasts 12 hours. A service
+# writes a fresh one before k3s starts, at every boot. It runs here before k3s is installed,
+# so k3s can pull the image on its very first start.
+registry="${IMAGE_REPOSITORY%%/*}"
+login_unit_path="/etc/systemd/system/ecr-registry-login.service"
+login_unit_text="[Unit]
+Description=Write a fresh ECR password where k3s reads it
+Wants=network-online.target
+After=network-online.target
+Before=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=${script_dir}/ecr_registry_login.sh ${registry}
+
+[Install]
+WantedBy=multi-user.target"
+echo "+ write ${login_unit_path}"
+echo "${login_unit_text}"
+if [[ "${dry_run}" != "1" ]]; then
+  printf '%s\n' "${login_unit_text}" > "${login_unit_path}"
+fi
+run systemctl daemon-reload
+run systemctl enable --now ecr-registry-login
 
 step "install k3s"
 # The k3s installer is not checksummed, so I pin the version it installs.
@@ -112,6 +143,7 @@ settings_command+=" --from-literal PLATFORM_LAKE_BUCKET=${BACKUP_BUCKET}"
 settings_command+=" --from-literal PLATFORM_WAREHOUSE=s3://${BACKUP_BUCKET}/warehouse"
 settings_command+=" --from-literal PLATFORM_ENV=${environment}"
 settings_command+=" --from-literal PLATFORM_ALERT_TOPIC_ARN=${ALERT_TOPIC_ARN}"
+settings_command+=" --from-literal AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}"
 settings_command+=" --dry-run=client --output yaml | kubectl apply -f -"
 run bash -c "${settings_command}"
 
@@ -147,6 +179,7 @@ After=network-online.target
 
 [Service]
 Environment=KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+Environment=AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
 Environment=PYTHONPATH=${repo_dir}/pipelines/platform/publish:${script_dir}
 ExecStart=/usr/bin/python3.11 ${script_dir}/box_watchdog.py --bucket ${BACKUP_BUCKET} --env ${environment} --alert-topic-arn ${ALERT_TOPIC_ARN}
 Restart=on-failure

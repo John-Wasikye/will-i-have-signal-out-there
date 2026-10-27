@@ -197,3 +197,15 @@ def test_the_bucket_names_come_from_a_settings_object_made_at_install(dev_object
     env_from = _scheduler_container(dev_objects).get("envFrom", [])
 
     assert {"configMapRef": {"name": "platform-settings"}} in env_from
+
+
+def test_the_database_is_migrated_by_a_plain_job_that_helm_waits_for(dev_objects):
+    # install.sh runs helm with --wait. The chart's migration job is a post-install hook by
+    # default, and Helm runs post-install hooks only after --wait is satisfied, while the
+    # scheduler, the API server and the DAG processor wait for the migration before they start.
+    # On the first real box the install timed out with the job never created. As a plain
+    # resource, the job runs with everything else.
+    jobs = [item for item in dev_objects if item["kind"] == "Job"]
+    migration = next(job for job in jobs if "run-airflow-migrations" in job["metadata"]["name"])
+    annotations = migration["metadata"].get("annotations") or {}
+    assert "helm.sh/hook" not in annotations

@@ -91,6 +91,13 @@ run "the_box_can_read_its_work_session_tag" {
     condition     = aws_instance.box.metadata_options[0].http_tokens == "required"
     error_message = "The box must keep requiring version 2 of the metadata service."
   }
+  # The pipelines run in k3s pods, one network hop further from the metadata service, and
+  # reach AWS with the box's role through it. Amazon Linux 2023 sets 2, but another image
+  # might set 1, so the module sets it.
+  assert {
+    condition     = aws_instance.box.metadata_options[0].http_put_response_hop_limit == 2
+    error_message = "Pods on the box need a metadata hop limit of 2 to reach the box's role."
+  }
 }
 
 run "start_gives_up_after_two_hours_without_spot_capacity" {

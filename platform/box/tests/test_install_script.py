@@ -105,6 +105,7 @@ def test_the_steps_run_in_a_safe_order():
     assert result.returncode == 0, result.stderr
     names = [step.split(": ", 1)[1] for step in _steps(result.stdout)]
     assert names == [
+        "let k3s sign in to the image registry",
         "install k3s",
         "install helm",
         "install the python tools for the box scripts",
@@ -250,3 +251,45 @@ def test_helm_and_kubectl_are_pointed_at_the_k3s_cluster():
     text = SCRIPT.read_text(encoding="utf-8")
 
     assert "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" in text
+
+
+def test_k3s_can_sign_in_to_the_image_registry_from_its_first_start():
+    # The image is in a private ECR repository, so k3s needs a password before it can pull it.
+    # The password lasts 12 hours, so a service writes a fresh one before k3s at every boot.
+    # It runs before k3s is installed, so the first start can pull the image already.
+    output = _run(["dev"]).stdout
+    login = _section(output, "let k3s sign in to the image registry")
+
+    assert "ecr-registry-login.service" in login
+    assert "Before=k3s.service" in login
+    assert "ecr_registry_login.sh 123456789012.dkr.ecr.us-east-1.amazonaws.com" in login
+    assert "systemctl enable --now ecr-registry-login" in login
+    assert "get-login-password" not in login
+
+
+# boto3 does not read the region from the instance metadata, as the AWS CLI does. On the first
+# real box the watchdog crashed with NoRegionError, and boto3 in the Airflow pods had no region
+# either. The install takes the region from the alert topic's ARN and hands it to both.
+
+
+def test_airflow_pods_are_told_the_aws_region():
+    settings_line = next(line for line in _run(["dev"]).stdout.splitlines() if "configmap" in line)
+
+    assert "AWS_DEFAULT_REGION=us-east-1" in settings_line
+
+
+def test_the_watchdog_is_told_the_aws_region():
+    watchdog = _section(_run(["dev"]).stdout, "start the watchdog")
+
+    assert "Environment=AWS_DEFAULT_REGION=us-east-1" in watchdog
+
+
+def test_the_region_comes_from_the_alert_topic():
+    settings = {
+        **REQUIRED_SETTINGS,
+        "ALERT_TOPIC_ARN": REQUIRED_SETTINGS["ALERT_TOPIC_ARN"].replace("us-east-1", "eu-west-2"),
+    }
+
+    output = _run(["dev"], settings=settings).stdout
+
+    assert "AWS_DEFAULT_REGION=eu-west-2" in output

@@ -9,14 +9,15 @@ These are the files that run on the session box, the one computer that runs the 
 | `smoke_test_airflow_image.sh` | Checks the built image: Java is there, the imports work, the nightly DAG loads, and it does not run as root. |
 | `airflow-values.yaml` | Settings for the official Airflow chart. Local executor, CPU and memory limits, connection keys from Parameter Store. |
 | `airflow-values-live.yaml` | The one thing that changes for live: the Parameter Store path. |
-| `install.sh` | Sets up the box: k3s, Helm, the Python tools, the database secrets, the platform settings, Airflow, the database restore, a restart, and the watchdog. |
+| `install.sh` | Sets up the box: the image registry sign-in, k3s, Helm, the Python tools, the database secrets, the platform settings, Airflow, the database restore, a restart, and the watchdog. |
+| `ecr_registry_login.sh` | Writes a fresh ECR password where k3s reads it, so k3s can pull my image from the private repository. A service runs it before k3s at every boot. |
 | `requirements-host.txt` | The Python packages for the scripts that run on the box itself. |
 | `airflow_db_backup.py` | Saves Airflow's database to S3 and restores the newest copy. |
 | `box_watchdog.py` | Switches the box off when its work is done. |
 
 ## How the pieces fit
 
-1. The box starts at 10:00 UTC. `install.sh` installs pinned versions of k3s and Helm, and the Python tools the box scripts need.
+1. The box starts at 10:00 UTC. `install.sh` first sets up the image registry sign-in: the image is in a private ECR repository, and an ECR password lasts 12 hours, so a service writes a fresh one before k3s starts, at every boot. It then installs pinned versions of k3s and Helm, and the Python tools the box scripts need.
 2. It reads the database password from Parameter Store and makes two Kubernetes secrets from it. The password is sent on standard input, so it is on no command line.
 3. It puts the bucket names, the environment name and the run alerts topic in a settings object, because they hold the AWS account number and stay out of the repository. It refuses a topic from the other environment.
 4. It installs Airflow with the chart, using my image and my settings.
