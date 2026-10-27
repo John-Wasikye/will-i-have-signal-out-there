@@ -25,10 +25,13 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    # The repository is public, so the account number, and the names that hold it, are secrets:
+    # GitHub hides them in the log.
     env:
-      SITE_BUCKET: ${{ vars.SITE_BUCKET }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
       SITE_DISTRIBUTION_ID: ${{ vars.SITE_DISTRIBUTION_ID }}
-      AIRFLOW_REPOSITORY: ${{ vars.AIRFLOW_REPOSITORY }}
+      AIRFLOW_REPOSITORY: ${{ secrets.AIRFLOW_REPOSITORY }}
     steps:
       - uses: actions/checkout@v7
 
@@ -49,8 +52,9 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
 
       # --delete removes files the new build no longer has. The box writes published/ and
       # status.json, so the upload leaves them alone, and the deploy role is refused them anyway.
