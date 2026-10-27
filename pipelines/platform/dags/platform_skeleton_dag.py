@@ -66,6 +66,7 @@ def record_failure_callback(context: dict) -> None:
     schedule="0 10 * * *",
     start_date=datetime(2026, 10, 1, tzinfo=UTC),
     catchup=False,
+    max_active_runs=1,
     tags=["platform"],
     default_args={"on_failure_callback": record_failure_callback},
 )
