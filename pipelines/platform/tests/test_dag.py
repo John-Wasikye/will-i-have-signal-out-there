@@ -121,3 +121,16 @@ def test_the_failure_callback_sends_one_email(fake_sns, failure_context):
 
     assert len(fake_sns.published) == 1
     assert "publish_sample" in fake_sns.published[0]["Subject"]
+
+
+def test_every_task_runs_without_a_data_interval(skeleton_dag):
+    """Airflow 3 leaves data_interval_end out of the context of a run started by hand."""
+    import inspect
+
+    for task in skeleton_dag.tasks:
+        required = [
+            name
+            for name, parameter in inspect.signature(task.python_callable).parameters.items()
+            if parameter.default is inspect.Parameter.empty and name.startswith("data_interval")
+        ]
+        assert required == [], task.task_id

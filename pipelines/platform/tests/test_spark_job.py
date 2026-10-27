@@ -8,13 +8,21 @@ partitioned table, and a rerun only overwrites partitions.
 from datetime import UTC, date, datetime
 
 import pytest
-from sample_iceberg_job import CATALOG_NAME, RowLimitExceeded, run_sample_iceberg_job
+from sample_iceberg_job import (
+    CATALOG_NAME,
+    ICEBERG_AWS_PACKAGE,
+    ICEBERG_PACKAGE,
+    RowLimitExceeded,
+    run_sample_iceberg_job,
+    spark_packages,
+)
 from sample_rows import build_sample_rows
 
 NOW = datetime(2026, 10, 9, 10, 0, tzinfo=UTC)
 RUN_DATE = date(2026, 10, 9)
 TABLE = "sample_answer"
-FULL_NAME = f"{CATALOG_NAME}.{TABLE}"
+NAMESPACE = "portfolio_dev"
+FULL_NAME = f"{CATALOG_NAME}.{NAMESPACE}.{TABLE}"
 
 
 class FakeWriter:
@@ -70,14 +78,14 @@ class FakeSpark:
 def test_rows_over_the_limit_stop_the_job_before_any_write():
     spark = FakeSpark()
     with pytest.raises(RowLimitExceeded, match="over the limit of 2"):
-        run_sample_iceberg_job(spark, TABLE, RUN_DATE, NOW, max_rows=2)
+        run_sample_iceberg_job(spark, TABLE, RUN_DATE, NOW, namespace=NAMESPACE, max_rows=2)
     assert "createDataFrame" not in spark.calls
     assert not any(call.startswith("writeTo") for call in spark.calls)
 
 
 def test_first_run_creates_the_table_partitioned_by_run_date():
     spark = FakeSpark(existing_tables=set())
-    written = run_sample_iceberg_job(spark, TABLE, RUN_DATE, NOW, max_rows=100)
+    written = run_sample_iceberg_job(spark, TABLE, RUN_DATE, NOW, namespace=NAMESPACE, max_rows=100)
     assert written == 3
     assert spark.calls == [
         "createDataFrame",
@@ -89,7 +97,7 @@ def test_first_run_creates_the_table_partitioned_by_run_date():
 
 def test_rerun_overwrites_partitions_and_does_not_recreate_the_table():
     spark = FakeSpark(existing_tables={FULL_NAME})
-    run_sample_iceberg_job(spark, TABLE, RUN_DATE, NOW, max_rows=100)
+    run_sample_iceberg_job(spark, TABLE, RUN_DATE, NOW, namespace=NAMESPACE, max_rows=100)
     assert spark.calls == [
         "createDataFrame",
         f"writeTo:{FULL_NAME}",
@@ -107,3 +115,13 @@ def test_sample_rows_carry_the_run_date_and_a_utc_time():
 def test_sample_rows_refuse_a_naive_time():
     with pytest.raises(ValueError, match="timezone-aware"):
         build_sample_rows(datetime(2026, 10, 9, 10, 0), RUN_DATE)
+
+
+def test_the_glue_catalog_brings_the_aws_sdk_with_the_iceberg_runtime():
+    packages = spark_packages(use_glue=True).split(",")
+
+    assert packages == [ICEBERG_PACKAGE, ICEBERG_AWS_PACKAGE]
+
+
+def test_the_local_catalog_needs_only_the_iceberg_runtime():
+    assert spark_packages(use_glue=False) == ICEBERG_PACKAGE

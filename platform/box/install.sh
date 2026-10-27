@@ -141,6 +141,8 @@ settings_command="kubectl create configmap platform-settings --namespace ${NAMES
 settings_command+=" --from-literal PLATFORM_SITE_BUCKET=${SITE_BUCKET}"
 settings_command+=" --from-literal PLATFORM_LAKE_BUCKET=${BACKUP_BUCKET}"
 settings_command+=" --from-literal PLATFORM_WAREHOUSE=s3://${BACKUP_BUCKET}/warehouse"
+# The Glue database the catalog module makes for this environment.
+settings_command+=" --from-literal PLATFORM_ICEBERG_NAMESPACE=portfolio_${environment}"
 settings_command+=" --from-literal PLATFORM_ENV=${environment}"
 settings_command+=" --from-literal PLATFORM_ALERT_TOPIC_ARN=${ALERT_TOPIC_ARN}"
 settings_command+=" --from-literal AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}"

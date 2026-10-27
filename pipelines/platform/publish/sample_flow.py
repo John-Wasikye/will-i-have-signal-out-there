@@ -27,6 +27,17 @@ MAX_ROWS = 1_000
 SAMPLE_TABLE_NAME = "sample_answer"
 
 
+def run_end(data_interval_end: datetime | None, run_after: datetime) -> datetime:
+    """Return the time a run covers data up to.
+
+    A scheduled run has a data interval. Airflow 3 gives a run started by hand none, so it
+    covers data up to the time it was started.
+    """
+    if data_interval_end is not None:
+        return data_interval_end
+    return run_after
+
+
 @dataclass(frozen=True)
 class PublishOutcome:
     """Result of publish_sample, passed to the metric and status tasks."""
