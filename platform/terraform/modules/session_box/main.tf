@@ -60,9 +60,12 @@ resource "aws_instance" "box" {
   }
 
   # Require IMDSv2, so a request from inside a container cannot read instance credentials.
+  # Tags are readable there too: the watchdog reads WorkSessionUntil to tell a work session I
+  # planned from a start nobody planned.
   metadata_options {
-    http_endpoint = "enabled"
-    http_tokens   = "required"
+    http_endpoint          = "enabled"
+    http_tokens            = "required"
+    instance_metadata_tags = "enabled"
   }
 
   root_block_device {
@@ -74,6 +77,11 @@ resource "aws_instance" "box" {
   # Project, Environment and ManagedBy come from the provider's default tags in envs/.
   tags = {
     Name = local.name
+  }
+
+  # I set WorkSessionUntil by hand when I start a work session, so Terraform must not remove it.
+  lifecycle {
+    ignore_changes = [tags["WorkSessionUntil"], tags_all["WorkSessionUntil"]]
   }
 }
 

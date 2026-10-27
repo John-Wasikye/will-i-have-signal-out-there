@@ -21,6 +21,7 @@ from alerts import (
     send_alert,
     status_alert,
     stop_alert,
+    unplanned_start_alert,
 )
 
 TOPIC = "arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts"
@@ -223,3 +224,19 @@ def test_a_stopped_nightly_run_gets_an_alert_with_the_reason():
     assert alert.subject.startswith("[live]")
     assert "stopped" in alert.subject
     assert "2 hour maximum" in alert.message
+
+
+def test_an_unplanned_start_gets_its_own_alert_not_the_nightly_one():
+    # AWS restarts a spot box by itself once capacity comes back, at any hour. The watchdog
+    # stops it, and the email says so, because no run was stopped and no incident was written.
+    alert = unplanned_start_alert("The box booted at 15:52 UTC and nobody planned it.", "live")
+
+    assert alert.subject.startswith("[live]")
+    assert "nightly run" not in alert.subject
+    assert "15:52 UTC" in alert.message
+    assert "incident" not in alert.message
+
+
+def test_an_unplanned_start_alert_refuses_an_unknown_environment():
+    with pytest.raises(ValueError):
+        unplanned_start_alert("reason", "staging")
