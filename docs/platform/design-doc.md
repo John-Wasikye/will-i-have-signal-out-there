@@ -305,7 +305,7 @@ sequenceDiagram
 
 Steps and failure handling:
 
-1. The box starts on spot at 10:00 UTC. If no spot instance is available, the night is skipped and the next run catches up [BP How the box is run; ADR-0012].
+1. The box starts on spot at 10:00 UTC. If no spot instance is available, the start retries for up to 2 hours (until 12:00 UTC), then the night is skipped and the next run catches up [BP How the box is run; ADR-0012].
 2. The box restores the Airflow database from S3 and reads keys from Parameter Store [PR-10].
 3. Each project's pipelines run. A failing task retries as the project's DAG defines, then fails. A failure opens one incident and one GitHub issue, and sends an email [PR-14, PR-24].
 4. Publishing happens only after the checks pass. A failed check stops the publish and opens an incident [Eng 4].

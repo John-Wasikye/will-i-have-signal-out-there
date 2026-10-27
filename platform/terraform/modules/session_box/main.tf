@@ -60,9 +60,12 @@ resource "aws_instance" "box" {
   }
 
   # Require IMDSv2, so a request from inside a container cannot read instance credentials.
+  # Tags are readable there too: the watchdog reads WorkSessionUntil to tell a work session I
+  # planned from a start nobody planned.
   metadata_options {
-    http_endpoint = "enabled"
-    http_tokens   = "required"
+    http_endpoint          = "enabled"
+    http_tokens            = "required"
+    instance_metadata_tags = "enabled"
   }
 
   root_block_device {
@@ -74,6 +77,11 @@ resource "aws_instance" "box" {
   # Project, Environment and ManagedBy come from the provider's default tags in envs/.
   tags = {
     Name = local.name
+  }
+
+  # I set WorkSessionUntil by hand when I start a work session, so Terraform must not remove it.
+  lifecycle {
+    ignore_changes = [tags["WorkSessionUntil"], tags_all["WorkSessionUntil"]]
   }
 }
 
@@ -93,6 +101,14 @@ resource "aws_scheduler_schedule" "start" {
     arn      = "arn:aws:scheduler:::aws-sdk:ec2:startInstances"
     role_arn = var.scheduler_role_arn
     input    = jsonencode({ InstanceIds = [aws_instance.box.id] })
+
+    # With no spot capacity the start fails. The default policy retries for 24 hours, which
+    # once started the box at 15:41 UTC, after the hard stop. Giving up after 2 hours means a
+    # 2-hour run still ends by 14:00 UTC; otherwise the night is skipped.
+    retry_policy {
+      maximum_event_age_in_seconds = 7200
+      maximum_retry_attempts       = 185
+    }
   }
 }
 

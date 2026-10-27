@@ -19,11 +19,13 @@ from box_watchdog import (
     carry_out_stop,
     decide,
     fetch_spot_stop_time,
+    fetch_work_session_end,
     http_request,
     is_nightly_boot,
     list_runs_command,
     next_incident_number,
     parse_args,
+    parse_session_end,
     parse_spot_notice,
     run_progress,
     stop_incident,
@@ -578,9 +580,15 @@ def test_a_boot_at_the_scheduled_time_is_the_nightly_run():
     assert is_nightly_boot(datetime(2026, 10, 10, 10, 2, tzinfo=UTC)) is True
 
 
-def test_a_boot_well_after_the_scheduled_time_is_a_work_session():
-    assert is_nightly_boot(datetime(2026, 10, 10, 10, 40, tzinfo=UTC)) is False
-    assert is_nightly_boot(datetime(2026, 10, 10, 15, 0, tzinfo=UTC)) is False
+def test_a_boot_from_a_retried_start_is_still_the_nightly_run():
+    # With no spot capacity, the start schedule retries for up to 2 hours (until 12:00 UTC).
+    assert is_nightly_boot(datetime(2026, 10, 10, 10, 40, tzinfo=UTC)) is True
+    assert is_nightly_boot(datetime(2026, 10, 10, 12, 0, tzinfo=UTC)) is True
+
+
+def test_a_boot_after_the_start_retries_end_is_not_the_nightly_run():
+    assert is_nightly_boot(datetime(2026, 10, 10, 12, 1, tzinfo=UTC)) is False
+    assert is_nightly_boot(datetime(2026, 10, 10, 15, 52, tzinfo=UTC)) is False
 
 
 def test_a_boot_before_the_scheduled_time_is_a_work_session():
@@ -593,6 +601,7 @@ def test_the_nightly_check_refuses_a_naive_time():
 
 
 WORK_SESSION_START = datetime(2026, 10, 10, 15, 0, tzinfo=UTC)
+WORK_SESSION_END = WORK_SESSION_START + timedelta(hours=4)
 
 
 def test_a_work_session_is_never_stopped_for_finishing_or_for_the_nightly_maximum():
@@ -603,6 +612,7 @@ def test_a_work_session_is_never_stopped_for_finishing_or_for_the_nightly_maximu
             progress=progress,
             spot_stop_utc=None,
             nightly=False,
+            session_ends_utc=WORK_SESSION_END,
         )
 
         assert decision.action is Action.KEEP_WAITING
@@ -617,6 +627,7 @@ def test_a_work_session_stops_at_the_four_hour_session_limit():
         progress=RunProgress.WAITING,
         spot_stop_utc=None,
         nightly=False,
+        session_ends_utc=WORK_SESSION_END,
     )
 
     assert decision.action is Action.STOP_SESSION_LIMIT
@@ -638,6 +649,7 @@ def test_a_work_session_still_stops_for_a_spot_warning():
         progress=RunProgress.RUNNING,
         spot_stop_utc=WORK_SESSION_START + timedelta(hours=1, minutes=2),
         nightly=False,
+        session_ends_utc=WORK_SESSION_END,
     )
 
     assert decision.action is Action.STOP_SPOT_WARNING
@@ -658,7 +670,170 @@ def test_the_watchdog_leaves_a_work_session_alone_until_a_spot_warning_comes():
         get_spot_stop=spot,
         on_stop=lambda d: None,
         poll_seconds=30,
+        get_session_end=lambda: WORK_SESSION_END,
     )
 
     assert decision.action is Action.STOP_SPOT_WARNING
     assert clock.now() == WORK_SESSION_START + timedelta(seconds=90)
+
+
+# --- A start nobody planned ------------------------------------------------------------------
+#
+# After AWS takes a spot box back, it starts the box again by itself once capacity returns,
+# at any hour (on 2026-10-26 it did so at 15:52 UTC). A work session is one I plan: I tag the
+# box with WorkSessionUntil before I start it. A boot outside the nightly window with no
+# current tag is a start nobody planned, and the watchdog stops it at once.
+
+UNPLANNED_BOOT = datetime(2026, 10, 26, 15, 52, tzinfo=UTC)
+
+
+def _decide_outside_the_window(now, started, session_ends):
+    return decide(
+        now_utc=now,
+        box_started_utc=started,
+        progress=RunProgress.WAITING,
+        spot_stop_utc=None,
+        nightly=False,
+        session_ends_utc=session_ends,
+    )
+
+
+def test_a_boot_outside_the_window_with_no_session_tag_is_stopped_at_once():
+    decision = _decide_outside_the_window(
+        UNPLANNED_BOOT + timedelta(minutes=1), UNPLANNED_BOOT, None
+    )
+
+    assert decision.action is Action.STOP_UNPLANNED
+
+
+def test_a_session_tag_left_over_from_an_earlier_session_does_not_count():
+    decision = _decide_outside_the_window(
+        UNPLANNED_BOOT + timedelta(minutes=1), UNPLANNED_BOOT, UNPLANNED_BOOT - timedelta(hours=3)
+    )
+
+    assert decision.action is Action.STOP_UNPLANNED
+
+
+def test_a_work_session_stops_at_the_end_time_i_tagged():
+    ends = WORK_SESSION_START + timedelta(hours=2)
+
+    before = _decide_outside_the_window(ends - timedelta(seconds=1), WORK_SESSION_START, ends)
+    at = _decide_outside_the_window(ends, WORK_SESSION_START, ends)
+
+    assert before.action is Action.KEEP_WAITING
+    assert at.action is Action.STOP_SESSION_LIMIT
+
+
+def test_a_tag_further_out_than_four_hours_still_stops_at_the_session_limit():
+    decision = _decide_outside_the_window(
+        WORK_SESSION_START + timedelta(hours=4),
+        WORK_SESSION_START,
+        WORK_SESSION_START + timedelta(hours=9),
+    )
+
+    assert decision.action is Action.STOP_SESSION_LIMIT
+
+
+def test_the_nightly_run_ignores_the_session_tag():
+    decision = decide(
+        now_utc=STARTED + timedelta(minutes=5),
+        box_started_utc=STARTED,
+        progress=RunProgress.RUNNING,
+        spot_stop_utc=None,
+        nightly=True,
+        session_ends_utc=None,
+    )
+
+    assert decision.action is Action.KEEP_WAITING
+
+
+def test_an_unplanned_stop_saves_the_database_and_emails_me_without_an_incident():
+    steps = Steps()
+
+    errors = _stop(steps, Action.STOP_UNPLANNED)
+
+    assert steps.order == ["save_database", "send_alert", "power_off"]
+    assert errors == []
+
+
+def _watch_outside_the_window(clock, started, get_session_end, poll_seconds=30):
+    return watch(
+        now=clock.now,
+        sleep=clock.sleep,
+        box_started_utc=started,
+        get_progress=lambda: RunProgress.WAITING,
+        get_spot_stop=lambda: None,
+        on_stop=lambda d: None,
+        poll_seconds=poll_seconds,
+        get_session_end=get_session_end,
+    )
+
+
+def test_the_watchdog_stops_an_unplanned_boot_on_its_first_check():
+    clock = FakeClock(UNPLANNED_BOOT)
+
+    decision = _watch_outside_the_window(clock, UNPLANNED_BOOT, lambda: None)
+
+    assert decision.action is Action.STOP_UNPLANNED
+    assert clock.now() == UNPLANNED_BOOT
+
+
+def test_if_the_session_tag_cannot_be_read_the_box_gets_the_four_hour_limit():
+    # A failed read must not stop a session I planned, so it counts as a 4-hour session.
+    clock = FakeClock(WORK_SESSION_START)
+
+    def broken():
+        raise OSError("the metadata service is not answering")
+
+    decision = _watch_outside_the_window(clock, WORK_SESSION_START, broken, poll_seconds=60)
+
+    assert decision.action is Action.STOP_SESSION_LIMIT
+    assert clock.now() == WORK_SESSION_START + timedelta(hours=4)
+
+
+def test_a_failed_read_keeps_the_last_session_end_it_read():
+    clock = FakeClock(WORK_SESSION_START)
+    ends = WORK_SESSION_START + timedelta(hours=1)
+    answers = iter([ends])
+
+    def flaky():
+        try:
+            return next(answers)
+        except StopIteration:
+            raise OSError("the metadata service is not answering") from None
+
+    decision = _watch_outside_the_window(clock, WORK_SESSION_START, flaky, poll_seconds=60)
+
+    assert decision.action is Action.STOP_SESSION_LIMIT
+    assert clock.now() == ends
+
+
+def test_the_session_end_is_read_from_the_instance_tag_with_a_token():
+    metadata = FakeMetadata(notice_status=200, notice_body="2026-10-26T20:00:00Z")
+
+    ends = fetch_work_session_end(metadata)
+
+    put, get = metadata.calls
+    assert put[0] == "PUT" and put[1].endswith("/latest/api/token")
+    assert get[0] == "GET" and get[1].endswith("/latest/meta-data/tags/instance/WorkSessionUntil")
+    assert get[2]["X-aws-ec2-metadata-token"] == "the-token"
+    assert ends == datetime(2026, 10, 26, 20, 0, tzinfo=UTC)
+
+
+def test_no_session_tag_means_no_session():
+    assert fetch_work_session_end(FakeMetadata(notice_status=404)) is None
+
+
+def test_an_unexpected_answer_for_the_session_tag_is_an_error():
+    with pytest.raises(OSError, match="500"):
+        fetch_work_session_end(FakeMetadata(notice_status=500))
+
+
+def test_a_session_end_must_be_a_time_with_a_timezone():
+    assert parse_session_end("2026-10-26T20:00:00+00:00") == datetime(
+        2026, 10, 26, 20, 0, tzinfo=UTC
+    )
+    with pytest.raises(ValueError):
+        parse_session_end("2026-10-26T20:00:00")
+    with pytest.raises(ValueError):
+        parse_session_end("tonight")

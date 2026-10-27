@@ -89,6 +89,23 @@ def stop_alert(reason: str, env: str) -> Alert:
     )
 
 
+def unplanned_start_alert(reason: str, env: str) -> Alert:
+    """Build the alert for a boot that was neither the nightly run nor a work session I planned.
+
+    AWS restarts a spot box by itself once capacity comes back, at any hour. The watchdog stops
+    it at once and sends this, so I know the box ran when it should not have.
+    """
+    _require_environment(env)
+    return Alert(
+        subject=f"[{env}] The session box started when nobody planned it",
+        message=(
+            f"The box watchdog stopped the session box in the {env} environment.\n\n"
+            f"Reason: {reason}\n\n"
+            "No pipeline run was stopped. If this happens often, look at the spot capacity."
+        ),
+    )
+
+
 def status_alert(status: Mapping, env: str) -> Alert | None:
     """Build the alert for a status.json document, or return None when every pipeline is ok."""
     _require_environment(env)

@@ -7,8 +7,10 @@ are three reasons to stop, and this is their order of priority:
 2. The nightly run has finished, whether it succeeded or failed.
 3. The box has been up for the 2-hour nightly maximum.
 
-A box I start by hand is a work session. Only a spot warning or the 4-hour session limit stops
-it here; the idle alarm can stop it too.
+A box I start by hand is a work session, and I tag it with WorkSessionUntil first. Only a spot
+warning, that end time or the 4-hour session limit stops it here; the idle alarm can stop it too.
+Any other boot outside the nightly window is a start nobody planned, such as AWS restarting a
+spot box by itself, and the watchdog stops it at once.
 
 A run that finished is never called a timeout, even if the watchdog notices it late.
 """
@@ -59,6 +61,7 @@ class Action(Enum):
     STOP_MAXIMUM = "stop: the 2 hour maximum"
     STOP_SPOT_WARNING = "stop: AWS is taking the box back"
     STOP_SESSION_LIMIT = "stop: the 4 hour session limit"
+    STOP_UNPLANNED = "stop: nobody planned this start"
 
 
 # ADR-0013: every box session lasts at most 4 hours. The 14:00 UTC hard stop bounds only the
@@ -108,11 +111,14 @@ def decide(
     progress: RunProgress,
     spot_stop_utc: datetime | None,
     nightly: bool = True,
+    session_ends_utc: datetime | None = None,
 ) -> Decision:
     """Choose the next action. ``spot_stop_utc`` is set only when AWS has sent its notice.
 
-    ``nightly`` is False for a work session that I start by hand. A work session is stopped
-    here only by a spot warning or the 4-hour session limit.
+    ``nightly`` is False for a boot outside the nightly window. ``session_ends_utc`` is the
+    WorkSessionUntil tag I set when I start a work session. With no tag, or one that ended
+    before the box booted, nobody planned the start. A work session stops at its end time or at
+    the 4-hour session limit, whichever comes first.
     """
     now = require_utc(now_utc, "now_utc")
     started = require_utc(box_started_utc, "box_started_utc")
@@ -123,6 +129,14 @@ def decide(
             f"AWS will stop the box at {format_utc(require_utc(spot_stop_utc, 'spot_stop_utc'))}.",
         )
     if not nightly:
+        if session_ends_utc is None or require_utc(session_ends_utc, "session_ends_utc") <= started:
+            return Decision(
+                Action.STOP_UNPLANNED,
+                f"The box booted at {format_utc(started)}, outside the nightly window, "
+                "and no work session was planned.",
+            )
+        if now >= session_ends_utc:
+            return Decision(Action.STOP_SESSION_LIMIT, "The work session reached its end time.")
         if now - started >= WORK_SESSION_LIMIT:
             return Decision(Action.STOP_SESSION_LIMIT, "The work session reached its 4 hour limit.")
         return Decision(Action.KEEP_WAITING, "This is a work session, not the nightly run.")
@@ -134,13 +148,14 @@ def decide(
 
 
 NIGHTLY_START_HOUR_UTC = 10
-NIGHTLY_START_WINDOW = timedelta(minutes=30)
+# The start schedule retries for up to 2 hours when there is no spot capacity.
+NIGHTLY_START_WINDOW = timedelta(hours=2)
 
 
 def is_nightly_boot(boot_utc: datetime) -> bool:
-    """Return True when the box booted for the nightly run: within 30 minutes after 10:00 UTC.
+    """Return True when the box booted for the nightly run: between 10:00 and 12:00 UTC.
 
-    The schedule starts the box at 10:00 UTC. Any other boot is a work session that I started.
+    The schedule starts the box at 10:00 UTC and retries until 12:00 UTC.
     """
     boot = require_utc(boot_utc, "boot_utc")
     scheduled = boot.replace(hour=NIGHTLY_START_HOUR_UTC, minute=0, second=0, microsecond=0)
@@ -163,12 +178,11 @@ def parse_spot_notice(body: str) -> datetime:
     return require_utc(datetime.fromisoformat(stop_time), "time")
 
 
-def fetch_spot_stop_time(request: Callable, base_url: str = METADATA_URL) -> datetime | None:
-    """Ask the instance metadata service whether AWS has sent a stop notice.
+def _read_metadata(request: Callable, base_url: str, path: str) -> str | None:
+    """Read one instance metadata path and return its body, or None for a 404.
 
     ``request(method, url, headers)`` returns ``(status, body)``. The service needs a token
-    first, because the box requires version 2 of the metadata service. A 404 means no
-    notice, which is the normal answer.
+    first, because the box requires version 2 of the metadata service.
     """
     status, token = request(
         "PUT", f"{base_url}/latest/api/token", {"X-aws-ec2-metadata-token-ttl-seconds": "60"}
@@ -177,15 +191,36 @@ def fetch_spot_stop_time(request: Callable, base_url: str = METADATA_URL) -> dat
         raise OSError(f"the metadata service refused a token with status {status}")
 
     status, body = request(
-        "GET",
-        f"{base_url}/latest/meta-data/spot/instance-action",
-        {"X-aws-ec2-metadata-token": token},
+        "GET", f"{base_url}/latest/meta-data/{path}", {"X-aws-ec2-metadata-token": token}
     )
     if status == 404:
         return None
     if status == 200:
-        return parse_spot_notice(body)
+        return body
     raise OSError(f"unexpected status {status} from the metadata service")
+
+
+def fetch_spot_stop_time(request: Callable, base_url: str = METADATA_URL) -> datetime | None:
+    """Ask the instance metadata service whether AWS has sent a stop notice.
+
+    A 404 means no notice, which is the normal answer.
+    """
+    body = _read_metadata(request, base_url, "spot/instance-action")
+    return None if body is None else parse_spot_notice(body)
+
+
+WORK_SESSION_TAG = "WorkSessionUntil"
+
+
+def parse_session_end(value: str) -> datetime:
+    """Read the WorkSessionUntil tag, a time with a timezone such as ``2026-10-26T20:00:00Z``."""
+    return require_utc(datetime.fromisoformat(value), WORK_SESSION_TAG)
+
+
+def fetch_work_session_end(request: Callable, base_url: str = METADATA_URL) -> datetime | None:
+    """Read the WorkSessionUntil tag from the instance metadata. A 404 means there is no tag."""
+    body = _read_metadata(request, base_url, f"tags/instance/{WORK_SESSION_TAG}")
+    return None if body is None else parse_session_end(body)
 
 
 def carry_out_stop(
@@ -198,8 +233,9 @@ def carry_out_stop(
     """Run the stop steps in order and return the errors from the steps that failed.
 
     The database is saved first, because it is the step with a deadline. An incident is
-    recorded and an email sent only for the maximum and for a spot warning: the run did not
-    finish, so nothing else reports it. Each step runs even if the one before it failed.
+    recorded and an email sent for the maximum and for a spot warning: the run did not
+    finish, so nothing else reports it. A start nobody planned gets the email only, because no
+    run was stopped. Each step runs even if the one before it failed.
     Powering off is last and always runs, so a failed save can never leave a billing server on.
     If powering off itself fails, the error is raised, because nothing else can be done about it.
     """
@@ -209,12 +245,16 @@ def carry_out_stop(
     except Exception as error:  # noqa: BLE001, a failed save must not stop the power-off
         errors.append(f"save_database failed: {error}")
 
+    steps = []
     if decision.action in (Action.STOP_MAXIMUM, Action.STOP_SPOT_WARNING):
-        for name, step in (("record_incident", record_incident), ("send_alert", send_alert)):
-            try:
-                step(decision)
-            except Exception as error:  # noqa: BLE001, a failed step must not stop the power-off
-                errors.append(f"{name} failed: {error}")
+        steps = [("record_incident", record_incident), ("send_alert", send_alert)]
+    elif decision.action is Action.STOP_UNPLANNED:
+        steps = [("send_alert", send_alert)]
+    for name, step in steps:
+        try:
+            step(decision)
+        except Exception as error:  # noqa: BLE001, a failed step must not stop the power-off
+            errors.append(f"{name} failed: {error}")
 
     power_off()
     return errors
@@ -237,18 +277,24 @@ def watch(
     get_spot_stop: Callable[[], datetime | None],
     on_stop: Callable[[Decision], None],
     poll_seconds: float = 30,
+    get_session_end: Callable[[], datetime | None] = lambda: None,
 ) -> Decision:
     """Poll until there is a reason to stop, call ``on_stop`` once, and return the decision.
 
     A read that fails counts as "nothing new". If Airflow cannot be reached, the watchdog
-    still stops the box at the 2-hour maximum. A box that booted outside the nightly window is
-    a work session, and only a spot warning or the 4-hour session limit stops it here.
+    still stops the box at the 2-hour maximum. Outside the nightly window, the WorkSessionUntil
+    tag is read on every check, so I can change it during a session. If it cannot be read, the
+    last value read stands; before the first good read, the box gets the 4-hour session limit,
+    so a failed read never stops a session I planned.
     """
     nightly = is_nightly_boot(box_started_utc)
+    session_end = box_started_utc + WORK_SESSION_LIMIT
     while True:
         progress = _or_default(get_progress, RunProgress.WAITING, "the run state")
         spot_stop = _or_default(get_spot_stop, None, "the spot notice")
-        decision = decide(now(), box_started_utc, progress, spot_stop, nightly)
+        if not nightly:
+            session_end = _or_default(get_session_end, session_end, "the work session tag")
+        decision = decide(now(), box_started_utc, progress, spot_stop, nightly, session_end)
         if decision.action is not Action.KEEP_WAITING:
             on_stop(decision)
             return decision
@@ -366,7 +412,11 @@ def main(argv: list[str] | None = None) -> int:
             upload_tree(client, args.bucket, "platform/incidents/", Path(folder))
 
     def send_alert(decision: Decision) -> None:
-        alerts.send_alert(sns, args.alert_topic_arn, alerts.stop_alert(decision.reason, args.env))
+        if decision.action is Action.STOP_UNPLANNED:
+            alert = alerts.unplanned_start_alert(decision.reason, args.env)
+        else:
+            alert = alerts.stop_alert(decision.reason, args.env)
+        alerts.send_alert(sns, args.alert_topic_arn, alert)
 
     def power_off() -> None:
         subprocess.run(["systemctl", "poweroff"], check=True)
@@ -386,6 +436,7 @@ def main(argv: list[str] | None = None) -> int:
         get_spot_stop=lambda: fetch_spot_stop_time(http_request),
         on_stop=on_stop,
         poll_seconds=args.poll_seconds,
+        get_session_end=lambda: fetch_work_session_end(http_request),
     )
     return 0
 

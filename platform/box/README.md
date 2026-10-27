@@ -35,7 +35,24 @@ The watchdog checks every 30 seconds and stops the box for the first of these re
 
 To stop, it saves the database to S3 first, because that is the step with a deadline. It then records the incident and sends the email if there is one, and powers the box off last. Powering off always runs, even if a save fails, so a broken step cannot leave a server billing.
 
-Only the scheduled boot, within 30 minutes after 10:00 UTC, counts as the nightly run. A box that I start by hand is a work session. The watchdog stops it for a spot warning or at the 4-hour session limit, counted from its boot, and the idle alarm stops it after 30 idle minutes. The 14:00 UTC hard stop only bounds the nightly run, so without the session limit a box started in the evening would run until the next afternoon. If the watchdog cannot reach Airflow, it keeps going and still stops the box at 2 hours.
+Only a boot between 10:00 and 12:00 UTC counts as the nightly run, because the start schedule retries for up to 2 hours when AWS has no spot capacity. If the watchdog cannot reach Airflow, it keeps going and still stops the box at 2 hours.
+
+Any other boot is either a work session I planned or a start nobody planned. After AWS takes a spot box back, it starts the box again by itself once capacity returns, at any hour; on 2026-10-26 it did so at 15:52 UTC. So a work session has to be marked: before I start the box, I tag it with `WorkSessionUntil`, the time the session ends. The watchdog reads that tag from the instance metadata on every check.
+
+- **A boot with no tag, or with a tag from an earlier session,** is a start nobody planned. The watchdog saves the database, emails me, and powers off at once.
+- **A work session** stops at its tagged end time, at the 4-hour session limit counted from its boot, or for a spot warning, whichever comes first. The idle alarm also stops it after 30 idle minutes. I can change the tag during the session to end it sooner. If the tag cannot be read, the session gets the 4-hour limit, so a failed read never cuts a session short.
+
+The 14:00 UTC hard stop only bounds the nightly run, so without these limits a box started in the evening would run until the next afternoon.
+
+To start a work session, in PowerShell (the instance ID is the `session_box_instance_id` Terraform output):
+
+```powershell
+$env:AWS_PROFILE = "nfl_player_stats"
+$box = "<instance id>"
+$until = (Get-Date).ToUniversalTime().AddHours(4).ToString("yyyy-MM-ddTHH:mm:ssZ")
+aws ec2 create-tags --resources $box --tags "Key=WorkSessionUntil,Value=$until"
+aws ec2 start-instances --instance-ids $box
+```
 
 ## Checking it
 

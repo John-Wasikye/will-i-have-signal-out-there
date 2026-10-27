@@ -22,14 +22,18 @@ locals {
 
   # IAM refuses an ARN whose service is a wildcard, so a "refuse anything named X" rule is
   # written once per service. These are the services the projects in this account use.
-  # S3 ARNs have no region or account, and IAM and CloudFront have no region.
+  # S3 ARNs have no region or account, and IAM and CloudFront have no region. IAM also refuses
+  # an IAM ARN whose resource part does not start with its type, so IAM names are refused once
+  # per type.
   named_resource_arns = {
     for name in distinct(concat(["portfolio-live-", "portfolio_live"], var.protected_names)) : name => concat(
       ["arn:${local.partition}:s3:::*${name}*"],
-      [for service in ["iam", "cloudfront"] : "arn:${local.partition}:${service}::*:*${name}*"],
+      [for type in local.iam_types : "arn:${local.partition}:iam::*:${type}/*${name}*"],
+      ["arn:${local.partition}:cloudfront::*:*${name}*"],
       [for service in local.regional_services : "arn:${local.partition}:${service}:*:*:*${name}*"],
     )
   }
+  iam_types = ["group", "instance-profile", "policy", "role", "user"]
   regional_services = [
     "apigateway", "cloudtrail", "cloudwatch", "dynamodb", "ec2", "ecr", "ecs", "events", "glue",
     "kms", "lambda", "logs", "scheduler", "secretsmanager", "sns", "sqs", "ssm", "states",
