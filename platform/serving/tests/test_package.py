@@ -2,9 +2,17 @@
 
 import base64
 import hashlib
+import re
 import zipfile
 
-from build_package import build_zip, serving_source_files, sha256_base64
+from build_package import (
+    LOCK_PATH,
+    REQUIREMENTS_PATH,
+    build_zip,
+    install_dependencies,
+    serving_source_files,
+    sha256_base64,
+)
 
 
 def _make_serving_folder(tmp_path):
@@ -89,3 +97,68 @@ def test_the_checksum_matches_the_format_terraform_expects(tmp_path):
     expected = base64.b64encode(hashlib.sha256(b"hello").digest()).decode("ascii")
 
     assert sha256_base64(path) == expected
+
+
+# --- The same package from every machine, on every day --------------------------------------
+#
+# A build on 2026-10-22 and one on 2026-10-27 differed: requirements.txt pinned only the four
+# packages I chose, so Starlette, which FastAPI pulls in, moved from 1.9.0 to 1.10.0. A build on
+# Windows also differed from one on Linux, because pip writes console scripts (bin/fastapi.exe)
+# and lists them in each package's RECORD file. Every package is now locked with its hash, and
+# the files that depend on the machine stay out of the zip.
+
+
+def _locked_versions(text):
+    return dict(re.findall(r"^([A-Za-z0-9_.-]+)==([A-Za-z0-9_.+!-]+)", text, re.MULTILINE))
+
+
+def test_every_locked_package_has_an_exact_version_and_a_hash():
+    text = LOCK_PATH.read_text(encoding="utf-8")
+    blocks = [block for block in re.split(r"\n(?=[A-Za-z0-9])", text) if block[:1].isalnum()]
+
+    assert blocks, "the lock file lists no packages"
+    for block in blocks:
+        assert re.match(r"^[A-Za-z0-9_.-]+==\S+", block), block.splitlines()[0]
+        assert "--hash=sha256:" in block, block.splitlines()[0]
+
+
+def test_the_lock_keeps_the_versions_i_chose():
+    chosen = _locked_versions(REQUIREMENTS_PATH.read_text(encoding="utf-8"))
+    locked = _locked_versions(LOCK_PATH.read_text(encoding="utf-8"))
+
+    assert chosen
+    for name, version in chosen.items():
+        assert locked.get(name) == version, name
+
+
+def test_the_build_installs_only_the_locked_packages(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr("build_package.subprocess.run", lambda args, check: calls.append(args))
+
+    install_dependencies(LOCK_PATH, tmp_path / "deps")
+
+    (args,) = calls
+    assert args[args.index("--requirement") + 1] == str(LOCK_PATH)
+    assert "--no-deps" in args
+    assert "--require-hashes" in args
+
+
+def test_files_that_depend_on_the_machine_stay_out_of_the_zip(tmp_path):
+    serving = _make_serving_folder(tmp_path)
+    dependencies = _make_dependencies(tmp_path)
+    (dependencies / "bin").mkdir()
+    (dependencies / "bin" / "fastapi.exe").write_bytes(b"MZ")
+    info = dependencies / "fastapi-0.143.0.dist-info"
+    info.mkdir()
+    (info / "RECORD").write_text("bin/fastapi.exe,,\n", encoding="utf-8")
+    (info / "METADATA").write_text("Name: fastapi\n", encoding="utf-8")
+    output = tmp_path / "function.zip"
+
+    build_zip(serving, dependencies, output)
+
+    with zipfile.ZipFile(output) as archive:
+        names = set(archive.namelist())
+    assert not any(name.startswith("bin/") for name in names)
+    assert "fastapi-0.143.0.dist-info/RECORD" not in names
+    # Packages read their own version from METADATA, so it stays.
+    assert "fastapi-0.143.0.dist-info/METADATA" in names

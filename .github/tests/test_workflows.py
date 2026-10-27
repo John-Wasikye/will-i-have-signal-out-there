@@ -312,3 +312,15 @@ def test_the_plan_summary_hides_the_account_number(terraform):
     summary = step["run"].split("GITHUB_STEP_SUMMARY")[0]
     assert 'sed "s/${AWS_ACCOUNT_ID}/***/g" plan.txt' in summary
     assert "cat plan.txt" not in summary
+
+
+def test_the_api_tests_run_on_the_exact_versions_the_package_ships():
+    # pyproject.toml allows ranges, so without this the tests would run on the newest releases
+    # while Lambda runs the locked ones.
+    steps = _load(WORKFLOWS / "ci.yml")["jobs"]["python"]["steps"]
+    runs = [step.get("run", "") for step in steps]
+    install = next(i for i, run in enumerate(runs) if 'pip install -e ".[dev]"' in run)
+    lock = next(i for i, run in enumerate(runs) if "requirements-lock.txt" in run)
+    test = next(i for i, run in enumerate(runs) if run.strip() == "pytest")
+    assert install < lock < test
+    assert "--no-deps" in runs[lock] and "--require-hashes" in runs[lock]
