@@ -15,8 +15,8 @@ from datetime import date, datetime
 
 from sample_rows import build_sample_rows
 
-ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1"
-ICEBERG_AWS_PACKAGE = "org.apache.iceberg:iceberg-aws-bundle:1.6.1"
+ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0"
+ICEBERG_AWS_PACKAGE = "org.apache.iceberg:iceberg-aws-bundle:1.12.0"
 CATALOG_NAME = "portfolio"
 
 

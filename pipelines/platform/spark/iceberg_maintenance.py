@@ -3,7 +3,8 @@
 For each table, in order:
 1. rewrite_data_files merges small files so reads stay fast.
 2. expire_snapshots removes snapshots older than the retention window.
-3. remove_orphan_files deletes files that no snapshot points to.
+3. remove_orphan_files deletes files that no snapshot points to. It lists the table's folder
+   with the table's own FileIO (prefix_listing), so S3 needs no Hadoop file system driver.
 
 The default windows are placeholders until John sets them after measuring table sizes
 (open question OQ-P07).
@@ -52,7 +53,8 @@ def maintain_tables(
         )
         spark.sql(
             f"CALL {CATALOG_NAME}.system.remove_orphan_files("
-            f"table => '{full_name}', older_than => TIMESTAMP '{orphan_cutoff}')"
+            f"table => '{full_name}', older_than => TIMESTAMP '{orphan_cutoff}', "
+            "prefix_listing => true)"
         )
 
 

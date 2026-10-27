@@ -39,7 +39,7 @@ def test_each_table_gets_compaction_snapshot_expiry_and_orphan_removal():
         f"CALL portfolio.system.expire_snapshots(table => '{table}', "
         f"older_than => TIMESTAMP '{snapshot_cutoff:%Y-%m-%d %H:%M:%S}')",
         f"CALL portfolio.system.remove_orphan_files(table => '{table}', "
-        f"older_than => TIMESTAMP '{orphan_cutoff:%Y-%m-%d %H:%M:%S}')",
+        f"older_than => TIMESTAMP '{orphan_cutoff:%Y-%m-%d %H:%M:%S}', prefix_listing => true)",
     ]
 
 

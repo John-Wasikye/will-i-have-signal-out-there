@@ -125,3 +125,9 @@ def test_the_glue_catalog_brings_the_aws_sdk_with_the_iceberg_runtime():
 
 def test_the_local_catalog_needs_only_the_iceberg_runtime():
     assert spark_packages(use_glue=False) == ICEBERG_PACKAGE
+
+
+def test_spark_uses_iceberg_1_12_for_both_packages():
+    """1.12 lists orphan files with Iceberg's own S3 client; 1.6.1 needed Hadoop's S3 driver."""
+    assert ICEBERG_PACKAGE.endswith(":1.12.0")
+    assert ICEBERG_AWS_PACKAGE.endswith(":1.12.0")
