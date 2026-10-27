@@ -93,6 +93,14 @@ resource "aws_scheduler_schedule" "start" {
     arn      = "arn:aws:scheduler:::aws-sdk:ec2:startInstances"
     role_arn = var.scheduler_role_arn
     input    = jsonencode({ InstanceIds = [aws_instance.box.id] })
+
+    # With no spot capacity the start fails. The default policy retries for 24 hours, which
+    # once started the box at 15:41 UTC, after the hard stop. Giving up after 2 hours means a
+    # 2-hour run still ends by 14:00 UTC; otherwise the night is skipped.
+    retry_policy {
+      maximum_event_age_in_seconds = 7200
+      maximum_retry_attempts       = 185
+    }
   }
 }
 

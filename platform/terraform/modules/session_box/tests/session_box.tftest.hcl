@@ -72,6 +72,27 @@ run "starts_each_night_at_1000_utc" {
   }
 }
 
+run "start_gives_up_after_two_hours_without_spot_capacity" {
+  command = plan
+
+  variables {
+    env                   = "dev"
+    ami_id                = "ami-0123456789abcdef0"
+    subnet_id             = "subnet-0123456789abcdef0"
+    instance_profile_name = "portfolio-dev-session-box"
+  }
+
+  assert {
+    condition     = length(aws_scheduler_schedule.start.target[0].retry_policy) == 1
+    error_message = "The start schedule must set its own retry policy, because the default retries for 24 hours."
+  }
+
+  assert {
+    condition     = aws_scheduler_schedule.start.target[0].retry_policy[0].maximum_event_age_in_seconds == 7200
+    error_message = "The start must stop retrying after 2 hours, so a 2-hour run still ends before the 14:00 UTC hard stop."
+  }
+}
+
 run "hard_stop_ends_the_session_four_hours_after_start" {
   command = plan
 
