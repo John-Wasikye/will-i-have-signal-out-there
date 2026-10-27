@@ -80,8 +80,15 @@ resource "aws_instance" "box" {
   }
 
   # I set WorkSessionUntil by hand when I start a work session, so Terraform must not remove it.
+  # A stopped box gives up its public address, and AWS then reports associate_public_ip_address
+  # as false, so every plan made while the box is off would replace it. The subnet gives the box
+  # a new address at each start, so the setting matters only when the box is created.
   lifecycle {
-    ignore_changes = [tags["WorkSessionUntil"], tags_all["WorkSessionUntil"]]
+    ignore_changes = [
+      associate_public_ip_address,
+      tags["WorkSessionUntil"],
+      tags_all["WorkSessionUntil"],
+    ]
   }
 }
 
