@@ -39,11 +39,14 @@ jobs:
     if: >-
       github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
-      && vars.TF_STATE_BUCKET != ''
+      && vars.AWS_SET_UP == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
+    # The repository is public, so the account number is a secret: GitHub hides it in the log.
+    env:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
     strategy:
       fail-fast: false
       matrix:
@@ -57,15 +60,16 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ vars[format('TF_PLAN_ROLE_ARN_{0}', matrix.suffix)] }}
+          role-to-assume: ${{ secrets[format('TF_PLAN_ROLE_ARN_{0}', matrix.suffix)] }}
           aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
 
       - id: init
         uses: ./.github/actions/terraform-init
         with:
           env: ${{ matrix.env }}
-          state-bucket: ${{ vars.TF_STATE_BUCKET }}
-          state-kms-key-arn: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+          state-bucket: ${{ secrets.TF_STATE_BUCKET }}
+          state-kms-key-arn: ${{ secrets.TF_STATE_KMS_KEY_ARN }}
           region: ${{ vars.AWS_REGION }}
 
       # Every parameter listed in checks/parameter_paths.yaml must exist before a change that
@@ -78,7 +82,8 @@ jobs:
           python checks/parameter_paths.py --check-aws --env "${ENV}"
 
       # The plan role can write nothing, so the plan takes no state lock. The alert addresses
-      # are sensitive in Terraform, so this public log shows only how many there are.
+      # are sensitive in Terraform, so this public log shows only how many there are. GitHub
+      # hides secrets in the log but not in the job summary, so the plan text is masked there.
       - name: Plan
         working-directory: platform/terraform/envs/${{ matrix.env }}
         env:
@@ -93,13 +98,13 @@ jobs:
           {
             echo "### Terraform plan for ${ENV}"
             echo '```'
-            cat plan.txt
+            sed "s/${AWS_ACCOUNT_ID}/***/g" plan.txt
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
 
   apply-dev:
     name: Apply (dev)
-    if: github.event_name == 'push' && vars.TF_STATE_BUCKET != ''
+    if: github.event_name == 'push' && vars.AWS_SET_UP == 'true'
     uses: ./.github/workflows/terraform-apply.yml
     with:
       env: dev
@@ -112,7 +117,7 @@ jobs:
   apply-live:
     name: Apply (live)
     needs: apply-dev
-    if: github.event_name == 'push' && vars.TF_STATE_BUCKET != ''
+    if: github.event_name == 'push' && vars.AWS_SET_UP == 'true'
     uses: ./.github/workflows/terraform-apply.yml
     with:
       env: live

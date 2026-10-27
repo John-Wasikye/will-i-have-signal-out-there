@@ -135,7 +135,7 @@ def test_dev_is_applied_first_and_live_only_after_dev(terraform):
 def test_the_apply_waits_for_the_github_environment_and_uses_its_role(terraform_apply):
     job = terraform_apply["jobs"]["apply"]
     assert job["environment"] == "${{ inputs.env }}"
-    assert "vars.TF_APPLY_ROLE_ARN" in yaml.safe_dump(job)
+    assert "secrets.TF_APPLY_ROLE_ARN" in yaml.safe_dump(job)
     assert job["permissions"] == {"contents": "read", "id-token": "write"}
 
 
@@ -154,7 +154,7 @@ def test_two_applies_never_run_at_the_same_time(terraform):
 
 @pytest.mark.parametrize("job", ["plan", "apply-dev", "apply-live"])
 def test_terraform_jobs_skip_until_aws_is_set_up(terraform, job):
-    assert "vars.TF_STATE_BUCKET != ''" in terraform["jobs"][job]["if"]
+    assert "vars.AWS_SET_UP == 'true'" in terraform["jobs"][job]["if"]
 
 
 def test_alert_addresses_come_from_secrets_not_variables(terraform, terraform_apply):
@@ -174,9 +174,16 @@ def test_init_reads_the_state_for_the_right_environment(terraform_init):
 # --- Deploy: dev, then live -----------------------------------------------------------------
 
 
-def test_deploy_runs_only_on_merges_to_main(deploy):
-    assert set(_triggers(deploy)) == {"push"}
+def test_deploy_runs_on_merges_to_main_or_when_i_start_it(deploy):
+    # A deploy I start from another branch builds the image, but the dev and live
+    # environments accept only main, so nothing reaches AWS.
+    assert set(_triggers(deploy)) == {"push", "workflow_dispatch"}
     assert _triggers(deploy)["push"]["branches"] == ["main"]
+
+
+def test_the_deploy_jobs_pass_the_secrets_on(deploy):
+    for name in ("dev", "live"):
+        assert deploy["jobs"][name]["secrets"] == "inherit"
 
 
 def test_the_image_is_built_on_arm_and_scanned_before_any_deploy(deploy):
@@ -188,7 +195,7 @@ def test_the_image_is_built_on_arm_and_scanned_before_any_deploy(deploy):
         i for i, step in enumerate(image["steps"]) if "upload-artifact" in step.get("uses", "")
     )
     assert scan < upload
-    assert "vars.TF_STATE_BUCKET != ''" in image["if"]
+    assert "vars.AWS_SET_UP == 'true'" in image["if"]
 
 
 def test_dev_is_deployed_first_and_live_only_after_dev(deploy):
@@ -202,7 +209,7 @@ def test_dev_is_deployed_first_and_live_only_after_dev(deploy):
 def test_the_deploy_waits_for_the_github_environment_and_uses_its_role(deploy_environment):
     job = deploy_environment["jobs"]["deploy"]
     assert job["environment"] == "${{ inputs.env }}"
-    assert "vars.DEPLOY_ROLE_ARN" in yaml.safe_dump(job)
+    assert "secrets.DEPLOY_ROLE_ARN" in yaml.safe_dump(job)
 
 
 def test_the_site_upload_leaves_the_box_files_alone(deploy_environment):
@@ -248,3 +255,60 @@ def test_a_rerun_deploy_skips_an_image_that_is_already_pushed(deploy_environment
     runs = _runs(deploy_environment["jobs"]["deploy"])
     assert "aws ecr describe-images" in runs
     assert runs.index("aws ecr describe-images") < runs.index("docker push")
+
+
+# --- The account number stays out of the public logs ----------------------------------------
+#
+# The repository is public, so anyone can read the workflow logs and job summaries. GitHub hides
+# a secret's value wherever it appears in a log, but prints a variable as it is. Every value that
+# holds the AWS account number is therefore a secret, and so is the account number itself, so it
+# is also hidden inside longer text such as the ARNs in a Terraform plan.
+
+ACCOUNT_VALUES = [
+    "TF_STATE_BUCKET",
+    "TF_STATE_KMS_KEY_ARN",
+    "TF_PLAN_ROLE_ARN_",
+    "TF_APPLY_ROLE_ARN",
+    "DEPLOY_ROLE_ARN",
+    "SITE_BUCKET",
+    "AIRFLOW_REPOSITORY",
+]
+
+
+@pytest.mark.parametrize(
+    "path", [*_all_workflows(), *sorted(ACTIONS.glob("*/action.yml"))], ids=lambda p: p.name
+)
+def test_values_that_hold_the_account_number_come_from_secrets(path):
+    text = path.read_text(encoding="utf-8")
+    for name in ACCOUNT_VALUES:
+        assert f"vars.{name}" not in text, name
+        assert f"vars[format('{name}" not in text, name
+
+
+def _aws_jobs():
+    for path in _all_workflows():
+        for name, job in (_load(path).get("jobs") or {}).items():
+            if any("configure-aws-credentials" in uses for uses in _uses(job)):
+                yield pytest.param(job, id=f"{path.name}:{name}")
+
+
+@pytest.mark.parametrize("job", list(_aws_jobs()))
+def test_every_aws_sign_in_hides_the_account_number(job):
+    sign_in = next(
+        step for step in job["steps"] if "configure-aws-credentials" in step.get("uses", "")
+    )
+    assert sign_in["with"]["mask-aws-account-id"] is True
+    assert job["env"]["AWS_ACCOUNT_ID"] == "${{ secrets.AWS_ACCOUNT_ID }}"
+
+
+def test_there_are_aws_jobs_to_check():
+    assert len(list(_aws_jobs())) == 3
+
+
+def test_the_plan_summary_hides_the_account_number(terraform):
+    # Hiding secrets is a log feature, so the plan text is masked before it reaches the summary.
+    plan = terraform["jobs"]["plan"]
+    step = next(step for step in plan["steps"] if "GITHUB_STEP_SUMMARY" in step.get("run", ""))
+    summary = step["run"].split("GITHUB_STEP_SUMMARY")[0]
+    assert 'sed "s/${AWS_ACCOUNT_ID}/***/g" plan.txt' in summary
+    assert "cat plan.txt" not in summary

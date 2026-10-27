@@ -1,7 +1,8 @@
 name: Deploy
 
 # A merge to main builds the Airflow image once, scans it, and deploys the site and the image
-# to dev, then to live. Each deploy waits for its GitHub environment's rules.
+# to dev, then to live. Each deploy waits for its GitHub environment's rules. I can also start
+# it by hand from the Actions tab; the environments accept only main.
 # Every job skips until AWS is set up: see .github/workflows/README.md.
 on:
   push:
@@ -12,6 +13,7 @@ on:
       - "platform/box/**"
       - ".trivyignore"
       - ".github/workflows/deploy*.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -27,7 +29,7 @@ defaults:
 jobs:
   image:
     name: Build and scan the Airflow image
-    if: vars.TF_STATE_BUCKET != ''
+    if: vars.AWS_SET_UP == 'true'
     # The session box is arm64, so the image is built on an arm64 runner, not emulated.
     runs-on: ubuntu-24.04-arm
     steps:
@@ -67,6 +69,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    secrets: inherit
 
   live:
     name: Deploy to live
@@ -77,3 +80,4 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    secrets: inherit

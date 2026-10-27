@@ -30,20 +30,24 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    # The repository is public, so the account number is a secret: GitHub hides it in the log.
+    env:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v7
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ vars.TF_APPLY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.TF_APPLY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
 
       - id: init
         uses: ./.github/actions/terraform-init
         with:
           env: ${{ inputs.env }}
-          state-bucket: ${{ vars.TF_STATE_BUCKET }}
-          state-kms-key-arn: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+          state-bucket: ${{ secrets.TF_STATE_BUCKET }}
+          state-kms-key-arn: ${{ secrets.TF_STATE_KMS_KEY_ARN }}
           region: ${{ vars.AWS_REGION }}
 
       # The plan is saved and applied as it is, so nothing changes between the two.
