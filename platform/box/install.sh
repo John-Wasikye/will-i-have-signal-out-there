@@ -163,11 +163,19 @@ run helm upgrade --install airflow apache-airflow/airflow \
   --set "images.airflow.tag=${IMAGE_TAG}" \
   --wait --timeout 15m
 
+step "stop airflow so nothing writes during the restore"
+# The restore drops and refills every table. A scheduler heartbeat written in between broke a
+# primary key on the first real box, so the parts that write to the database stop first.
+run kubectl scale --namespace "${NAMESPACE}" --replicas=0 \
+  deployment/airflow-api-server deployment/airflow-dag-processor statefulset/airflow-scheduler
+run kubectl wait --for=delete pod --namespace "${NAMESPACE}" \
+  --selector "component in (scheduler,api-server,dag-processor)" --timeout 5m
+
 step "restore the database backup"
 run python3.11 "${script_dir}/airflow_db_backup.py" restore --bucket "${BACKUP_BUCKET}"
 
-step "restart airflow"
-run kubectl rollout restart --namespace "${NAMESPACE}" \
+step "start airflow"
+run kubectl scale --namespace "${NAMESPACE}" --replicas=1 \
   deployment/airflow-api-server deployment/airflow-dag-processor statefulset/airflow-scheduler
 
 step "start the watchdog"

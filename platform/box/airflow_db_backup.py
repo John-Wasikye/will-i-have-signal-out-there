@@ -99,7 +99,11 @@ def pg_dump_command(host: str, port: int, user: str, database: str) -> list[str]
 
 
 def psql_restore_command(host: str, port: int, user: str, database: str) -> list[str]:
-    """Build the psql command that loads a dump. It stops at the first error."""
+    """Build the psql command that loads a dump.
+
+    It stops at the first error, and the whole dump is one transaction, so a failed restore
+    leaves the database as it was instead of half replaced.
+    """
     return [
         "psql",
         "--host",
@@ -108,6 +112,7 @@ def psql_restore_command(host: str, port: int, user: str, database: str) -> list
         str(port),
         "--username",
         user,
+        "--single-transaction",
         "--set",
         "ON_ERROR_STOP=1",
         database,

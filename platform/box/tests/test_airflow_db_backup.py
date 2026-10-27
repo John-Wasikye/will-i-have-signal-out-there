@@ -164,6 +164,13 @@ def test_the_restore_command_names_the_database_and_carries_no_password():
     assert not any("password" in part.lower() for part in command)
 
 
+def test_a_restore_that_fails_partway_changes_nothing():
+    command = psql_restore_command(host="localhost", port=5432, user="airflow", database="airflow")
+
+    assert "--single-transaction" in command
+    assert command[command.index("--set") + 1] == "ON_ERROR_STOP=1"
+
+
 class FakeRun:
     """Stands in for subprocess.run and records what it was given."""
 
