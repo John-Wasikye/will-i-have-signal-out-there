@@ -20,6 +20,10 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: python -m pip install -e ".[dev]"
+      # pyproject.toml allows version ranges, so the API's packages are reinstalled at the exact
+      # versions the Lambda package ships, and the tests run against what Lambda runs.
+      - name: Use the API package's locked versions
+        run: python -m pip install --no-deps --require-hashes -r platform/serving/requirements-lock.txt
       - name: Lint
         run: |
           ruff check .

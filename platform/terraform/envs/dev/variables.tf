@@ -52,6 +52,6 @@ variable "lambda_zip_path" {
 }
 
 variable "lambda_zip_sha256" {
-  description = "Base64 SHA-256 of the API package. The build script prints it."
+  description = "Base64 SHA-256 of the files inside the API package. The build script prints it."
   type        = string
 }

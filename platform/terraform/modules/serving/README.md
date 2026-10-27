@@ -21,7 +21,7 @@ What it creates:
 | `env` | string | none | `dev` or `live`. |
 | `published_bucket` | string | none | Site bucket name. The function reads its `published/` folder. |
 | `lambda_zip_path` | string | none | Zip with the app, arm64 dependencies and `handler.py`. |
-| `lambda_zip_sha256` | string | none | Base64 SHA-256 of the zip. |
+| `lambda_zip_sha256` | string | none | Base64 SHA-256 of the files inside the zip, as `build_package.py` prints it. |
 | `allowed_origins` | list(string) | none | Websites that may call the API. No wildcard. |
 | `memory_mb` | number | 1024 | Function memory. |
 | `timeout_seconds` | number | 30 | Longest request time. |
@@ -44,6 +44,6 @@ The zip comes from `platform/serving/build_package.py`. I run it from the reposi
 python platform/serving/build_package.py
 ```
 
-It downloads arm64 wheels for Python 3.12, adds the app's Python files, and writes `platform/serving/build/function.zip`. It prints the `lambda_zip_sha256` value to pass to this module. The zip is deterministic, so the checksum changes only when the code or the dependencies change. The last build was 22.6 MB zipped and 64.7 MB unzipped, well inside Lambda's limits.
+It downloads arm64 wheels for Python 3.12, adds the app's Python files, and writes `platform/serving/build/function.zip`. It prints the `lambda_zip_sha256` value to pass to this module. The checksum is taken over the files inside the zip, not the zip's bytes, because the same files compress to different bytes on Windows and Linux. It changes only when the code or the dependencies change, on any machine. The last build was 22.6 MB zipped and 64.7 MB unzipped, well inside Lambda's limits.
 
 The package leaves out `pyarrow` and `boto3`. DuckDB reads Parquet on its own, and the Lambda runtime provides `boto3`.

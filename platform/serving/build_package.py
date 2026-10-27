@@ -1,8 +1,13 @@
 """Builds the zip file that the serving Lambda function runs.
 
 The zip holds the app's Python files and its dependencies, built for arm64 and Python 3.12.
-It is deterministic: the same inputs give the same bytes, so Terraform sees a change only
-when the code or the dependencies really change.
+It is deterministic: the same inputs give the same bytes, on any machine and on any day, so
+Terraform sees a change only when the code or the dependencies really change. Every package
+comes from requirements-lock.txt with its version and hash, and the files that pip writes
+differently on Windows and Linux stay out of the zip.
+
+After changing requirements.txt, refresh the lock with the command at the top of
+requirements-lock.txt.
 
 Run it from the repo root:
     python platform/serving/build_package.py
@@ -21,10 +26,26 @@ from pathlib import Path
 SERVING_DIR = Path(__file__).resolve().parent
 BUILD_DIR = SERVING_DIR / "build"
 ZIP_PATH = BUILD_DIR / "function.zip"
+REQUIREMENTS_PATH = SERVING_DIR / "requirements.txt"
+LOCK_PATH = SERVING_DIR / "requirements-lock.txt"
 
 # A fixed timestamp in every zip entry keeps the file identical from one build to the next.
 _FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 _EXCLUDED_SOURCE_FILES = {"build_package.py"}
+
+
+def _belongs_in_the_zip(relative: Path) -> bool:
+    """Return True for a dependency file that belongs in the zip.
+
+    Compiled caches stay out, and so does what pip writes per machine: console scripts in bin/,
+    such as bin/fastapi.exe on Windows, and the RECORD file that lists them. Lambda needs
+    neither. METADATA stays, because packages read their own version from it.
+    """
+    if "__pycache__" in relative.parts or relative.suffix == ".pyc":
+        return False
+    if relative.parts[0] == "bin":
+        return False
+    return not (relative.name == "RECORD" and relative.parent.name.endswith(".dist-info"))
 
 
 def serving_source_files(serving_dir: Path) -> list[Path]:
@@ -41,7 +62,7 @@ def build_zip(serving_dir: Path, dependencies_dir: Path, output_path: Path) -> N
         entries[path.name] = path
     for path in dependencies_dir.rglob("*"):
         relative = path.relative_to(dependencies_dir)
-        if path.is_file() and "__pycache__" not in relative.parts and path.suffix != ".pyc":
+        if path.is_file() and _belongs_in_the_zip(relative):
             entries[relative.as_posix()] = path
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,16 +74,29 @@ def build_zip(serving_dir: Path, dependencies_dir: Path, output_path: Path) -> N
             archive.writestr(info, entries[name].read_bytes())
 
 
-def sha256_base64(path: Path) -> str:
-    """Return the file's SHA-256 as base64, the format Terraform's source_code_hash uses."""
-    return base64.b64encode(hashlib.sha256(path.read_bytes()).digest()).decode("ascii")
+def contents_sha256_base64(zip_path: Path) -> str:
+    """Return a base64 SHA-256 of the names and bytes inside the zip, for source_code_hash.
+
+    The zip's own bytes depend on the zlib build that compressed it: the same files gave
+    different zips on Windows and Linux. Terraform needs only a value that changes when the
+    code changes, so it gets this one. Each name and file is length-prefixed, so moving bytes
+    from one to the other changes the checksum.
+    """
+    digest = hashlib.sha256()
+    with zipfile.ZipFile(zip_path) as archive:
+        for info in sorted(archive.infolist(), key=lambda entry: entry.filename):
+            for part in (info.filename.encode("utf-8"), archive.read(info)):
+                digest.update(len(part).to_bytes(8, "big"))
+                digest.update(part)
+    return base64.b64encode(digest.digest()).decode("ascii")
 
 
-def install_dependencies(requirements: Path, target_dir: Path) -> None:
+def install_dependencies(lock: Path, target_dir: Path) -> None:
     """Download arm64 wheels for Python 3.12 into ``target_dir``. This needs the internet.
 
-    Lambda's Python 3.12 runtime is Amazon Linux 2023 (glibc 2.34), so wheels tagged
-    manylinux_2_28 or the older manylinux2014 both run there.
+    Only the locked packages are installed, each checked against its hash, so a new release
+    of a package I did not choose cannot slip in. Lambda's Python 3.12 runtime is Amazon Linux
+    2023 (glibc 2.34), so wheels tagged manylinux_2_28 or the older manylinux2014 both run there.
     """
     shutil.rmtree(target_dir, ignore_errors=True)
     subprocess.run(
@@ -72,7 +106,9 @@ def install_dependencies(requirements: Path, target_dir: Path) -> None:
             "pip",
             "install",
             "--requirement",
-            str(requirements),
+            str(lock),
+            "--no-deps",
+            "--require-hashes",
             "--target",
             str(target_dir),
             "--platform",
@@ -93,10 +129,10 @@ def install_dependencies(requirements: Path, target_dir: Path) -> None:
 def main() -> None:
     """Install the dependencies, build the zip, and print its path and checksum."""
     dependencies_dir = BUILD_DIR / "dependencies"
-    install_dependencies(SERVING_DIR / "requirements.txt", dependencies_dir)
+    install_dependencies(LOCK_PATH, dependencies_dir)
     build_zip(SERVING_DIR, dependencies_dir, ZIP_PATH)
     print(f"Built {ZIP_PATH}")
-    print(f"lambda_zip_sha256 = {sha256_base64(ZIP_PATH)}")
+    print(f"lambda_zip_sha256 = {contents_sha256_base64(ZIP_PATH)}")
 
 
 if __name__ == "__main__":
