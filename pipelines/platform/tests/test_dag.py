@@ -8,6 +8,7 @@ installed (CI, or the session box). The rules come from docs/platform/design-doc
 - report_run emails about a late or failed pipeline once the outputs are in S3
 - a failed task records an incident and sends an email
 - only one run is active at a time, because every run writes the same table
+- a fresh install starts the DAG unpaused, so the nightly schedule runs without a manual step
 """
 
 import importlib
@@ -30,6 +31,11 @@ def test_dag_has_the_platform_skeleton_id(skeleton_dag):
 def test_only_one_run_is_active_at_a_time(skeleton_dag):
     """Two runs at once raced to create the Iceberg table on a fresh box (2026-10-27)."""
     assert skeleton_dag.max_active_runs == 1
+
+
+def test_a_fresh_install_does_not_leave_the_dag_paused(skeleton_dag):
+    """Airflow pauses a new DAG by default, so an empty database would skip every night."""
+    assert skeleton_dag.is_paused_upon_creation is False
 
 
 def test_every_task_is_in_the_dag(skeleton_dag):
