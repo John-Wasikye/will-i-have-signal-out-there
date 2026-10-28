@@ -1,5 +1,11 @@
 # Changelog: Platform
 
+## Oct 28, 2026: incident records live in S3 and can be closed
+
+- Each incident is filed in the lake as soon as it opens, numbered from what the lake already holds, and an upload never replaces a record the lake has (ADR-0024 update).
+- A command closes a record with its cause and fix (operations, section 2).
+- The nightly DAG allows one active run, and a fresh install starts it unpaused (pull request 14).
+
 ## Oct 22, 2026: Parameter Store check
 
 - OQ-P10 answered: the Parameter Store path check is built with the platform skeleton. The paths are listed in `checks/parameter_paths.yaml`, CI checks them against the naming convention and the code, and the pull request plan checks that each listed parameter exists.

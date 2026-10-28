@@ -37,6 +37,17 @@ Hitting the 2-hour maximum is recorded as an incident. The next run catches up.
 | Session limit (4 hours) | The box stops | Logged |
 | Spend | AWS Budget at $40, with an action that stops new launches (backup) | Budget email |
 
+### Incident records
+
+- **Where:** one Parquet file per incident in the lake bucket of each environment, under `platform/incidents/`, named by its ID (for example `INC-2026-10-27-01.parquet`). The records stay private, because the error text can name files and tables. The failure email is the notice; the file is the record.
+- **Closing one:** once the cause and the fix are known, run from the repository root, after `pip install ".[ops]"` and an AWS sign-in:
+
+  ```
+  python pipelines/platform/publish/incidents.py close --bucket <lake bucket> --id <incident ID> --cause "<why it broke>" --fix "<what fixed it>"
+  ```
+
+  It refuses a record that is already closed, an empty cause or fix, and a record that changed while it was being closed. The bucket keeps the open version in its history.
+
 ## 3. Cost
 
 Estimates are from public price pages as of Oct 8, 2026. They are checked before the first run and after any change of instance type. The project-level models in each project's operations document add their own costs.
