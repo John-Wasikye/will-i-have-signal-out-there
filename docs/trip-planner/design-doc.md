@@ -4,10 +4,10 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft for review. Coding of this project does not begin until John approves this document, the requirements, the ADRs and the interface specs |
+| Status | Approved by John (Oct 28, 2026), with the requirements, the ADRs, the contracts and the API specification. Coding of Phase A may begin |
 | Owner | John |
 | Reviewers | John |
-| Last updated | Oct 9, 2026 |
+| Last updated | Oct 28, 2026 |
 | Template | Documentation Plan "Design doc template" (Google design doc, arc42, C4 model) |
 | Companion documents | [requirements.md](requirements.md), [adrs/](adrs/), [contracts/](contracts/), [openapi.yaml](openapi.yaml), [../Platform/platform-requirements.md](../platform/platform-requirements.md), [operations.md](operations.md), [security-and-privacy.md](security-and-privacy.md), [model-card.md](model-card.md), [README.md](README.md), [changelog.md](changelog.md) |
 | Platform requirements | [../Platform/platform-requirements.md](../platform/platform-requirements.md): the platform parts this project depends on, specified in full. The separate platform document set is not written yet |

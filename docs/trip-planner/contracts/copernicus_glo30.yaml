@@ -1,10 +1,10 @@
-# Data contract (ODCS). Draft. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). Approved by John (Oct 28, 2026). ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-copernicus-glo30
 name: copernicus_glo30
 version: 0.1.0
-status: draft
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

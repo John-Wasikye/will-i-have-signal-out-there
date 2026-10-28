@@ -1,11 +1,11 @@
-# Data contract (ODCS v3.0.2). Draft, Phase B. Source for the remoteness input (ADR 0035).
+# Data contract (ODCS v3.0.2). Approved by John (Oct 28, 2026), Phase B. Source for the remoteness input (ADR 0035).
 # Field names are the TIGER/Line names as published; they are confirmed against a real file in the first-run check (OQ-20).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-tiger-roads
 name: tiger_roads
 version: 0.1.0
-status: draft
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

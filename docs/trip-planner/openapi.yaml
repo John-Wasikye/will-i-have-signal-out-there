@@ -1,4 +1,4 @@
-# OpenAPI 3 specification for Project 1. Draft.
+# OpenAPI 3 specification for Project 1. Approved by John (Oct 28, 2026).
 # - The OpenAPI version (3.0.3 here) is a working placeholder; pinned in ADR 0032.
 # - Paths, field names and operation ids are proposals (OQ-21).
 # - Phase A operations: listTrails, getTrailSignal (without confidence fields).

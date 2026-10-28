@@ -10,6 +10,12 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Oct 28, 2026: documents approved
+
+- John approved the requirements, the design doc, the ADRs, the data contracts and the API specification. This meets the gate in README section 9, so coding of Phase A can begin.
+- Status lines changed from "Draft" to "Approved by John (Oct 28, 2026)" in README.md, requirements.md, design-doc.md and openapi.yaml, and in the header of every contract. Each contract's `status` field changed from `draft` to `active`, the ODCS (Open Data Contract Standard) term for a contract in force.
+- Approval does not settle the open questions. Source URLs and field lists stay unconfirmed until the first-run checks (OQ-20, ADR 0018), and names stay working names (OQ-21).
+
 ### Oct 9, 2026: horizon defaults, credit wording, assistant spend limit
 
 - OQ-24 (horizon details) is decided in ADR 0036: 15 km range, 30 m ray step, 1.7 m eye height, Earth curvature applied, refraction not applied, the surface model kept, 36 sectors final, linear interpolation, and a 5-degree margin for AC-1A.2.
