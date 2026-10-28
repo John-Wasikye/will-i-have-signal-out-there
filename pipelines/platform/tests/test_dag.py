@@ -81,6 +81,15 @@ def test_maintenance_runs_even_when_earlier_tasks_fail(skeleton_dag):
     assert maintenance.trigger_rule == "all_done"
 
 
+def test_a_task_tries_again_after_a_brief_failure(skeleton_dag):
+    # On 2026-10-28 a task started 8 seconds before the API server and failed for good.
+    from datetime import timedelta
+
+    for task in skeleton_dag.tasks:
+        assert task.retries == 2, task.task_id
+        assert task.retry_delay == timedelta(minutes=2), task.task_id
+
+
 def test_every_task_records_an_incident_when_it_fails(skeleton_dag):
     module = importlib.import_module("platform_skeleton_dag")
 
