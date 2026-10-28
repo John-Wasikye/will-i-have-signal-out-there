@@ -46,19 +46,26 @@ def aws_client(service: str):  # noqa: ANN201
 
 
 def record_failure_callback(context: dict) -> None:
-    """Record an incident for a task that failed, then email about it.
+    """File an incident in the lake for a task that failed, then email about it.
 
-    Airflow calls this with the task's context. The incident is written first, so it is kept
-    even if the email cannot be sent. The settings are read when the callback runs, so a test
-    can point them somewhere else.
+    Airflow calls this with the task's context. The email goes out even when the incident
+    cannot be filed, and the filing error is raised afterwards so Airflow logs it. The settings
+    are read when the callback runs, so a test can point them somewhere else.
     """
-    record_failure(context, Path(os.environ.get("PLATFORM_INCIDENTS_DIR", str(INCIDENTS_DIR))))
-    alerts.alert_failure(
-        context,
-        aws_client("sns"),
-        os.environ["PLATFORM_ALERT_TOPIC_ARN"],
-        os.environ["PLATFORM_ENV"],
-    )
+    try:
+        record_failure(
+            context,
+            Path(os.environ.get("PLATFORM_INCIDENTS_DIR", str(INCIDENTS_DIR))),
+            aws_client("s3"),
+            os.environ["PLATFORM_LAKE_BUCKET"],
+        )
+    finally:
+        alerts.alert_failure(
+            context,
+            aws_client("sns"),
+            os.environ["PLATFORM_ALERT_TOPIC_ARN"],
+            os.environ["PLATFORM_ENV"],
+        )
 
 
 @dag(

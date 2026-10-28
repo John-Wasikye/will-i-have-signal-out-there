@@ -20,10 +20,10 @@ from box_watchdog import (
     decide,
     fetch_spot_stop_time,
     fetch_work_session_end,
+    file_stop_incident,
     http_request,
     is_nightly_boot,
     list_runs_command,
-    next_incident_number,
     parse_args,
     parse_session_end,
     parse_spot_notice,
@@ -462,18 +462,25 @@ def test_only_the_maximum_and_a_spot_warning_make_incidents():
 
 
 class FakeLake:
+    """An S3 bucket in memory: listing by prefix, and put_object with If-None-Match."""
+
     def __init__(self, keys):
-        self.keys = keys
+        self.objects = {key: b"" for key in keys}
 
     def get_paginator(self, name):
         return self
 
     def paginate(self, Bucket, Prefix):  # noqa: N803, boto3 parameter names
-        found = [k for k in self.keys if k.startswith(Prefix)]
+        found = [k for k in sorted(self.objects) if k.startswith(Prefix)]
         yield {"Contents": [{"Key": k} for k in found]} if found else {}
 
+    def put_object(self, Bucket, Key, Body, IfNoneMatch=None, ContentType=None):  # noqa: N803
+        assert IfNoneMatch == "*", "an incident must never replace an existing record"
+        assert Key not in self.objects
+        self.objects[Key] = Body
 
-def test_the_next_incident_number_counts_the_incidents_already_filed_that_day():
+
+def test_a_stop_incident_is_filed_in_s3_after_the_ones_already_there(tmp_path):
     lake = FakeLake(
         [
             "platform/incidents/INC-2026-10-10-01.parquet",
@@ -481,12 +488,12 @@ def test_the_next_incident_number_counts_the_incidents_already_filed_that_day():
             "platform/incidents/INC-2026-10-09-01.parquet",
         ]
     )
+    decision = Decision(Action.STOP_SPOT_WARNING, "AWS will stop the box at 10:12.")
 
-    assert next_incident_number(lake, "bucket", STARTED) == 3
+    key = file_stop_incident(lake, "bucket", decision, STARTED, "p", tmp_path)
 
-
-def test_the_first_incident_of_a_day_is_number_one():
-    assert next_incident_number(FakeLake([]), "bucket", STARTED) == 1
+    assert key == "platform/incidents/INC-2026-10-10-03.parquet"
+    assert key in lake.objects
 
 
 class _Server:
