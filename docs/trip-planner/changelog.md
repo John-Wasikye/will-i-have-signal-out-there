@@ -10,6 +10,28 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Oct 28, 2026: Phase A first-run checks
+
+The checks ran on John's laptop. Downloads were kept outside the repository. Answers are in design doc section 16.
+
+- OQ-6 answered: 636 of 637 `[DTC]` satellites pass the altitude and inclination cross-check. The exception, STARLINK-11075 (58706), is at about 296 km and stays selected with a logged disagreement (ADR 0002).
+- OQ-8 answered: the NPS trails for `GRCA` and the four Copernicus GLO-30 tiles download and open, and decoded heights match known points.
+- OQ-36 answered: Bright Angel, South Kaibab and North Kaibab are one line each. The loader must match the whole `TRLNAME`.
+- OQ-7 partly answered: the T-Mobile Arizona 4G LTE hexagon GeoPackage is 83 MB zipped, 289 MB unzipped, 1,007,438 rows. Ookla and OpenCelliD sizes are Phase B.
+- OQ-20 partly answered: URLs, field lists, the `GRCA` unit code and the FCC file name pattern for the four Phase A sources. Ookla and OpenCelliD are Phase B.
+- New open question OQ-44: which FCC rows count as covered for a hiker (environment and signal fields).
+- Files checked, with SHA-256 hashes:
+
+| File | Source | Size | SHA-256 |
+|---|---|---|---|
+| Starlink GP JSON, pulled 2026-10-28 02:44 UTC | celestrak.org | 4,715,590 bytes | not kept; it changes every pull |
+| `grca_trails.geojson` (`UNITCODE='GRCA'`, all fields) | mapservices.nps.gov | 5,892,096 bytes | `d96a5ed47a2f939217e30e3cd5987dbe2cc3445a5069dd0e7f2548a8a88eb268` |
+| `Copernicus_DSM_COG_10_N35_00_W113_00_DEM.tif` | copernicus-dem-30m (AWS Open Data) | 37,969,615 bytes | `5103c75c674fd6924a898203488f7761404b684a47d5e9e2e6fd3adcff2fb04a` |
+| `Copernicus_DSM_COG_10_N35_00_W112_00_DEM.tif` | same | 37,529,476 bytes | `105a2ff831e660c878bb72ac88147c79659444167ef8931b5b4d4eeefc54b4b1` |
+| `Copernicus_DSM_COG_10_N36_00_W113_00_DEM.tif` | same | 40,201,504 bytes | `3778b88efb81c8f05aa483d1d5267c07c55e058f34df6603f29be0ac99289e7b` |
+| `Copernicus_DSM_COG_10_N36_00_W112_00_DEM.tif` | same | 39,364,241 bytes | `92df94da758bde3c9da71db304967893ae63b01f7bf314cca5ea07c73ac4e26e` |
+| `bdc_04_130403_4GLTE_mobile_broadband_h3_D25_19oct2026.zip` | broadbandmap.fcc.gov | 82,984,558 bytes | `95701de37cfc89571178f332e16e23caec9eda50030a421fc19403eac1df4464` |
+
 ### Oct 28, 2026: documents approved
 
 - John approved the requirements, the design doc, the ADRs, the data contracts and the API specification. This meets the gate in README section 9, so coding of Phase A can begin.
