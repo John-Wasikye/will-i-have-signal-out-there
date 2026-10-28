@@ -87,12 +87,13 @@ _RUN_STATES = {
 def run_progress(runs_json: str, box_started_utc: datetime) -> RunProgress:
     """Read the output of ``airflow dags list-runs --output json`` for the nightly DAG.
 
-    Only runs created after the box started count, because a run from an earlier night says
-    nothing about tonight. The newest of those runs decides.
+    Only runs from tonight's scheduled start onwards count, because a run from an earlier night
+    says nothing about tonight. The box can boot after that start when spot capacity is short,
+    so the boot time is not the cut-off. The newest of those runs decides.
     """
-    started = require_utc(box_started_utc, "box_started_utc")
+    since = nightly_start(require_utc(box_started_utc, "box_started_utc"))
     runs = [
-        run for run in json.loads(runs_json) if datetime.fromisoformat(run["run_after"]) >= started
+        run for run in json.loads(runs_json) if datetime.fromisoformat(run["run_after"]) >= since
     ]
     if not runs:
         return RunProgress.WAITING
@@ -157,8 +158,12 @@ def is_nightly_boot(boot_utc: datetime) -> bool:
     The schedule starts the box at 10:00 UTC and retries until 12:00 UTC.
     """
     boot = require_utc(boot_utc, "boot_utc")
-    scheduled = boot.replace(hour=NIGHTLY_START_HOUR_UTC, minute=0, second=0, microsecond=0)
-    return timedelta(0) <= boot - scheduled <= NIGHTLY_START_WINDOW
+    return timedelta(0) <= boot - nightly_start(boot) <= NIGHTLY_START_WINDOW
+
+
+def nightly_start(boot_utc: datetime) -> datetime:
+    """Return 10:00 UTC on the day of the boot, when the schedule starts the nightly run."""
+    return boot_utc.replace(hour=NIGHTLY_START_HOUR_UTC, minute=0, second=0, microsecond=0)
 
 
 def parse_spot_notice(body: str) -> datetime:
