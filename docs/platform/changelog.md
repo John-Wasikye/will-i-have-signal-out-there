@@ -5,6 +5,7 @@
 - Each incident is filed in the lake as soon as it opens, numbered from what the lake already holds, and an upload never replaces a record the lake has (ADR-0024 update).
 - A command closes a record with its cause and fix (operations, section 2).
 - The nightly DAG allows one active run, and a fresh install starts it unpaused (pull request 14).
+- A spot warning no longer records an incident. It sends the stop email, and the email plus the watchdog's log are the note that runbook PRB-3 asks for. Only the 2-hour maximum records an incident.
 
 ## Oct 22, 2026: Parameter Store check
 

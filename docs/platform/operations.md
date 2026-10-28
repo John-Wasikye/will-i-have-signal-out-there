@@ -86,9 +86,9 @@ Each runbook names the symptom, how it is found, the first action, and what to r
 
 ### PRB-3: A spot server is taken back mid-run
 
-- **Found by:** the interruption handler records the two-minute warning and the run stops.
+- **Found by:** the watchdog reads AWS's two-minute warning, saves the database, emails me, and powers the box off. The run stops.
 - **First action:** rerun on a new box. Every job overwrites its own partition, so a rerun replaces only that day.
-- **Record:** a note in the metrics table.
+- **Record:** a note, not an incident, because nothing broke. The note is the stop email ("AWS will stop the box at ...") and the watchdog's log on the box (`journalctl -u box-watchdog -b -1` after the next boot). The same applies to a spot warning during a work session.
 
 ### PRB-4: Airflow's saved database cannot be restored
 
