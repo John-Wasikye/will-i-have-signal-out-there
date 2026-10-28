@@ -19,11 +19,9 @@ UTC by definition of the GP format.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import urllib.request
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -34,27 +32,14 @@ from contract_diff import (
     load_contract,
     observed_schema_from_records,
 )
-from sample_iceberg_job import CATALOG_NAME
+from lake_write import write_run_partition
+from raw_store import FetchRefused, RawFile, download, write_raw
 from timeutil import format_utc, require_utc
 
 CELESTRAK_STARLINK_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=json"
 MIN_TIME_BETWEEN_FETCHES = timedelta(hours=2)
-FETCH_TIMEOUT_SECONDS = 60
 RAW_PREFIX = "signal/celestrak/gp"
 TABLE_NAME = "celestrak_gp"
-
-
-class FetchRefused(RuntimeError):
-    """The pull did not happen or did not return a usable file."""
-
-
-@dataclass(frozen=True)
-class RawFile:
-    """A source file exactly as received, with where and when it came from."""
-
-    body: bytes
-    url: str
-    fetched_at: datetime
 
 
 def fetch_gp_json(
@@ -72,13 +57,7 @@ def fetch_gp_json(
             raise FetchRefused(
                 f"the last pull was {since} ago; CelesTrak is pulled at most once in 2 hours"
             )
-    with opener(url, timeout=FETCH_TIMEOUT_SECONDS) as response:
-        if response.status != 200:
-            raise FetchRefused(f"{url} answered HTTP {response.status}")
-        body = response.read()
-    if not body:
-        raise FetchRefused(f"{url} returned an empty body")
-    return RawFile(body=body, url=url, fetched_at=now_utc)
+    return download(url, now_utc=now_utc, opener=opener)
 
 
 def raw_key(fetched_at: datetime) -> str:
@@ -92,24 +71,7 @@ def store_raw(client, bucket: str, raw: RawFile) -> dict:  # noqa: ANN001, a bot
     Both writes use If-None-Match, so an existing raw file is never replaced.
     """
     key = raw_key(raw.fetched_at)
-    manifest = {
-        "source_url": raw.url,
-        "fetched_at_utc": format_utc(raw.fetched_at),
-        "content_sha256": hashlib.sha256(raw.body).hexdigest(),
-        "size_bytes": len(raw.body),
-        "raw_key": key,
-    }
-    client.put_object(
-        Bucket=bucket, Key=key, Body=raw.body, IfNoneMatch="*", ContentType="application/json"
-    )
-    client.put_object(
-        Bucket=bucket,
-        Key=key.rsplit("/", 1)[0] + "/manifest.json",
-        Body=json.dumps(manifest, indent=2).encode(),
-        IfNoneMatch="*",
-        ContentType="application/json",
-    )
-    return manifest
+    return write_raw(client, bucket, key, key.rsplit("/", 1)[0] + "/manifest.json", raw)
 
 
 def parse_gp_records(body: bytes, contract_path: Path) -> list[dict]:
@@ -163,12 +125,4 @@ def load_gp_partition(
     The partition is the run's logical date, not the fetch time (engineering standard 3), so a
     rerun of the same night replaces only that night's rows.
     """
-    if not rows:
-        raise ValueError("no rows to load; an empty pull must stop before this step")
-    frame = spark.createDataFrame([row | {"run_date": run_date} for row in rows])
-    full_name = f"{CATALOG_NAME}.{namespace}.{TABLE_NAME}"
-    if spark.catalog.tableExists(full_name):
-        frame.writeTo(full_name).overwritePartitions()
-    else:
-        frame.writeTo(full_name).partitionedBy("run_date").create()
-    return len(rows)
+    return write_run_partition(spark, TABLE_NAME, rows, run_date, namespace=namespace)

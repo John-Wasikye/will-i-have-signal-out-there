@@ -111,6 +111,14 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 
 ## Phases
 
+### Oct 28, 2026: C3 trail loader (code)
+
+- `pipelines/signal/trail_loader.py`: pages through the NPS Public Trails service for `GRCA` in OBJECTID order (2,000 a page), stopping on any status other than 200, an error inside a 200 or more than 10 pages; keeps each page unchanged with a manifest under `signal/nps/trails/unitcode=GRCA/fetched_at=<time>/`; checks the fields against the contract (C8); keeps Bright Angel, South Kaibab and North Kaibab by whole name, each required to be exactly one line in one part; places a point every 50 m measured along the line, plus the line's last point; writes `nps_trail_line` and `trail_point` for the run date.
+- Conventions (working names, OQ-21): trail IDs are slugs such as `grca-bright-angel`, because OBJECTID can change when the NPS republishes; point IDs add a five-digit sequence from 0, such as `grca-bright-angel-00042`. Elevation is added by C4.
+- On the real file from the first-run check: 12.68, 10.41 and 23.26 km, and 255, 210 and 467 points (932 in all).
+- Contract `nps_trails` 0.2.0: confirmed URL and raw location, `upstreamField` and `upstreamType` for OBJECTID, TRLNAME and UNITCODE, and `geometry_geojson` stored as GeoJSON text.
+- Shared helpers: `raw_store.py` (download and keep a raw file with its manifest) and `lake_write.py` (write a run-date partition) now serve C1 and C3; C1's behavior is unchanged and its tests still pass.
+
 ### Oct 28, 2026: C2 Direct-to-Cell selector (code)
 
 - `pipelines/signal/dtc_selector.py`: `select_dtc_satellites` keeps every satellite whose name carries `[DTC]` and cross-checks each one. The exact rule (ADR 0002 left it to the code): perigee and apogee both between 330 and 370 km, from mean motion and eccentricity above the equatorial radius, and inclination within 0.5 degrees of 43 or 53. A disagreement is logged and listed; the satellite stays selected. No tagged satellite at all stops the run.
@@ -132,7 +140,7 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 | Phase | Status | Released |
 |---|---|---|
 | Platform skeleton (before Project 1) | Built; first unattended live run on 2026-10-28 | Live |
-| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | In progress: C8, C1 and C2 code built; not yet in the nightly run | Not released |
+| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | In progress: C8, C1, C2 and C3 code built; not yet in the nightly run | Not released |
 | Phase B: depth (every carrier, warehouse, confidence model, assistant, reports) | Not started | Not released |
 | Phase C: scale (second round) | Not started. Acceptance checks not yet written | Not released |
 
