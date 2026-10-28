@@ -8,7 +8,16 @@ from datetime import UTC, datetime
 
 import pyarrow.parquet as pq
 import pytest
-from incidents import build_incident, failure_incident, record_failure, write_incident
+from incidents import (
+    build_incident,
+    close_incident,
+    failure_incident,
+    file_incident,
+    main,
+    next_incident_number,
+    record_failure,
+    write_incident,
+)
 
 OPENED = datetime(2026, 10, 10, 10, 30, tzinfo=UTC)
 
@@ -116,30 +125,230 @@ class FakeTaskInstance:
         self.task_id = task_id
 
 
-def test_the_failure_callback_records_an_incident_from_the_airflow_context(tmp_path):
-    context = {
-        "dag": type("Dag", (), {"dag_id": "platform_skeleton_nightly"})(),
-        "task_instance": FakeTaskInstance("publish_sample"),
-        "exception": RuntimeError("disk full"),
-    }
+class S3Error(Exception):
+    """Stands in for botocore's ClientError, which carries the S3 error code."""
 
-    path = record_failure(context, tmp_path, now_utc=OPENED)
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.response = {"Error": {"Code": code}}
 
-    row = pq.ParquetFile(path).read().to_pylist()[0]
+
+class FakeLake:
+    """An S3 bucket in memory: listing by prefix, and put_object with If-None-Match."""
+
+    def __init__(self, keys=(), take_first: int = 0, fail_with: str | None = None):
+        self.objects: dict[str, bytes] = {key: b"" for key in keys}
+        self.take_first = take_first
+        self.fail_with = fail_with
+
+    def get_paginator(self, name):
+        return self
+
+    def paginate(self, Bucket, Prefix):  # noqa: N803, boto3 parameter names
+        found = [{"Key": key} for key in sorted(self.objects) if key.startswith(Prefix)]
+        yield {"Contents": found} if found else {}
+
+    def put_object(self, Bucket, Key, Body, IfNoneMatch=None, ContentType=None):  # noqa: N803
+        if self.fail_with:
+            raise S3Error(self.fail_with)
+        if self.take_first:
+            # Another writer files the same key a moment before this one.
+            self.take_first -= 1
+            self.objects[Key] = b"someone else"
+        if IfNoneMatch == "*" and Key in self.objects:
+            raise S3Error("PreconditionFailed")
+        self.objects[Key] = Body
+
+
+FAILURE = {
+    "dag": type("Dag", (), {"dag_id": "platform_skeleton_nightly"})(),
+    "task_instance": type("TaskInstance", (), {"task_id": "publish_sample"})(),
+    "exception": RuntimeError("disk full"),
+}
+
+
+def _row(lake: FakeLake, key: str) -> dict:
+    import io
+
+    return pq.read_table(io.BytesIO(lake.objects[key])).to_pylist()[0]
+
+
+def test_the_next_number_follows_the_highest_one_used_that_day():
+    taken = [
+        "platform/incidents/INC-2026-10-10-01.parquet",
+        "platform/incidents/INC-2026-10-10-03.parquet",
+        "platform/incidents/INC-2026-10-09-07.parquet",
+    ]
+
+    assert next_incident_number(taken, OPENED) == 4
+
+
+def test_the_first_incident_of_a_day_is_number_one():
+    assert next_incident_number([], OPENED) == 1
+
+
+def test_the_failure_callback_files_the_incident_in_s3_at_once(tmp_path):
+    lake = FakeLake()
+
+    key = record_failure(FAILURE, tmp_path, lake, "lake", now_utc=OPENED)
+
+    assert key == "platform/incidents/INC-2026-10-10-01.parquet"
+    row = _row(lake, key)
     assert row["pipeline"] == "platform_skeleton_nightly"
     assert "publish_sample" in row["what_broke"]
     assert "disk full" in row["what_broke"]
-    assert row["incident_id"] == "INC-2026-10-10-01"
 
 
-def test_a_second_failure_on_the_same_day_gets_the_next_number(tmp_path):
-    context = {
-        "dag": type("Dag", (), {"dag_id": "d"})(),
-        "task_instance": FakeTaskInstance("t"),
-        "exception": RuntimeError("x"),
-    }
+def test_the_number_comes_from_s3_so_a_new_box_does_not_reuse_one(tmp_path):
+    """A replaced box starts with an empty folder, but S3 still has the day's records."""
+    lake = FakeLake(["platform/incidents/INC-2026-10-10-01.parquet"])
 
-    record_failure(context, tmp_path, now_utc=OPENED)
-    second = record_failure(context, tmp_path, now_utc=OPENED)
+    key = record_failure(FAILURE, tmp_path, lake, "lake", now_utc=OPENED)
 
-    assert pq.ParquetFile(second).read().to_pylist()[0]["incident_id"] == "INC-2026-10-10-02"
+    assert key == "platform/incidents/INC-2026-10-10-02.parquet"
+    assert lake.objects["platform/incidents/INC-2026-10-10-01.parquet"] == b""
+
+
+def test_a_record_on_the_box_that_is_not_in_s3_yet_still_counts(tmp_path):
+    write_incident(build_incident(1, OPENED, "p", "Earlier."), tmp_path)
+
+    key = record_failure(FAILURE, tmp_path, FakeLake(), "lake", now_utc=OPENED)
+
+    assert key.endswith("INC-2026-10-10-02.parquet")
+
+
+def test_when_another_writer_takes_the_number_the_next_one_is_used(tmp_path):
+    lake = FakeLake(take_first=1)
+
+    key = record_failure(FAILURE, tmp_path, lake, "lake", now_utc=OPENED)
+
+    assert key.endswith("INC-2026-10-10-02.parquet")
+    assert lake.objects["platform/incidents/INC-2026-10-10-01.parquet"] == b"someone else"
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["INC-2026-10-10-02.parquet"]
+
+
+def test_a_writer_that_keeps_losing_gives_up_with_an_error(tmp_path):
+    with pytest.raises(RuntimeError, match="could not file"):
+        file_incident(
+            FakeLake(take_first=10),
+            "lake",
+            lambda number: build_incident(number, OPENED, "p", "x"),
+            OPENED,
+            tmp_path,
+            attempts=3,
+        )
+
+
+def test_when_s3_cannot_be_reached_the_record_stays_on_the_box_for_the_nightly_upload(tmp_path):
+    with pytest.raises(S3Error, match="RequestTimeout"):
+        record_failure(FAILURE, tmp_path, FakeLake(fail_with="RequestTimeout"), "lake", OPENED)
+
+    assert [path.name for path in tmp_path.iterdir()] == ["INC-2026-10-10-01.parquet"]
+
+
+CLOSED = datetime(2026, 10, 28, 9, 0, tzinfo=UTC)
+KEY = "platform/incidents/INC-2026-10-10-01.parquet"
+
+
+class VersionedLake:
+    """One S3 bucket in memory with ETags: get_object, and put_object with If-Match."""
+
+    def __init__(self):
+        self.objects: dict[str, bytes] = {}
+        self.versions = 0
+        self.change_before_put = False
+
+    def add(self, incident: dict, tmp_path) -> None:
+        path = write_incident(incident, tmp_path)
+        self.objects["platform/incidents/" + path.name] = path.read_bytes()
+
+    def get_object(self, Bucket, Key):  # noqa: N803
+        import io
+
+        if Key not in self.objects:
+            raise S3Error("NoSuchKey")
+        return {"Body": io.BytesIO(self.objects[Key]), "ETag": self._etag(Key)}
+
+    def put_object(self, Bucket, Key, Body, IfMatch=None, ContentType=None):  # noqa: N803
+        if self.change_before_put:
+            self.objects[Key] += b" "
+        if IfMatch is not None and IfMatch != self._etag(Key):
+            raise S3Error("PreconditionFailed")
+        self.objects[Key] = Body
+
+    def _etag(self, key: str) -> str:
+        return f'"{hash(self.objects[key])}"'
+
+
+@pytest.fixture
+def lake(tmp_path):
+    lake = VersionedLake()
+    lake.add(build_incident(1, OPENED, "platform_skeleton_nightly", "Two runs raced."), tmp_path)
+    return lake
+
+
+def test_closing_fills_in_the_cause_and_the_fix_and_marks_the_record_closed(lake):
+    close_incident(lake, "lake", "INC-2026-10-10-01", "Two runs at once.", "PR 14.", CLOSED)
+
+    row = _row(lake, KEY)
+    assert row["status"] == "closed"
+    assert row["cause"] == "Two runs at once."
+    assert row["fix"] == "PR 14."
+    assert row["closed_at_utc"] == CLOSED
+    assert row["what_broke"] == "Two runs raced."
+    assert row["opened_at_utc"] == OPENED
+
+
+def test_a_closed_record_cannot_be_closed_again(lake):
+    close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", CLOSED)
+
+    with pytest.raises(ValueError, match="already closed"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", CLOSED)
+
+
+@pytest.mark.parametrize(("cause", "fix"), [("", "f"), ("c", "  ")])
+def test_closing_needs_both_a_cause_and_a_fix(lake, cause, fix):
+    with pytest.raises(ValueError, match="cause and the fix"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", cause, fix, CLOSED)
+
+
+def test_closing_a_record_that_does_not_exist_says_so(lake):
+    with pytest.raises(LookupError, match="INC-2026-10-10-09"):
+        close_incident(lake, "lake", "INC-2026-10-10-09", "c", "f", CLOSED)
+
+
+def test_an_id_that_is_not_an_incident_id_is_refused(lake):
+    with pytest.raises(ValueError, match="incident ID"):
+        close_incident(lake, "lake", "../status", "c", "f", CLOSED)
+
+
+def test_a_record_changed_while_it_was_being_closed_is_not_overwritten(lake):
+    lake.change_before_put = True
+
+    with pytest.raises(RuntimeError, match="changed while"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", CLOSED)
+
+
+def test_a_record_cannot_close_before_it_opened(lake):
+    with pytest.raises(ValueError, match="before it opened"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", OPENED.replace(hour=9))
+
+
+def test_the_command_line_closes_a_record(lake, capsys):
+    main(
+        [
+            "close",
+            "--bucket",
+            "lake",
+            "--id",
+            "INC-2026-10-10-01",
+            "--cause",
+            "Two runs at once.",
+            "--fix",
+            "PR 14.",
+        ],
+        client=lake,
+    )
+
+    assert _row(lake, KEY)["status"] == "closed"
+    assert "Closed INC-2026-10-10-01" in capsys.readouterr().out

@@ -95,6 +95,26 @@ class FakeSns:
         self.published.append(kwargs)
 
 
+class FakeLake:
+    """Just enough S3 for filing an incident: listing, and put_object with If-None-Match."""
+
+    def __init__(self, broken: bool = False):
+        self.objects = {}
+        self.broken = broken
+
+    def get_paginator(self, name):
+        return self
+
+    def paginate(self, Bucket, Prefix):  # noqa: N803, boto3 parameter names
+        if self.broken:
+            raise ConnectionError("S3 cannot be reached")
+        found = [{"Key": key} for key in self.objects if key.startswith(Prefix)]
+        yield {"Contents": found} if found else {}
+
+    def put_object(self, Bucket, Key, Body, IfNoneMatch=None, ContentType=None):  # noqa: N803
+        self.objects[(Bucket, Key)] = Body
+
+
 @pytest.fixture
 def failure_context():
     return {
@@ -105,34 +125,50 @@ def failure_context():
 
 
 @pytest.fixture
-def fake_sns(monkeypatch, tmp_path):
-    """Point the callback at a temporary folder, a fake topic and a fake SNS client."""
+def fakes(monkeypatch, tmp_path):
+    """Point the callback at a temporary folder, a fake topic, and fake SNS and S3 clients."""
     module = importlib.import_module("platform_skeleton_dag")
-    sns = FakeSns()
+    clients = {"sns": FakeSns(), "s3": FakeLake()}
     monkeypatch.setenv("PLATFORM_INCIDENTS_DIR", str(tmp_path))
     monkeypatch.setenv("PLATFORM_ENV", "dev")
+    monkeypatch.setenv("PLATFORM_LAKE_BUCKET", "lake-bucket")
     monkeypatch.setenv(
         "PLATFORM_ALERT_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts"
     )
-    monkeypatch.setattr(module, "aws_client", lambda service: sns)
-    return sns
+    monkeypatch.setattr(module, "aws_client", lambda service: clients[service])
+    return clients
 
 
-def test_the_failure_callback_writes_an_incident_file(fake_sns, failure_context, tmp_path):
+def test_the_failure_callback_files_the_incident_in_the_lake(fakes, failure_context):
+    from datetime import UTC, datetime
+
     module = importlib.import_module("platform_skeleton_dag")
 
     module.record_failure_callback(failure_context)
 
-    assert len(list(tmp_path.glob("INC-*.parquet"))) == 1
+    today = datetime.now(UTC)
+    assert list(fakes["s3"].objects) == [
+        ("lake-bucket", f"platform/incidents/INC-{today:%Y-%m-%d}-01.parquet")
+    ]
 
 
-def test_the_failure_callback_sends_one_email(fake_sns, failure_context):
+def test_the_failure_callback_sends_one_email(fakes, failure_context):
     module = importlib.import_module("platform_skeleton_dag")
 
     module.record_failure_callback(failure_context)
 
-    assert len(fake_sns.published) == 1
-    assert "publish_sample" in fake_sns.published[0]["Subject"]
+    assert len(fakes["sns"].published) == 1
+    assert "publish_sample" in fakes["sns"].published[0]["Subject"]
+
+
+def test_the_email_is_still_sent_when_the_incident_cannot_be_filed(fakes, failure_context):
+    module = importlib.import_module("platform_skeleton_dag")
+    fakes["s3"].broken = True
+
+    with pytest.raises(ConnectionError):
+        module.record_failure_callback(failure_context)
+
+    assert len(fakes["sns"].published) == 1
 
 
 def test_every_task_runs_without_a_data_interval(skeleton_dag):

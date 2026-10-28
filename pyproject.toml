@@ -18,6 +18,9 @@ packages = []
 
 [project.optional-dependencies]
 spark = ["pyspark==3.5.9"]
+# For closing incident records from a laptop (pipelines/platform/publish/incidents.py).
+# Same pin as the box host (platform/box/requirements-host.txt).
+ops = ["boto3==1.43.97"]
 dev = [
     "httpx>=0.27,<1",
     "pytest>=8,<9",

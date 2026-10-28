@@ -7,18 +7,43 @@ fake S3 client, so no AWS call is made.
 """
 
 import pytest
-from uploads import OutputLocations, upload_outputs, upload_tree
+from uploads import OutputLocations, upload_new_files, upload_outputs, upload_tree
+
+
+class S3Error(Exception):
+    """Stands in for botocore's ClientError, which carries the S3 error code."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.response = {"Error": {"Code": code}}
 
 
 class FakeS3:
-    """Records every upload as (bucket, key, content type)."""
+    """Records every upload as (bucket, key, content type), and keeps what each key holds.
 
-    def __init__(self):
+    put_object honours ``IfNoneMatch="*"`` the way S3 does: it refuses a key that exists.
+    """
+
+    def __init__(self, objects: dict[tuple[str, str], bytes] | None = None, fail_with=None):
         self.uploads: list[tuple[str, str, str | None]] = []
+        self.objects = dict(objects or {})
+        self.conditions: list[str | None] = []
+        self.fail_with = fail_with
 
     def upload_file(self, Filename: str, Bucket: str, Key: str, ExtraArgs=None):  # noqa: N803
         content_type = (ExtraArgs or {}).get("ContentType")
         self.uploads.append((Bucket, Key, content_type))
+        with open(Filename, "rb") as file:
+            self.objects[(Bucket, Key)] = file.read()
+
+    def put_object(self, Bucket, Key, Body, IfNoneMatch=None, ContentType=None):  # noqa: N803
+        if self.fail_with:
+            raise S3Error(self.fail_with)
+        self.conditions.append(IfNoneMatch)
+        if IfNoneMatch == "*" and (Bucket, Key) in self.objects:
+            raise S3Error("PreconditionFailed")
+        self.uploads.append((Bucket, Key, ContentType))
+        self.objects[(Bucket, Key)] = Body
 
 
 def _write(path, text="x"):
@@ -113,3 +138,44 @@ def test_the_status_file_goes_up_last_so_the_page_never_points_at_missing_data(t
     upload_outputs(s3, LOCATIONS, published, tmp_path / "m", tmp_path / "i")
 
     assert s3.uploads[-1][1] == "status.json"
+
+
+def test_a_new_file_goes_up_only_on_the_condition_that_the_key_is_free(tmp_path):
+    _write(tmp_path / "INC-2026-10-10-01.parquet", "open")
+    s3 = FakeS3()
+
+    keys = upload_new_files(s3, "lake", "platform/incidents/", tmp_path)
+
+    assert keys == ["platform/incidents/INC-2026-10-10-01.parquet"]
+    assert s3.conditions == ["*"]
+    assert s3.objects[("lake", keys[0])] == b"open"
+
+
+def test_a_file_already_in_s3_is_never_replaced_by_the_copy_on_the_box(tmp_path):
+    """A record closed in S3 must not go back to open when the box uploads its old copy."""
+    key = "platform/incidents/INC-2026-10-10-01.parquet"
+    _write(tmp_path / "INC-2026-10-10-01.parquet", "open")
+    s3 = FakeS3({("lake", key): b"closed"})
+
+    keys = upload_new_files(s3, "lake", "platform/incidents/", tmp_path)
+
+    assert keys == []
+    assert s3.objects[("lake", key)] == b"closed"
+
+
+def test_any_other_s3_error_still_stops_the_upload(tmp_path):
+    _write(tmp_path / "INC-2026-10-10-01.parquet")
+
+    with pytest.raises(S3Error, match="AccessDenied"):
+        upload_new_files(FakeS3(fail_with="AccessDenied"), "lake", "p/", tmp_path)
+
+
+def test_the_nightly_upload_never_replaces_an_incident_record_in_s3(tmp_path):
+    key = "platform/incidents/INC-2026-10-10-01.parquet"
+    incidents = tmp_path / "inc"
+    _write(incidents / "INC-2026-10-10-01.parquet", "open")
+    s3 = FakeS3({("lake-bucket", key): b"closed"})
+
+    upload_outputs(s3, LOCATIONS, tmp_path / "pub", tmp_path / "met", incidents)
+
+    assert s3.objects[("lake-bucket", key)] == b"closed"

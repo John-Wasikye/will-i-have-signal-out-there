@@ -34,10 +34,9 @@ from pathlib import Path
 
 import airflow_db_backup
 import alerts
-from incidents import build_incident, write_incident
+from incidents import build_incident, file_incident
 from nightly_limit import reached_maximum
 from timeutil import format_utc, require_utc
-from uploads import upload_tree
 
 logger = logging.getLogger(__name__)
 
@@ -232,10 +231,11 @@ def carry_out_stop(
 ) -> list[str]:
     """Run the stop steps in order and return the errors from the steps that failed.
 
-    The database is saved first, because it is the step with a deadline. An incident is
-    recorded and an email sent for the maximum and for a spot warning: the run did not
-    finish, so nothing else reports it. A start nobody planned gets the email only, because no
-    run was stopped. Each step runs even if the one before it failed.
+    The database is saved first, because it is the step with a deadline. The maximum records
+    an incident and sends an email: the run did not finish, so nothing else reports it. A spot
+    warning and a start nobody planned send the email only: AWS taking the box back is a note,
+    not an incident (runbook PRB-3), and an unplanned start stopped no run. Each step runs even
+    if the one before it failed.
     Powering off is last and always runs, so a failed save can never leave a billing server on.
     If powering off itself fails, the error is raised, because nothing else can be done about it.
     """
@@ -246,9 +246,9 @@ def carry_out_stop(
         errors.append(f"save_database failed: {error}")
 
     steps = []
-    if decision.action in (Action.STOP_MAXIMUM, Action.STOP_SPOT_WARNING):
+    if decision.action is Action.STOP_MAXIMUM:
         steps = [("record_incident", record_incident), ("send_alert", send_alert)]
-    elif decision.action is Action.STOP_UNPLANNED:
+    elif decision.action in (Action.STOP_SPOT_WARNING, Action.STOP_UNPLANNED):
         steps = [("send_alert", send_alert)]
     for name, step in steps:
         try:
@@ -327,23 +327,34 @@ def list_runs_command(namespace: str, dag_id: str) -> list[str]:
 
 
 def stop_incident(decision: Decision, number: int, opened_utc: datetime, pipeline: str) -> dict:
-    """Build the incident for a stop that was not a normal finish."""
-    if decision.action not in (Action.STOP_MAXIMUM, Action.STOP_SPOT_WARNING):
+    """Build the incident for a nightly run stopped at its 2-hour maximum."""
+    if decision.action is not Action.STOP_MAXIMUM:
         raise ValueError(f"no incident is recorded for {decision.action.name}")
     return build_incident(
         number=number,
         opened_utc=opened_utc,
         pipeline=pipeline,
         what_broke=decision.reason,
-        reached_maximum_runtime=decision.action is Action.STOP_MAXIMUM,
+        reached_maximum_runtime=True,
     )
 
 
-def next_incident_number(client, bucket: str, now_utc: datetime) -> int:  # noqa: ANN001
-    """Return the next unused incident number for the UTC date, from the incidents in S3."""
-    day = require_utc(now_utc, "now_utc")
-    prefix = f"platform/incidents/INC-{day:%Y-%m-%d}-"
-    return len(airflow_db_backup.list_keys(client, bucket, prefix)) + 1
+def file_stop_incident(
+    client,  # noqa: ANN001
+    bucket: str,
+    decision: Decision,
+    opened_utc: datetime,
+    pipeline: str,
+    directory: Path,
+) -> str:
+    """File the incident for a stop in S3, under the day's next free number. Return its key."""
+    return file_incident(
+        client,
+        bucket,
+        lambda number: stop_incident(decision, number, opened_utc, pipeline),
+        opened_utc,
+        directory,
+    )
 
 
 def http_request(method: str, url: str, headers: dict[str, str]) -> tuple[int, str]:
@@ -404,12 +415,8 @@ def main(argv: list[str] | None = None) -> int:
         airflow_db_backup.main(["save", "--bucket", args.bucket])
 
     def record_incident(decision: Decision) -> None:
-        opened = now()
-        number = next_incident_number(client, args.bucket, opened)
-        incident = stop_incident(decision, number, opened, args.dag_id)
         with tempfile.TemporaryDirectory() as folder:
-            write_incident(incident, Path(folder))
-            upload_tree(client, args.bucket, "platform/incidents/", Path(folder))
+            file_stop_incident(client, args.bucket, decision, now(), args.dag_id, Path(folder))
 
     def send_alert(decision: Decision) -> None:
         if decision.action is Action.STOP_UNPLANNED:

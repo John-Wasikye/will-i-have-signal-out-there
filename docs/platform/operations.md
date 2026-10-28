@@ -37,6 +37,17 @@ Hitting the 2-hour maximum is recorded as an incident. The next run catches up.
 | Session limit (4 hours) | The box stops | Logged |
 | Spend | AWS Budget at $40, with an action that stops new launches (backup) | Budget email |
 
+### Incident records
+
+- **Where:** one Parquet file per incident in the lake bucket of each environment, under `platform/incidents/`, named by its ID (for example `INC-2026-10-27-01.parquet`). The records stay private, because the error text can name files and tables. The failure email is the notice; the file is the record.
+- **Closing one:** once the cause and the fix are known, run from the repository root, after `pip install ".[ops]"` and an AWS sign-in:
+
+  ```
+  python pipelines/platform/publish/incidents.py close --bucket <lake bucket> --id <incident ID> --cause "<why it broke>" --fix "<what fixed it>"
+  ```
+
+  It refuses a record that is already closed, an empty cause or fix, and a record that changed while it was being closed. The bucket keeps the open version in its history.
+
 ## 3. Cost
 
 Estimates are from public price pages as of Oct 8, 2026. They are checked before the first run and after any change of instance type. The project-level models in each project's operations document add their own costs.
@@ -75,9 +86,9 @@ Each runbook names the symptom, how it is found, the first action, and what to r
 
 ### PRB-3: A spot server is taken back mid-run
 
-- **Found by:** the interruption handler records the two-minute warning and the run stops.
+- **Found by:** the watchdog reads AWS's two-minute warning, saves the database, emails me, and powers the box off. The run stops.
 - **First action:** rerun on a new box. Every job overwrites its own partition, so a rerun replaces only that day.
-- **Record:** a note in the metrics table.
+- **Record:** a note, not an incident, because nothing broke. The note is the stop email ("AWS will stop the box at ...") and the watchdog's log on the box (`journalctl -u box-watchdog -b -1` after the next boot). The same applies to a spot warning during a work session.
 
 ### PRB-4: Airflow's saved database cannot be restored
 
