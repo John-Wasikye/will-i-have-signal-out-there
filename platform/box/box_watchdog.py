@@ -231,10 +231,11 @@ def carry_out_stop(
 ) -> list[str]:
     """Run the stop steps in order and return the errors from the steps that failed.
 
-    The database is saved first, because it is the step with a deadline. An incident is
-    recorded and an email sent for the maximum and for a spot warning: the run did not
-    finish, so nothing else reports it. A start nobody planned gets the email only, because no
-    run was stopped. Each step runs even if the one before it failed.
+    The database is saved first, because it is the step with a deadline. The maximum records
+    an incident and sends an email: the run did not finish, so nothing else reports it. A spot
+    warning and a start nobody planned send the email only: AWS taking the box back is a note,
+    not an incident (runbook PRB-3), and an unplanned start stopped no run. Each step runs even
+    if the one before it failed.
     Powering off is last and always runs, so a failed save can never leave a billing server on.
     If powering off itself fails, the error is raised, because nothing else can be done about it.
     """
@@ -245,9 +246,9 @@ def carry_out_stop(
         errors.append(f"save_database failed: {error}")
 
     steps = []
-    if decision.action in (Action.STOP_MAXIMUM, Action.STOP_SPOT_WARNING):
+    if decision.action is Action.STOP_MAXIMUM:
         steps = [("record_incident", record_incident), ("send_alert", send_alert)]
-    elif decision.action is Action.STOP_UNPLANNED:
+    elif decision.action in (Action.STOP_SPOT_WARNING, Action.STOP_UNPLANNED):
         steps = [("send_alert", send_alert)]
     for name, step in steps:
         try:
@@ -326,15 +327,15 @@ def list_runs_command(namespace: str, dag_id: str) -> list[str]:
 
 
 def stop_incident(decision: Decision, number: int, opened_utc: datetime, pipeline: str) -> dict:
-    """Build the incident for a stop that was not a normal finish."""
-    if decision.action not in (Action.STOP_MAXIMUM, Action.STOP_SPOT_WARNING):
+    """Build the incident for a nightly run stopped at its 2-hour maximum."""
+    if decision.action is not Action.STOP_MAXIMUM:
         raise ValueError(f"no incident is recorded for {decision.action.name}")
     return build_incident(
         number=number,
         opened_utc=opened_utc,
         pipeline=pipeline,
         what_broke=decision.reason,
-        reached_maximum_runtime=decision.action is Action.STOP_MAXIMUM,
+        reached_maximum_runtime=True,
     )
 
 

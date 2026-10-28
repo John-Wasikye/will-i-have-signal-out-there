@@ -32,7 +32,7 @@ The watchdog checks every 30 seconds and stops the box for the first of these re
 
 1. **AWS is taking the box back.** AWS puts a notice in the instance metadata two minutes ahead. This applies to every boot.
 2. **The nightly run finished,** whether it succeeded or failed.
-3. **The box has been up for 2 hours.** It records an incident for this, and for a spot warning, and emails me through the run alerts topic, because a run stopped this way never reports anything itself.
+3. **The box has been up for 2 hours.** It records an incident for this and emails me through the run alerts topic, because a run stopped this way never reports anything itself. A spot warning sends the email only: AWS taking the box back is a note, not an incident (runbook PRB-3).
 
 To stop, it saves the database to S3 first, because that is the step with a deadline. It then records the incident and sends the email if there is one, and powers the box off last. Powering off always runs, even if a save fails, so a broken step cannot leave a server billing.
 
