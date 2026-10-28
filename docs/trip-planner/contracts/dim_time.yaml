@@ -1,10 +1,10 @@
-# Data contract (ODCS). Draft. Published gold table (Parquet). The grain is not decided (OQ-33).
+# Data contract (ODCS). Approved by John (Oct 28, 2026). Published gold table (Parquet). The grain is not decided (OQ-33).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-published-dim-time
 name: dim_time
 version: 0.1.0
-status: draft
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

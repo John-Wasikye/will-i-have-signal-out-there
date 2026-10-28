@@ -1,4 +1,4 @@
-# Data contract (ODCS). Draft. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). Approved by John (Oct 28, 2026). ODCS version is a working placeholder (design-doc OQ-32).
 # Upstream CelesTrak GP JSON field names are TO BE CONFIRMED (OQ-6, OQ-20) against a real file.
 # The snake_case names below are the NORMALIZED lake column names. Mapping note: each lake column is filled from the
 # upstream field named in its description (upstream name to be confirmed); the loader owns the rename.
@@ -7,7 +7,7 @@ kind: DataContract
 id: p1-source-celestrak-gp
 name: celestrak_gp
 version: 0.1.0
-status: draft
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

@@ -6,9 +6,9 @@ This folder is the documentation for Project 1. It is written so that someone wh
 
 | Field | Value |
 |---|---|
-| Status | Documents complete for review. Draft pending John's approval. **No code exists yet** |
+| Status | Approved by John (Oct 28, 2026). **No code exists yet** |
 | Owner | John |
-| Last updated | Oct 9, 2026 |
+| Last updated | Oct 28, 2026 |
 | Live link | None yet. Phase A (live) has not started |
 
 ---

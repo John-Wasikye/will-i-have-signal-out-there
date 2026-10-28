@@ -1,11 +1,11 @@
-# Data contract (ODCS). Draft, Phase B. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). Approved by John (Oct 28, 2026), Phase B. ODCS version is a working placeholder (design-doc OQ-32).
 # Field names and source location are to be confirmed in the first-run check (OQ-20).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-opencellid-towers
 name: opencellid_towers
 version: 0.1.0
-status: draft
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

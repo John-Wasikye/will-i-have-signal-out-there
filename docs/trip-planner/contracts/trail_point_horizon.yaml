@@ -1,11 +1,11 @@
-# Data contract (ODCS). Draft. Internal Iceberg table, written by Spark (C4). Not a source or a published table;
+# Data contract (ODCS). Approved by John (Oct 28, 2026). Internal Iceberg table, written by Spark (C4). Not a source or a published table;
 # included because the horizon is one of the four trickiest parts of the design.
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-trail-point-horizon
 name: trail_point_horizon
 version: 0.1.0
-status: draft
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

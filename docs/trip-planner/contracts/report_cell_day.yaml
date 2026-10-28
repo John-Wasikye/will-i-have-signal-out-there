@@ -1,10 +1,10 @@
-# Data contract (ODCS v3.0.2). Draft, Phase B. Lake table that replaces raw report rows after 30 days (ADR 0034).
+# Data contract (ODCS v3.0.2). Approved by John (Oct 28, 2026), Phase B. Lake table that replaces raw report rows after 30 days (ADR 0034).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-report-cell-day
 name: report_cell_day
 version: 0.1.0
-status: draft
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
