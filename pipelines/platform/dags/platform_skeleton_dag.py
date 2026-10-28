@@ -2,7 +2,8 @@
 
 The sample is written to Iceberg first, then published. Once the outputs are in S3, the run
 is reported: an email for a late or failed pipeline, or a CloudWatch data point for a good
-one. Iceberg maintenance runs last. A task that fails records an incident and sends an email.
+one. Iceberg maintenance runs last. A task that fails tries twice more, then records an
+incident and sends an email.
 
 Order follows docs/platform/design-doc.md section 7.4. The DAG only wires tasks together.
 The logic lives in modules that have their own tests:
@@ -17,7 +18,7 @@ The logic lives in modules that have their own tests:
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import alerts
@@ -76,7 +77,14 @@ def record_failure_callback(context: dict) -> None:
     max_active_runs=1,
     is_paused_upon_creation=False,
     tags=["platform"],
-    default_args={"on_failure_callback": record_failure_callback},
+    # Two tries more for a brief failure, such as a task that starts before the API server is
+    # up at boot. Every task overwrites its own output, so a retry is safe. The incident and the
+    # email come only after the last try fails.
+    default_args={
+        "on_failure_callback": record_failure_callback,
+        "retries": 2,
+        "retry_delay": timedelta(minutes=2),
+    },
 )
 def platform_skeleton_nightly():
     """Nightly run of the skeleton. The schedule is 10:00 UTC (design doc section 2)."""
