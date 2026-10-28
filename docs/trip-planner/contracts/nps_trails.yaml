@@ -3,13 +3,13 @@ apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-nps-trails
 name: nps_trails
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: National Park Service Public Trails ArcGIS service for Grand Canyon, giving trail polylines used to sample points every 50 meters. Phase A uses Bright Angel, South Kaibab and North Kaibab (ADR 0020).
-  limitations: GeoJSON output is supported, 2,000 records per request, so the pull pages. Other fields beyond TRLNAME and UNITCODE are not recorded (OQ-20). Public data from data.gov; credit on the page (OQ-22).
+  limitations: GeoJSON output, 2,000 records per request, so the pull pages in OBJECTID order. The service has 42 fields (OQ-20); the loader reads OBJECTID, TRLNAME, UNITCODE and the geometry. Grand Canyon is UNITCODE GRCA. Public data from data.gov; credit on the page (OQ-22).
   usage: Input to C3 (trail loader and sampler).
 team:
   - username: John
@@ -17,8 +17,8 @@ team:
 servers:
   - server: nps-public-trails
     type: api
-    description: NPS Public Trails ArcGIS service (polylines, GeoJSON, 2,000 records per request). Service URL to be fixed in the first-run check (OQ-8, OQ-20).
-    location: "Public NPS Public Trails ArcGIS service; query and UNITCODE fixed by OQ-20 and OQ-36. Raw pages: s3://{env}-signal-raw/nps/."
+    description: NPS Public Trails ArcGIS service (polylines, GeoJSON, 2,000 records per request), confirmed by the first-run check (OQ-8, OQ-20). Its HTML directory returns 403; the query API works.
+    location: "https://mapservices.nps.gov/arcgis/rest/services/NationalDatasets/NPS_Public_Trails/FeatureServer/0/query?where=UNITCODE='GRCA'&outFields=*&orderByFields=OBJECTID&f=geojson (paged with resultOffset). Raw pages: s3://portfolio-{env}-raw-{account}/signal/nps/trails/unitcode=GRCA/fetched_at={time}/."
 slaProperties:
   - property: frequency
     value: refresh cadence open
@@ -41,19 +41,34 @@ schema:
         required: true
         primaryKey: true
         primaryKeyPosition: 1
-        description: Source key for the line (the service's object identifier, name to be confirmed, OQ-20).
+        customProperties:
+          - property: upstreamField
+            value: OBJECTID
+          - property: upstreamType
+            value: integer
+        description: Source key for the line, the service's OBJECTID as text.
       - name: trlname
         logicalType: string
         required: false
-        description: Trail name (field TRLNAME).
+        customProperties:
+          - property: upstreamField
+            value: TRLNAME
+          - property: upstreamType
+            value: string
+        description: Trail name (field TRLNAME). Phase A trails are matched on the whole name (OQ-36).
       - name: unitcode
         logicalType: string
         required: true
-        description: Park code (field UNITCODE). The value for Grand Canyon is confirmed in the first-run check (OQ-20).
+        customProperties:
+          - property: upstreamField
+            value: UNITCODE
+          - property: upstreamType
+            value: string
+        description: Park code (field UNITCODE). Grand Canyon is GRCA (OQ-20).
       - name: geometry_geojson
-        logicalType: object
+        logicalType: string
         required: true
-        description: Polyline geometry as GeoJSON (WGS 84 longitude and latitude is the expected reference; confirm, OQ-20).
+        description: Polyline geometry as GeoJSON text, WGS 84 longitude and latitude (confirmed, OQ-20). Stored as text so the lake column has one simple type.
       - name: source_url
         logicalType: string
         required: true
