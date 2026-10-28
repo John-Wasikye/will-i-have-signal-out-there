@@ -59,6 +59,15 @@ def test_a_run_from_before_the_box_started_is_ignored():
     assert run_progress(runs, STARTED) is RunProgress.WAITING
 
 
+def test_tonights_run_counts_when_the_box_boots_after_its_scheduled_time():
+    # On 2026-10-28 the box booted at 10:02:59 after spot capacity retries, and the 10:00 run
+    # was ignored for 90 minutes.
+    late_boot = datetime(2026, 10, 10, 10, 2, 59, tzinfo=UTC)
+    runs = json.dumps([_run("failed", "2026-10-10T10:00:00+00:00")])
+
+    assert run_progress(runs, late_boot) is RunProgress.FAILED
+
+
 def test_a_queued_or_running_run_means_the_pipelines_are_still_working():
     for state in ("queued", "running"):
         runs = json.dumps([_run(state, "2026-10-10T10:00:00+00:00")])

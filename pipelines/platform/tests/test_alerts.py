@@ -219,11 +219,27 @@ def test_the_failure_callback_emails_about_the_task_in_the_airflow_context():
 
 
 def test_a_stopped_nightly_run_gets_an_alert_with_the_reason():
-    alert = stop_alert("The nightly run reached its 2 hour maximum.", "live")
+    alert = stop_alert("The nightly run reached its 2 hour maximum.", "live", incident_written=True)
 
     assert alert.subject.startswith("[live]")
     assert "stopped" in alert.subject
     assert "2 hour maximum" in alert.message
+
+
+def test_a_stop_at_the_maximum_says_an_incident_was_written():
+    alert = stop_alert("The nightly run reached its 2 hour maximum.", "live", incident_written=True)
+
+    assert "An incident record was written to the lake." in alert.message
+
+
+def test_a_spot_stop_says_it_is_a_note_not_an_incident():
+    # On 2026-10-28 the spot stop email said an incident was written, but none was (PRB-3).
+    alert = stop_alert(
+        "AWS will stop the box at 2026-10-28T11:34:49Z.", "live", incident_written=False
+    )
+
+    assert "incident record was written" not in alert.message
+    assert "a note, not an incident" in alert.message
 
 
 def test_an_unplanned_start_gets_its_own_alert_not_the_nightly_one():
