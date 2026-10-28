@@ -70,13 +70,22 @@ def diff_schema(expected: Mapping[str, str | None], observed: Mapping[str, str])
     changed = tuple(
         (name, expected_type, observed[name])
         for name, expected_type in expected.items()
-        if expected_type is not None and observed.get(name, "null") not in ("null", expected_type)
+        if expected_type is not None
+        and not _type_matches(expected_type, observed.get(name, "null"))
     )
     return SchemaDiff(
         added=tuple(sorted(set(observed) - set(expected))),
         removed=tuple(sorted(set(expected) - set(observed))),
         changed=tuple(sorted(changed)),
     )
+
+
+def _type_matches(expected_type: str, observed_type: str) -> bool:
+    # A field that is null throughout says nothing about its type. JSON writes 0.0 as 0, so a
+    # number field can arrive holding only whole numbers.
+    if observed_type in ("null", expected_type):
+        return True
+    return expected_type == "number" and observed_type == "integer"
 
 
 def assert_no_breaking_change(diff: SchemaDiff, source: str) -> None:

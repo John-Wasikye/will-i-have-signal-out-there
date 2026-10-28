@@ -111,6 +111,13 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 
 ## Phases
 
+### Oct 28, 2026: C1 orbit ingest (code)
+
+- `pipelines/signal/orbit_ingest.py`: `fetch_gp_json` pulls the confirmed CelesTrak URL, refuses a second pull within 2 hours without calling CelesTrak, and stops on any status other than 200 or an empty body; `store_raw` writes the file unchanged and a manifest (URL, fetch time, size, SHA-256) under `signal/celestrak/gp/fetched_at=<time>/` in the raw bucket, never replacing a file; `parse_gp_records` runs the contract diff (C8) before anything is loaded; `lake_rows` renames fields to the contract columns; `load_gp_partition` writes one Iceberg partition per run date. Checked on the real file from the first-run check: all 11,133 records pass.
+- Contract `celestrak_gp` 0.2.0: the confirmed upstream field names, their JSON types (`upstreamType`) and the confirmed URL and raw location.
+- C8: whole numbers in a number field are not a type change, because JSON writes 0.0 as 0.
+- Not yet in the nightly run: the `orbit_ingest` DAG, the raw bucket setting on the box, and the image copy of `pipelines/signal` come in a separate change.
+
 ### Oct 28, 2026: C8 contract diff
 
 - `pipelines/signal/contract_diff.py` reads the source fields a contract names in `upstreamField` (with the source type in `upstreamType` when given) and compares them with a source file's fields. A removed field or a changed type stops the run and names the field; a rename shows as removed plus added; an added field is listed only. Tests: `pipelines/signal/tests/test_contract_diff.py`.
@@ -119,7 +126,7 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 | Phase | Status | Released |
 |---|---|---|
 | Platform skeleton (before Project 1) | Built; first unattended live run on 2026-10-28 | Live |
-| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | In progress: C8 contract diff built | Not released |
+| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | In progress: C8 contract diff and C1 orbit ingest code built | Not released |
 | Phase B: depth (every carrier, warehouse, confidence model, assistant, reports) | Not started | Not released |
 | Phase C: scale (second round) | Not started. Acceptance checks not yet written | Not released |
 
