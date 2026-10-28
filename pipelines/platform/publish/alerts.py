@@ -73,18 +73,25 @@ def alert_failure(context: Mapping, client, topic_arn: str, env: str) -> None:  
     send_alert(client, topic_arn, alert)
 
 
-def stop_alert(reason: str, env: str) -> Alert:
+def stop_alert(reason: str, env: str, *, incident_written: bool) -> Alert:
     """Build the alert for a nightly run the box watchdog stopped before it finished.
 
     The box powers off, so no task fails and the run never reports. The watchdog sends this.
+    Only a stop at the 2-hour maximum writes an incident; a spot stop is a note (runbook PRB-3),
+    so the caller says which it was.
     """
     _require_environment(env)
+    record = (
+        "An incident record was written to the lake."
+        if incident_written
+        else "This is a note, not an incident, so nothing was filed in the lake."
+    )
     return Alert(
         subject=f"[{env}] The nightly run was stopped before it finished",
         message=(
             f"The box watchdog stopped the nightly run in the {env} environment.\n\n"
             f"Reason: {reason}\n\n"
-            "An incident record was written to the lake. The next nightly run catches up."
+            f"{record} The next nightly run catches up."
         ),
     )
 

@@ -427,7 +427,11 @@ def main(argv: list[str] | None = None) -> int:
         if decision.action is Action.STOP_UNPLANNED:
             alert = alerts.unplanned_start_alert(decision.reason, args.env)
         else:
-            alert = alerts.stop_alert(decision.reason, args.env)
+            alert = alerts.stop_alert(
+                decision.reason,
+                args.env,
+                incident_written=decision.action is Action.STOP_MAXIMUM,
+            )
         alerts.send_alert(sns, args.alert_topic_arn, alert)
 
     def power_off() -> None:
