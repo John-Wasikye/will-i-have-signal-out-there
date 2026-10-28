@@ -5,7 +5,10 @@ which pipeline. The cause and the fix are filled in later, by hand. The incident
 stay in the private lake, and the public status page links only to the GitHub issue.
 
 The copy in S3 is the record. A new incident is filed there as soon as it opens, and its
-number is the next one free that day in S3, so a replaced box never reuses a number.
+number is the next one free that day in S3, so a replaced box never reuses a number. It is
+closed there too, with this file's command line:
+
+    python incidents.py close --bucket <lake bucket> --id <ID> --cause "..." --fix "..."
 
 The error text of a failed task goes into the record, cut to a short length. It can name
 files or tables, so these records are never published.
@@ -13,6 +16,8 @@ files or tables, so these records are never published.
 
 from __future__ import annotations
 
+import argparse
+import io
 import os
 import re
 from collections.abc import Callable, Iterable
@@ -22,9 +27,10 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 from timeutil import format_utc, require_utc
-from uploads import INCIDENTS_PREFIX, put_if_new
+from uploads import INCIDENTS_PREFIX, put_if_new, s3_error_code
 
 MAX_DESCRIPTION_LENGTH = 300
+_INCIDENT_ID = re.compile(r"^INC-\d{4}-\d{2}-\d{2}-\d{2,}$")
 
 _SCHEMA = pa.schema(
     [
@@ -166,3 +172,83 @@ def record_failure(
         now,
         directory,
     )
+
+
+def close_incident(
+    client,  # noqa: ANN001
+    bucket: str,
+    incident_id: str,
+    cause: str,
+    fix: str,
+    closed_utc: datetime,
+) -> dict:
+    """Close one incident in S3: write its cause and fix, and mark it closed. Return the row.
+
+    The record is replaced only if nobody changed it since it was read (S3's If-Match), so two
+    people closing it at once cannot overwrite each other. The lake bucket keeps versions, so
+    the open record stays in the history. ``client`` is a boto3 S3 client.
+    """
+    if not _INCIDENT_ID.match(incident_id):
+        raise ValueError(f"{incident_id!r} is not an incident ID such as INC-2026-10-27-01")
+    if not cause.strip() or not fix.strip():
+        raise ValueError("closing an incident needs both the cause and the fix")
+    closed = require_utc(closed_utc, "closed_utc")
+    key = f"{INCIDENTS_PREFIX}{incident_id}.parquet"
+
+    try:
+        response = client.get_object(Bucket=bucket, Key=key)
+    except Exception as error:
+        if s3_error_code(error) == "NoSuchKey":
+            raise LookupError(f"there is no incident {incident_id} in {bucket}") from None
+        raise
+    row = pq.read_table(io.BytesIO(response["Body"].read())).to_pylist()[0]
+    if row["status"] != "open":
+        raise ValueError(f"{incident_id} is already {row['status']}")
+    if closed < row["opened_at_utc"]:
+        raise ValueError(f"{incident_id} cannot close before it opened")
+
+    row.update(cause=cause.strip(), fix=fix.strip(), closed_at_utc=closed, status="closed")
+    body = io.BytesIO()
+    pq.write_table(pa.Table.from_pylist([row], schema=_SCHEMA), body, compression="zstd")
+    try:
+        client.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=body.getvalue(),
+            IfMatch=response["ETag"],
+            ContentType="application/vnd.apache.parquet",
+        )
+    except Exception as error:
+        if s3_error_code(error) == "PreconditionFailed":
+            raise RuntimeError(
+                f"{incident_id} changed while it was being closed; read it and try again"
+            ) from None
+        raise
+    return row
+
+
+def main(argv: list[str] | None = None, client=None) -> None:  # noqa: ANN001
+    """Close an incident from the command line. ``client`` replaces boto3 in tests."""
+    parser = argparse.ArgumentParser(description="Close an incident record in the lake.")
+    commands = parser.add_subparsers(dest="command", required=True)
+    close = commands.add_parser("close", help="write the cause and the fix, and mark it closed")
+    close.add_argument(
+        "--bucket", required=True, help="the lake bucket, for example portfolio-live-lake-..."
+    )
+    close.add_argument(
+        "--id", required=True, dest="incident_id", help="for example INC-2026-10-27-01"
+    )
+    close.add_argument("--cause", required=True, help="why it broke, in one or two sentences")
+    close.add_argument("--fix", required=True, help="what fixed it, for example the pull request")
+    args = parser.parse_args(argv)
+
+    if client is None:
+        import boto3  # On the box it is installed; on a laptop, pip install ".[ops]".
+
+        client = boto3.client("s3")
+    close_incident(client, args.bucket, args.incident_id, args.cause, args.fix, datetime.now(UTC))
+    print(f"Closed {args.incident_id} in {args.bucket}.")
+
+
+if __name__ == "__main__":
+    main()

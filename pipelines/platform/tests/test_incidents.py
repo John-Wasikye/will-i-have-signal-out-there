@@ -10,8 +10,10 @@ import pyarrow.parquet as pq
 import pytest
 from incidents import (
     build_incident,
+    close_incident,
     failure_incident,
     file_incident,
+    main,
     next_incident_number,
     record_failure,
     write_incident,
@@ -242,3 +244,111 @@ def test_when_s3_cannot_be_reached_the_record_stays_on_the_box_for_the_nightly_u
         record_failure(FAILURE, tmp_path, FakeLake(fail_with="RequestTimeout"), "lake", OPENED)
 
     assert [path.name for path in tmp_path.iterdir()] == ["INC-2026-10-10-01.parquet"]
+
+
+CLOSED = datetime(2026, 10, 28, 9, 0, tzinfo=UTC)
+KEY = "platform/incidents/INC-2026-10-10-01.parquet"
+
+
+class VersionedLake:
+    """One S3 bucket in memory with ETags: get_object, and put_object with If-Match."""
+
+    def __init__(self):
+        self.objects: dict[str, bytes] = {}
+        self.versions = 0
+        self.change_before_put = False
+
+    def add(self, incident: dict, tmp_path) -> None:
+        path = write_incident(incident, tmp_path)
+        self.objects["platform/incidents/" + path.name] = path.read_bytes()
+
+    def get_object(self, Bucket, Key):  # noqa: N803
+        import io
+
+        if Key not in self.objects:
+            raise S3Error("NoSuchKey")
+        return {"Body": io.BytesIO(self.objects[Key]), "ETag": self._etag(Key)}
+
+    def put_object(self, Bucket, Key, Body, IfMatch=None, ContentType=None):  # noqa: N803
+        if self.change_before_put:
+            self.objects[Key] += b" "
+        if IfMatch is not None and IfMatch != self._etag(Key):
+            raise S3Error("PreconditionFailed")
+        self.objects[Key] = Body
+
+    def _etag(self, key: str) -> str:
+        return f'"{hash(self.objects[key])}"'
+
+
+@pytest.fixture
+def lake(tmp_path):
+    lake = VersionedLake()
+    lake.add(build_incident(1, OPENED, "platform_skeleton_nightly", "Two runs raced."), tmp_path)
+    return lake
+
+
+def test_closing_fills_in_the_cause_and_the_fix_and_marks_the_record_closed(lake):
+    close_incident(lake, "lake", "INC-2026-10-10-01", "Two runs at once.", "PR 14.", CLOSED)
+
+    row = _row(lake, KEY)
+    assert row["status"] == "closed"
+    assert row["cause"] == "Two runs at once."
+    assert row["fix"] == "PR 14."
+    assert row["closed_at_utc"] == CLOSED
+    assert row["what_broke"] == "Two runs raced."
+    assert row["opened_at_utc"] == OPENED
+
+
+def test_a_closed_record_cannot_be_closed_again(lake):
+    close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", CLOSED)
+
+    with pytest.raises(ValueError, match="already closed"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", CLOSED)
+
+
+@pytest.mark.parametrize(("cause", "fix"), [("", "f"), ("c", "  ")])
+def test_closing_needs_both_a_cause_and_a_fix(lake, cause, fix):
+    with pytest.raises(ValueError, match="cause and the fix"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", cause, fix, CLOSED)
+
+
+def test_closing_a_record_that_does_not_exist_says_so(lake):
+    with pytest.raises(LookupError, match="INC-2026-10-10-09"):
+        close_incident(lake, "lake", "INC-2026-10-10-09", "c", "f", CLOSED)
+
+
+def test_an_id_that_is_not_an_incident_id_is_refused(lake):
+    with pytest.raises(ValueError, match="incident ID"):
+        close_incident(lake, "lake", "../status", "c", "f", CLOSED)
+
+
+def test_a_record_changed_while_it_was_being_closed_is_not_overwritten(lake):
+    lake.change_before_put = True
+
+    with pytest.raises(RuntimeError, match="changed while"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", CLOSED)
+
+
+def test_a_record_cannot_close_before_it_opened(lake):
+    with pytest.raises(ValueError, match="before it opened"):
+        close_incident(lake, "lake", "INC-2026-10-10-01", "c", "f", OPENED.replace(hour=9))
+
+
+def test_the_command_line_closes_a_record(lake, capsys):
+    main(
+        [
+            "close",
+            "--bucket",
+            "lake",
+            "--id",
+            "INC-2026-10-10-01",
+            "--cause",
+            "Two runs at once.",
+            "--fix",
+            "PR 14.",
+        ],
+        client=lake,
+    )
+
+    assert _row(lake, KEY)["status"] == "closed"
+    assert "Closed INC-2026-10-10-01" in capsys.readouterr().out
