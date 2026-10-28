@@ -1,12 +1,13 @@
 # Data contract (ODCS). Approved by John (Oct 28, 2026). ODCS version is a working placeholder (design-doc OQ-32).
-# Upstream CelesTrak GP JSON field names are TO BE CONFIRMED (OQ-6, OQ-20) against a real file.
-# The snake_case names below are the NORMALIZED lake column names. Mapping note: each lake column is filled from the
-# upstream field named in its description (upstream name to be confirmed); the loader owns the rename.
+# Upstream field names and types were confirmed against a real file on Oct 28, 2026 (OQ-6, OQ-20).
+# The snake_case names below are the lake column names. Each column read from the source names its
+# upstream field in upstreamField and the JSON type in upstreamType; the loader owns the rename, and
+# the contract diff (C8) checks the upstream fields before loading.
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-celestrak-gp
 name: celestrak_gp
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
@@ -20,8 +21,8 @@ team:
 servers:
   - server: celestrak-gp-json
     type: api
-    description: CelesTrak Starlink list, GP data as JSON. Exact URL and query to be fixed after the first-run check (OQ-20).
-    location: "Public CelesTrak endpoint; URL fixed by the first-run check (OQ-20). Raw copies: s3://{env}-signal-raw/celestrak/gp/. Lake table: {env}_signal.celestrak_gp (Glue catalog)."
+    description: CelesTrak Starlink list, GP data as JSON (confirmed by the first-run check, OQ-20).
+    location: "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=json. Raw copies: s3://portfolio-{env}-raw-{account}/signal/celestrak/gp/fetched_at={time}/ (the file and a manifest). Lake table: {env}_signal.celestrak_gp (Glue catalog)."
 slaProperties:
   - property: frequency
     value: 1
@@ -46,7 +47,9 @@ schema:
         required: true
         customProperties:
           - property: upstreamField
-            value: 'NORAD_CAT_ID (to be confirmed, OQ-6, OQ-20)'
+            value: NORAD_CAT_ID
+          - property: upstreamType
+            value: integer
         primaryKey: true
         primaryKeyPosition: 1
         description: Satellite catalog number.
@@ -55,7 +58,9 @@ schema:
         required: true
         customProperties:
           - property: upstreamField
-            value: 'EPOCH (to be confirmed, OQ-6, OQ-20)'
+            value: EPOCH
+          - property: upstreamType
+            value: string
         primaryKey: true
         primaryKeyPosition: 2
         description: Epoch of the element set, UTC.
@@ -64,52 +69,68 @@ schema:
         required: true
         customProperties:
           - property: upstreamField
-            value: 'OBJECT_NAME (to be confirmed, OQ-6, OQ-20)'
+            value: OBJECT_NAME
+          - property: upstreamType
+            value: string
         description: Satellite name; the [DTC] tag appears in this value for Direct-to-Cell satellites.
       - name: inclination_deg
         logicalType: number
         required: true
         customProperties:
           - property: upstreamField
-            value: 'INCLINATION (to be confirmed, OQ-6, OQ-20)'
+            value: INCLINATION
+          - property: upstreamType
+            value: number
         description: Orbit inclination in degrees. Direct-to-Cell cross-check expects 43 or 53.
       - name: mean_motion_rev_per_day
         logicalType: number
         required: true
         customProperties:
           - property: upstreamField
-            value: 'MEAN_MOTION (to be confirmed, OQ-6, OQ-20)'
+            value: MEAN_MOTION
+          - property: upstreamType
+            value: number
         description: Mean motion; with eccentricity gives altitude for the cross-check (about 330 to 370 km).
       - name: eccentricity
         logicalType: number
         required: true
         customProperties:
           - property: upstreamField
-            value: 'ECCENTRICITY (to be confirmed, OQ-6, OQ-20)'
+            value: ECCENTRICITY
+          - property: upstreamType
+            value: number
       - name: ra_of_asc_node_deg
         logicalType: number
         required: true
         customProperties:
           - property: upstreamField
-            value: 'RA_OF_ASC_NODE (to be confirmed, OQ-6, OQ-20)'
+            value: RA_OF_ASC_NODE
+          - property: upstreamType
+            value: number
       - name: arg_of_pericenter_deg
         logicalType: number
         required: true
         customProperties:
           - property: upstreamField
-            value: 'ARG_OF_PERICENTER (to be confirmed, OQ-6, OQ-20)'
+            value: ARG_OF_PERICENTER
+          - property: upstreamType
+            value: number
       - name: mean_anomaly_deg
         logicalType: number
         required: true
         customProperties:
           - property: upstreamField
-            value: 'MEAN_ANOMALY (to be confirmed, OQ-6, OQ-20)'
+            value: MEAN_ANOMALY
+          - property: upstreamType
+            value: number
       - name: bstar
         logicalType: number
         required: true
         customProperties:
           - property: upstreamField
-            value: 'BSTAR (to be confirmed, OQ-6, OQ-20)'
+            value: BSTAR
+          - property: upstreamType
+            value: number
         description: Drag term used by SGP4.
       - name: source_url
         logicalType: string

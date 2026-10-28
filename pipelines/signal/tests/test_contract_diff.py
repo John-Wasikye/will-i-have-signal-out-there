@@ -168,3 +168,18 @@ def test_observed_schema_reports_a_field_with_two_types_as_mixed():
 def test_observed_schema_refuses_no_records():
     with pytest.raises(ValueError, match="no records"):
         observed_schema_from_records([])
+
+
+def test_whole_numbers_in_a_number_field_are_not_a_type_change(contract_path, tmp_path):
+    # JSON writes 0.0 as 0, so a number field can arrive holding only whole numbers.
+    path = tmp_path / "number.yaml"
+    path.write_text(
+        "schema:\n  - name: t\n    properties:\n      - name: bstar\n        customProperties:\n"
+        "          - property: upstreamField\n            value: BSTAR\n"
+        "          - property: upstreamType\n            value: number\n",
+        encoding="utf-8",
+    )
+    assert diff_schema(load_contract(path), {"BSTAR": "integer"}).changed == ()
+    assert diff_schema(load_contract(path), {"BSTAR": "string"}).changed == (
+        ("BSTAR", "number", "string"),
+    )
