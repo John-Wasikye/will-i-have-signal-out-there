@@ -6,6 +6,7 @@
 - A command closes a record with its cause and fix (operations, section 2).
 - The nightly DAG allows one active run, and a fresh install starts it unpaused (pull request 14).
 - A spot warning no longer records an incident. It sends the stop email, and the email plus the watchdog's log are the note that runbook PRB-3 asks for. Only the 2-hour maximum records an incident.
+- The Airflow image installs Authlib 1.9.0 over the 1.8.0 that Airflow's constraint file pins. The image scan found CVE-2026-96760 (a signature check skipped in `deserialize_json`) and fails on any critical flaw that has a fix. The running boxes keep 1.8.0 until their next reinstall; their Airflow accepts no inbound traffic.
 
 ## Oct 22, 2026: Parameter Store check
 
