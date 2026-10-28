@@ -111,10 +111,15 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 
 ## Phases
 
+### Oct 28, 2026: C8 contract diff
+
+- `pipelines/signal/contract_diff.py` reads the source fields a contract names in `upstreamField` (with the source type in `upstreamType` when given) and compares them with a source file's fields. A removed field or a changed type stops the run and names the field; a rename shows as removed plus added; an added field is listed only. Tests: `pipelines/signal/tests/test_contract_diff.py`.
+- Not yet wired into a DAG or the metrics table: that comes with C1, the first source it checks.
+
 | Phase | Status | Released |
 |---|---|---|
-| Platform skeleton (before Project 1) | Not started | Not released |
-| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | Not started | Not released |
+| Platform skeleton (before Project 1) | Built; first unattended live run on 2026-10-28 | Live |
+| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | In progress: C8 contract diff built | Not released |
 | Phase B: depth (every carrier, warehouse, confidence model, assistant, reports) | Not started | Not released |
 | Phase C: scale (second round) | Not started. Acceptance checks not yet written | Not released |
 

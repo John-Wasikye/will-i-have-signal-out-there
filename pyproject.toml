@@ -33,6 +33,7 @@ dev = [
 testpaths = [
     "platform/serving/tests",
     "pipelines/platform/tests",
+    "pipelines/signal/tests",
     "platform/box/tests",
     ".github/tests",
     "checks/tests",
@@ -42,6 +43,7 @@ pythonpath = [
     "pipelines/platform/publish",
     "pipelines/platform/spark",
     "pipelines/platform/dags",
+    "pipelines/signal",
     "platform/box",
     "checks",
 ]
