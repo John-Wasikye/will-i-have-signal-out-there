@@ -111,6 +111,12 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 
 ## Phases
 
+### Oct 28, 2026: C2 Direct-to-Cell selector (code)
+
+- `pipelines/signal/dtc_selector.py`: `select_dtc_satellites` keeps every satellite whose name carries `[DTC]` and cross-checks each one. The exact rule (ADR 0002 left it to the code): perigee and apogee both between 330 and 370 km, from mean motion and eccentricity above the equatorial radius, and inclination within 0.5 degrees of 43 or 53. A disagreement is logged and listed; the satellite stays selected. No tagged satellite at all stops the run.
+- On the real file from the first-run check: 637 selected, 2 disagreements. STARLINK-11075 (58706) is low (perigee 294 km); STARLINK-11434 (62420) has an apogee of 379 km, so its orbit is not yet circular even though its mean altitude is in the band. The OQ-6 check used mean altitude, so it found only the first.
+- Not yet written to the lake: the `dtc_satellite` and `dtc_disagreement` tables come with the nightly DAG change.
+
 ### Oct 28, 2026: C1 orbit ingest (code)
 
 - `pipelines/signal/orbit_ingest.py`: `fetch_gp_json` pulls the confirmed CelesTrak URL, refuses a second pull within 2 hours without calling CelesTrak, and stops on any status other than 200 or an empty body; `store_raw` writes the file unchanged and a manifest (URL, fetch time, size, SHA-256) under `signal/celestrak/gp/fetched_at=<time>/` in the raw bucket, never replacing a file; `parse_gp_records` runs the contract diff (C8) before anything is loaded; `lake_rows` renames fields to the contract columns; `load_gp_partition` writes one Iceberg partition per run date. Checked on the real file from the first-run check: all 11,133 records pass.
@@ -126,7 +132,7 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 | Phase | Status | Released |
 |---|---|---|
 | Platform skeleton (before Project 1) | Built; first unattended live run on 2026-10-28 | Live |
-| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | In progress: C8 contract diff and C1 orbit ingest code built | Not released |
+| Phase A: live (Grand Canyon, T-Mobile, next 24 hours) | In progress: C8, C1 and C2 code built; not yet in the nightly run | Not released |
 | Phase B: depth (every carrier, warehouse, confidence model, assistant, reports) | Not started | Not released |
 | Phase C: scale (second round) | Not started. Acceptance checks not yet written | Not released |
 
