@@ -1,0 +1,60 @@
+# Dependabot opens a pull request when a pinned version has a newer release or a security fix.
+# Every pull request still goes through CI and my review, so nothing updates by itself.
+# Updates are grouped per folder and come weekly, so I review a few pull requests, not dozens.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /platform/serving
+    schedule:
+      interval: weekly
+    groups:
+      serving:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /platform/box
+    schedule:
+      interval: weekly
+    groups:
+      box:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: weekly
+    groups:
+      site:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /platform/box
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: terraform
+    directories:
+      - /platform/terraform/bootstrap
+      - /platform/terraform/envs/dev
+      - /platform/terraform/envs/live
+    schedule:
+      interval: weekly
+    groups:
+      terraform:
+        patterns: ["*"]

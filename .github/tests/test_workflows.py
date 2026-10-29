@@ -5,6 +5,7 @@ keep AWS safe: who can use which role, what waits for approval, and the order of
 actionlint, in CI, checks that the files are valid workflows.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -77,13 +78,15 @@ def test_no_workflow_runs_pull_requests_with_the_repository_secrets(path):
 @pytest.mark.parametrize(
     "path", [*_all_workflows(), *sorted(ACTIONS.glob("*/action.yml"))], ids=lambda p: p.name
 )
-def test_every_outside_action_is_pinned_to_a_version(path):
+def test_every_outside_action_is_pinned_to_a_full_commit_sha(path):
+    # A tag such as v7 can be moved to other code by whoever controls the action's repository.
+    # A full commit SHA cannot. The comment names the version so Dependabot and a reader can
+    # tell what the SHA is.
     text = path.read_text(encoding="utf-8")
     for line in text.splitlines():
         if "uses:" in line and "./" not in line:
             reference = line.split("uses:")[1].strip()
-            assert "@" in reference, line
-            assert reference.split("@")[1] not in {"main", "master", "latest"}, line
+            assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+", reference), line
 
 
 # --- Terraform: plan on pull requests, apply after approval ---------------------------------
