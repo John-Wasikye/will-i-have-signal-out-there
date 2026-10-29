@@ -42,6 +42,7 @@ REQUIRED_SETTINGS = {
     "IMAGE_TAG": "3.3.2",
     "BACKUP_BUCKET": "portfolio-dev-lake-123456789012",
     "SITE_BUCKET": "portfolio-dev-site-123456789012",
+    "RAW_BUCKET": "portfolio-dev-raw-123456789012",
     "ALERT_TOPIC_ARN": "arn:aws:sns:us-east-1:123456789012:portfolio-dev-run-alerts",
 }
 LIVE_TOPIC = "arn:aws:sns:us-east-1:123456789012:portfolio-live-run-alerts"
@@ -138,7 +139,12 @@ def test_dev_uses_only_the_base_settings_file():
 def test_live_adds_the_live_settings_file():
     output = _run(
         ["live"],
-        settings={**REQUIRED_SETTINGS, "BACKUP_BUCKET": "b", "ALERT_TOPIC_ARN": LIVE_TOPIC},
+        settings={
+            **REQUIRED_SETTINGS,
+            "BACKUP_BUCKET": "b",
+            "RAW_BUCKET": "portfolio-live-raw-123456789012",
+            "ALERT_TOPIC_ARN": LIVE_TOPIC,
+        },
     ).stdout
 
     assert "airflow-values.yaml" in output
@@ -192,6 +198,23 @@ def test_the_bucket_names_go_into_a_settings_object_that_holds_no_secret():
     assert "password" not in settings_line.lower()
 
 
+def test_the_raw_bucket_goes_into_the_settings_object():
+    output = _run(["dev"]).stdout
+
+    settings_line = next(line for line in output.splitlines() if "configmap" in line)
+    assert "PLATFORM_RAW_BUCKET=portfolio-dev-raw-123456789012" in settings_line
+
+
+def test_a_raw_bucket_from_the_other_environment_is_refused():
+    result = _run(
+        ["dev"], settings={**REQUIRED_SETTINGS, "RAW_BUCKET": "portfolio-live-raw-123456789012"}
+    )
+
+    assert result.returncode == 2
+    assert "RAW_BUCKET" in result.stderr
+    assert "STEP" not in result.stdout
+
+
 def test_airflow_is_told_its_environment_and_where_to_send_alerts():
     output = _run(["dev"]).stdout
 
@@ -240,6 +263,12 @@ def test_the_watchdog_service_knows_the_bucket_the_cluster_and_where_the_code_is
     assert "KUBECONFIG=/etc/rancher/k3s/k3s.yaml" in watchdog
     assert "pipelines/platform/publish" in watchdog
     assert "platform/box" in watchdog
+
+
+def test_the_watchdog_waits_for_every_nightly_dag():
+    watchdog = _section(_run(["dev"]).stdout, "start the watchdog")
+
+    assert "--dag-id platform_skeleton_nightly" in watchdog
 
 
 def test_the_watchdog_can_email_me_when_it_stops_a_run():

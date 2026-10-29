@@ -19,6 +19,13 @@ in_image python -c "import airflow, pyspark, pyarrow"
 echo "The nightly DAG loads"
 in_image python -c "import platform_skeleton_dag as m; assert m.platform_skeleton_nightly().dag_id == 'platform_skeleton_nightly'"
 
+echo "The signal pipeline modules import"
+in_image python -c "import contract_diff, dtc_selector, lake_write, orbit_ingest, raw_store, trail_loader"
+
+echo "The signal pipelines' contracts are in the image"
+# shellcheck disable=SC2016  # The variable is set in the image, so it expands there, not here.
+in_image bash -c 'for table in celestrak_gp nps_trails trail_point; do test -f "${SIGNAL_CONTRACTS_DIR}/${table}.yaml"; done'
+
 echo "The image does not run as root"
 test "$(in_image id -un)" = "airflow"
 

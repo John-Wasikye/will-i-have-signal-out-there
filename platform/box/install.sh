@@ -8,6 +8,7 @@
 #   IMAGE_TAG         the image version to run
 #   BACKUP_BUCKET     the lake bucket, which holds the Airflow database backups
 #   SITE_BUCKET       the site bucket, where the pipeline publishes its files
+#   RAW_BUCKET        the raw bucket, where the pipelines keep source files unchanged
 #   ALERT_TOPIC_ARN   the run alerts topic, from the alert_topic_arn Terraform output
 #
 # DRY_RUN=1 prints every step and command and runs none of them. The tests use it.
@@ -30,12 +31,14 @@ environment="${1:-}"
 [[ -n "${environment}" ]] || fail "usage: install.sh dev|live"
 [[ "${environment}" == "dev" || "${environment}" == "live" ]] \
   || fail "The environment must be dev or live, not '${environment}'."
-for setting in IMAGE_REPOSITORY IMAGE_TAG BACKUP_BUCKET SITE_BUCKET ALERT_TOPIC_ARN; do
+for setting in IMAGE_REPOSITORY IMAGE_TAG BACKUP_BUCKET SITE_BUCKET RAW_BUCKET ALERT_TOPIC_ARN; do
   [[ -n "${!setting:-}" ]] || fail "${setting} must be set."
 done
 # A dev box must never email through the live topic, or the reverse.
 [[ "${ALERT_TOPIC_ARN}" == *":portfolio-${environment}-run-alerts" ]] \
   || fail "ALERT_TOPIC_ARN must be the ${environment} run alerts topic."
+# Raw files are locked once written, so a dev box must never write to the live raw bucket.
+[[ "${RAW_BUCKET}" == "portfolio-${environment}-raw-"* ]]   || fail "RAW_BUCKET must be the ${environment} raw bucket."
 # boto3 does not read the region from the instance metadata, as the AWS CLI does, so the
 # watchdog and the Airflow pods are told it. The alert topic is in the box's region.
 [[ "${ALERT_TOPIC_ARN}" =~ ^arn:aws:sns:([a-z0-9-]+): ]] \
@@ -140,6 +143,7 @@ step "create the platform settings"
 settings_command="kubectl create configmap platform-settings --namespace ${NAMESPACE}"
 settings_command+=" --from-literal PLATFORM_SITE_BUCKET=${SITE_BUCKET}"
 settings_command+=" --from-literal PLATFORM_LAKE_BUCKET=${BACKUP_BUCKET}"
+settings_command+=" --from-literal PLATFORM_RAW_BUCKET=${RAW_BUCKET}"
 settings_command+=" --from-literal PLATFORM_WAREHOUSE=s3://${BACKUP_BUCKET}/warehouse"
 # The Glue database the catalog module makes for this environment.
 settings_command+=" --from-literal PLATFORM_ICEBERG_NAMESPACE=portfolio_${environment}"
@@ -182,6 +186,12 @@ step "start the watchdog"
 # The watchdog switches the box off when the nightly run finishes, at the 2-hour maximum, or
 # when AWS sends its two-minute spot warning. It restarts if it stops, because it is a cost guard.
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
+# Every DAG the nightly run waits for. The box stays on until each one has finished.
+nightly_dags=(platform_skeleton_nightly)
+dag_arguments=""
+for dag in "${nightly_dags[@]}"; do
+  dag_arguments+=" --dag-id ${dag}"
+done
 unit_path="/etc/systemd/system/box-watchdog.service"
 unit_text="[Unit]
 Description=Switch the session box off when its work is done
@@ -191,7 +201,7 @@ After=network-online.target
 Environment=KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 Environment=AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
 Environment=PYTHONPATH=${repo_dir}/pipelines/platform/publish:${script_dir}
-ExecStart=/usr/bin/python3.11 ${script_dir}/box_watchdog.py --bucket ${BACKUP_BUCKET} --env ${environment} --alert-topic-arn ${ALERT_TOPIC_ARN}
+ExecStart=/usr/bin/python3.11 ${script_dir}/box_watchdog.py --bucket ${BACKUP_BUCKET} --env ${environment} --alert-topic-arn ${ALERT_TOPIC_ARN}${dag_arguments}
 Restart=on-failure
 RestartSec=10
 
