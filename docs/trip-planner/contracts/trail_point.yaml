@@ -1,0 +1,82 @@
+# Data contract (ODCS). Approved by John (Oct 29, 2026). Internal Iceberg table, written by Spark (C3). Not a source or a published table;
+# included because C4 and C5 read it, and the loader takes its column types from here.
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-trail-point
+name: trail_point
+version: 0.1.0
+status: active
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: One row per sampled trail point, every 50 meters along each Phase A trail plus the trail's last point, with its trail identity and location.
+  limitations: Phase A covers Bright Angel, South Kaibab and North Kaibab in Grand Canyon (ADR 0020). Distances are measured along the line on a sphere; elevation is added later by C4, not here.
+  usage: Input to the terrain horizon engine (C4) and the satellite window engine (C5), and the base of dim_trail_point.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: iceberg-trail-point
+    type: s3
+    description: Iceberg table in the lake, written by Spark through the Glue catalog. Separate for dev and live.
+    location: "Lake table portfolio.portfolio_{env}.trail_point in s3://portfolio-{env}-lake-{account}/."
+slaProperties:
+  - property: frequency
+    value: reference data
+    description: Rewritten when the trail loader runs (cadence open, OQ-25). Partition overwrite by run date makes a rerun safe.
+customProperties:
+  - property: openQuestions
+    value: OQ-21, OQ-25, OQ-36
+  - property: adr
+    value: adrs/0004, adrs/0020
+schema:
+  - name: trail_point
+    physicalName: trail_point
+    physicalType: table
+    description: One row per trail point. Partition per run date.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: The trail ID and the point's sequence number, for example grca-bright-angel-00000. The same name as in dim_trail_point and the tables built from it.
+      - name: trail_id
+        logicalType: string
+        required: true
+        description: Readable, stable trail ID from the unit code and trail name, for example grca-bright-angel.
+      - name: trail_name
+        logicalType: string
+        required: false
+        description: Trail name from the source line (TRLNAME). Empty when the source line has no name.
+      - name: unit_code
+        logicalType: string
+        required: true
+        description: Park code from the source line (UNITCODE). Grand Canyon is GRCA.
+      - name: seq
+        logicalType: integer
+        required: true
+        description: Position along the trail, counting from 0 at the trail's first point.
+      - name: lon
+        logicalType: number
+        required: true
+        description: Longitude in degrees, WGS 84.
+      - name: lat
+        logicalType: number
+        required: true
+        description: Latitude in degrees, WGS 84.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        description: An empty load stops before it is written.

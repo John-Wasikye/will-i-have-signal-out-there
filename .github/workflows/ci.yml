@@ -45,8 +45,11 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: python -m pip install -e ".[dev,spark]"
-      - name: Run the Spark job and maintenance on real Spark
-        run: pytest pipelines/platform/tests/test_spark_integration.py -v
+      - name: Run the Spark job, maintenance and the lake writer on real Spark
+        run: >-
+          pytest -v
+          pipelines/platform/tests/test_spark_integration.py
+          pipelines/signal/tests/test_lake_write_spark.py
 
   airflow:
     name: Airflow DAG tests

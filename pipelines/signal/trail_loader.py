@@ -37,7 +37,7 @@ from contract_diff import (
     load_contract,
     observed_schema_from_records,
 )
-from lake_write import write_run_partition
+from lake_write import contract_columns, write_run_partition
 from raw_store import FetchRefused, RawFile, download, write_raw
 from timeutil import format_utc
 
@@ -70,7 +70,7 @@ class TrailLine:
 class TrailPoint:
     """One sampled point; ``seq`` counts from 0 at the trail's first point."""
 
-    point_id: str
+    trail_point_id: str
     trail_id: str
     trail_name: str
     unit_code: str
@@ -236,7 +236,7 @@ def trail_point_rows(lines: Iterable[TrailLine], spacing_m: float) -> list[Trail
         for seq, (lon, lat) in enumerate(sample_points_along_line(line.parts[0], spacing_m)):
             points.append(
                 TrailPoint(
-                    point_id=f"{trail_id}-{seq:05d}",
+                    trail_point_id=f"{trail_id}-{seq:05d}",
                     trail_id=trail_id,
                     trail_name=line.trlname,
                     unit_code=line.unitcode,
@@ -273,18 +273,29 @@ def load_trail_tables(
     point_rows: list[TrailPoint],
     run_date: date,
     *,
+    line_contract_path: Path,
+    point_contract_path: Path,
     namespace: str,
 ) -> dict[str, int]:
-    """Write ``nps_trail_line`` and ``trail_point`` for the run date; return each row count."""
+    """Write ``nps_trail_line`` and ``trail_point`` for the run date; return each row count.
+
+    Each table takes its column types from its contract (nps_trails.yaml and trail_point.yaml).
+    """
     return {
         "nps_trail_line": write_run_partition(
-            spark, "nps_trail_line", line_rows, run_date, namespace=namespace
+            spark,
+            "nps_trail_line",
+            line_rows,
+            run_date,
+            columns=contract_columns(line_contract_path, "nps_trail_line"),
+            namespace=namespace,
         ),
         "trail_point": write_run_partition(
             spark,
             "trail_point",
             [asdict(point) for point in point_rows],
             run_date,
+            columns=contract_columns(point_contract_path, "trail_point"),
             namespace=namespace,
         ),
     }

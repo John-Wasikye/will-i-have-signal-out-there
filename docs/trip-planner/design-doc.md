@@ -443,7 +443,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Inputs | NPS Public Trails ArcGIS service (polylines; GeoJSON output; 2,000 records per request; `TRLNAME`, `UNITCODE`). Park filter: Grand Canyon by `UNITCODE` (the code value is not recorded, OQ-20) |
 | Outputs | Raw GeoJSON pages with hash; Iceberg `nps_trail_line`; Iceberg `trail_point` (50 m spacing) |
 | Main functions and classes (proposed) | `fetch_trail_pages(service_url, unit_code)`: pages of up to 2,000 records; `parse_trail_geojson(payload)`; `sample_points_along_line(line, spacing_m)`; `build_trail_points(spark, trails_df, spacing_m)`; class `TrailPoint` |
-| Contract | contracts/nps_trails.yaml |
+| Contract | contracts/nps_trails.yaml (source); contracts/trail_point.yaml (output) |
 | ADRs | 0004 |
 
 #### C4 Terrain horizon engine (F-1A.2)
@@ -667,7 +667,7 @@ Convention proposed here: 36 horizon angles, one per 10-degree compass sector (3
 
 | Function or class | Purpose | Takes | Returns |
 |---|---|---|---|
-| `TrailPoint` (class) | One sampled point on a trail | `point_id`, `trail_id`, `seq`, `lon`, `lat`, `elevation_m` | Immutable record |
+| `TrailPoint` (class) | One sampled point on a trail | `trail_point_id`, `trail_id`, `seq`, `lon`, `lat`, `elevation_m` | Immutable record |
 | `ElevationTiles` (class) | The loaded set of GLO-30 tiles for the park plus margin, with fast lookup | Tile keys or a bounding box | Object with `elevation_at(lon, lat)` and `profile(lon, lat, azimuth_deg, max_range_m, step_m)` |
 | `HorizonProfile` (class) | The 36 angles for one point | `point_id`, `angles_deg` (36 values) | Immutable record |
 | `sample_points_along_line(line, spacing_m)` | Place a point every `spacing_m` (50) along a trail polyline | A line geometry, spacing in meters | Ordered list of `(lon, lat)` |
@@ -844,7 +844,7 @@ Every row carries event time and a source key (engineering standard 2). All time
 | `dtc_disagreement` | Iceberg | A | One row per disagreement per run | internal |
 | NPS raw GeoJSON pages | Raw | A | Per request page | contracts/nps_trails.yaml |
 | `nps_trail_line` | Iceberg | A | One row per trail line (`TRLNAME`, `UNITCODE`) | same |
-| `trail_point` | Iceberg | A | One row per sampled point (trail id plus sequence) | internal; published form is `dim_trail_point` |
+| `trail_point` | Iceberg | A | One row per sampled point (trail id plus sequence) | contracts/trail_point.yaml (internal); published form is `dim_trail_point` |
 | Copernicus GLO-30 tiles | Raw (manifest only: URL, size, hash, per standard 1 for public archives that never change) | A | Per tile | contracts/copernicus_glo30.yaml |
 | `trail_point_horizon` | Iceberg | A | One row per trail point, with 36 angles | contracts/trail_point_horizon.yaml |
 | FCC raw files | Raw | A | One file per provider, state, technology and release | contracts/fcc_mobile_coverage.yaml |

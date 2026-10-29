@@ -32,7 +32,7 @@ from contract_diff import (
     load_contract,
     observed_schema_from_records,
 )
-from lake_write import write_run_partition
+from lake_write import contract_columns, write_run_partition
 from raw_store import FetchRefused, RawFile, download, write_raw
 from timeutil import format_utc, require_utc
 
@@ -118,11 +118,16 @@ def load_gp_partition(
     rows: list[dict],
     run_date: date,
     *,
+    contract_path: Path,
     namespace: str,
 ) -> int:
     """Write the rows as the run date's partition of ``celestrak_gp`` and return the row count.
 
     The partition is the run's logical date, not the fetch time (engineering standard 3), so a
-    rerun of the same night replaces only that night's rows.
+    rerun of the same night replaces only that night's rows. The column types come from the
+    contract.
     """
-    return write_run_partition(spark, TABLE_NAME, rows, run_date, namespace=namespace)
+    columns = contract_columns(contract_path, TABLE_NAME)
+    return write_run_partition(
+        spark, TABLE_NAME, rows, run_date, columns=columns, namespace=namespace
+    )
