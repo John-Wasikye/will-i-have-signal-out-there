@@ -1,5 +1,5 @@
 variable "env" {
-  description = "Environment name. Must be dev or live. Live roles trust only the main branch. Dev roles trust any ref in the repository."
+  description = "Environment name. Must be dev or live. Each role trusts only jobs that the GitHub environment of the same name let run."
   type        = string
 
   validation {

@@ -51,7 +51,7 @@ run "dev_policy_references_only_dev_buckets" {
   }
 }
 
-run "dev_role_trusts_any_ref_in_the_repository" {
+run "dev_role_trusts_only_the_dev_environment" {
   command = plan
 
   override_data {
@@ -85,12 +85,12 @@ run "dev_role_trusts_any_ref_in_the_repository" {
   }
 
   assert {
-    condition     = strcontains(aws_iam_role.pipeline["platform_skeleton"].assume_role_policy, "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:*")
-    error_message = "Dev roles must trust any ref in the repository."
+    condition     = strcontains(aws_iam_role.pipeline["platform_skeleton"].assume_role_policy, "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:environment:dev\"")
+    error_message = "Dev roles must trust only jobs the dev GitHub environment let run."
   }
 }
 
-run "live_role_trusts_only_the_main_branch" {
+run "live_role_trusts_only_the_live_environment" {
   command = plan
 
   override_data {
@@ -123,8 +123,8 @@ run "live_role_trusts_only_the_main_branch" {
   }
 
   assert {
-    condition     = output.github_subject == "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:ref:refs/heads/main"
-    error_message = "Live roles must trust only the main branch."
+    condition     = output.github_subject == "repo:John-Wasikye@171445038/will-i-have-signal-out-there@1412828974:environment:live"
+    error_message = "Live roles must trust only jobs the live GitHub environment approved."
   }
 }
 

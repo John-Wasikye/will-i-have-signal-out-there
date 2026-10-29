@@ -29,9 +29,10 @@ locals {
   glue_database_arn = "arn:${local.partition}:glue:${local.region}:${local.account_id}:database/${var.glue_database_name}"
   glue_tables_arn   = "arn:${local.partition}:glue:${local.region}:${local.account_id}:table/${var.glue_database_name}/*"
 
-  # Live roles trust only the main branch. Dev roles trust any ref in the repository.
-  # Known gap for dev: any branch can request a dev role token. Dev roles cannot reach live data, so the risk is limited.
-  github_subject = var.env == "live" ? "repo:${var.github_repo}:ref:refs/heads/main" : "repo:${var.github_repo}:*"
+  # A job that names a GitHub environment gets ...:environment:<name> as its token subject, and
+  # only after that environment's rules (my approval, main branch only) have let it run. Trusting
+  # the main branch alone would let any workflow pushed to main use the role without asking me.
+  github_subject = "repo:${var.github_repo}:environment:${var.env}"
 }
 
 # GitHub OIDC provider. One per AWS account, so at most one configuration creates it. In
@@ -62,7 +63,7 @@ data "aws_iam_policy_document" "trust" {
     }
 
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "${local.github_host}:sub"
       values   = [local.github_subject]
     }
