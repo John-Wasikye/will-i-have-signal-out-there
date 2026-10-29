@@ -269,6 +269,7 @@ def test_the_watchdog_waits_for_every_nightly_dag():
     watchdog = _section(_run(["dev"]).stdout, "start the watchdog")
 
     assert "--dag-id platform_skeleton_nightly" in watchdog
+    assert "--dag-id signal_phase_a_nightly" in watchdog
 
 
 def test_the_watchdog_can_email_me_when_it_stops_a_run():

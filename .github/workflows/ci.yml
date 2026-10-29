@@ -67,7 +67,7 @@ jobs:
             "apache-airflow==${AIRFLOW_VERSION}" pyarrow pytest \
             --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
       - name: Run the DAG tests
-        run: pytest pipelines/platform/tests/test_dag.py -v
+        run: pytest pipelines/platform/tests/test_dag.py pipelines/signal/tests/test_signal_dag.py -v
 
   box-image:
     name: Airflow image

@@ -110,14 +110,24 @@ def write_run_partition(
     *,
     columns: Sequence[Column],
     namespace: str,
+    allow_empty: bool = False,
 ) -> int:
-    """Write the rows as ``run_date``'s partition of the table and return the row count."""
-    if not rows:
+    """Write the rows as ``run_date``'s partition of the table and return the row count.
+
+    Most tables must never be empty, so no rows stop the load. A table where empty is a real
+    answer, such as a night with no disagreements, passes ``allow_empty``: its partition is then
+    cleared, because overwriting partitions with no rows would keep an earlier run's rows.
+    """
+    full_name = f"{CATALOG_NAME}.{namespace}.{table_name}"
+    if not rows and not allow_empty:
         raise ValueError(f"{table_name}: no rows to load; an empty pull must stop before this step")
+    if not rows and spark.catalog.tableExists(full_name):
+        plain = date(run_date.year, run_date.month, run_date.day)
+        spark.sql(f"DELETE FROM {full_name} WHERE run_date = DATE '{plain.isoformat()}'")
+        return 0
     frame = spark.createDataFrame(
         conform_rows(rows, columns, run_date), schema=spark_schema(columns)
     )
-    full_name = f"{CATALOG_NAME}.{namespace}.{table_name}"
     if spark.catalog.tableExists(full_name):
         frame.writeTo(full_name).overwritePartitions()
     else:

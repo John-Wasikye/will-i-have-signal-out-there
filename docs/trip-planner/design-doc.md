@@ -420,7 +420,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Job | Pull CelesTrak GP data (orbital elements) as JSON, keep the raw file unchanged with its hash and load time, and pass the records to the selector (C2) |
 | Inputs | CelesTrak Starlink list (GP, JSON). Exact URL and field list: OQ-20 |
 | Outputs | Raw file in the raw bucket with URL, fetch time and hash; Iceberg table `celestrak_gp` (partition per pull); a metrics-table row (freshness, row count) |
-| Main functions and classes (proposed) | `fetch_gp_json(url, last_fetch_time)`: calls CelesTrak at most once per 2-hour update and stops on any response other than HTTP 200; `store_raw(payload, url, fetched_at)`: writes the file and manifest with hash; `load_gp_partition(spark, raw_path, logical_date)`: overwrites the partition; Airflow DAG `orbit_ingest` |
+| Main functions and classes (proposed) | `fetch_gp_json(url, last_fetch_time)`: calls CelesTrak at most once per 2-hour update and stops on any response other than HTTP 200; `store_raw(payload, url, fetched_at)`: writes the file and manifest with hash; `load_gp_partition(spark, raw_path, logical_date)`: overwrites the partition; Airflow DAG `signal_phase_a_nightly`, which runs C1, C8, C2 and C3 (named `orbit_ingest` in this proposal) |
 | Contract | contracts/celestrak_gp.yaml |
 | ADRs | 0002, 0018 |
 
@@ -432,7 +432,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Inputs | Records of `celestrak_gp` for the run |
 | Outputs | Selected satellites (Iceberg `dtc_satellite`), disagreement list (logged and listed in the table `dtc_disagreement`) |
 | Main functions and classes (proposed) | `select_dtc_satellites(gp_records)` returns selected and disagreements; `has_dtc_tag(name)`; `altitude_km_from_elements(record)` (derived from mean motion and eccentricity); `check_orbit(record)` returns the list of disagreements for one record; class `OrbitCheckResult` |
-| Contract | None. These are internal tables (neither a source nor a published table); their schema is defined in code and tests |
+| Contract | contracts/dtc_satellite.yaml and contracts/dtc_disagreement.yaml (internal tables, neither a source nor a published table) |
 | ADRs | 0002 |
 
 #### C3 Trail loader and sampler (F-1A.2)
@@ -840,8 +840,8 @@ Every row carries event time and a source key (engineering standard 2). All time
 |---|---|---|---|---|
 | CelesTrak raw JSON files | Raw | A | One file per pull; URL, fetch time, hash | contracts/celestrak_gp.yaml |
 | `celestrak_gp` | Iceberg | A | One row per satellite element set per pull; partition per pull | same |
-| `dtc_satellite` | Iceberg | A | One row per selected satellite per run | internal, no standalone contract |
-| `dtc_disagreement` | Iceberg | A | One row per disagreement per run | internal |
+| `dtc_satellite` | Iceberg | A | One row per selected satellite per run | contracts/dtc_satellite.yaml (internal) |
+| `dtc_disagreement` | Iceberg | A | One row per disagreement per run | contracts/dtc_disagreement.yaml (internal) |
 | NPS raw GeoJSON pages | Raw | A | Per request page | contracts/nps_trails.yaml |
 | `nps_trail_line` | Iceberg | A | One row per trail line (`TRLNAME`, `UNITCODE`) | same |
 | `trail_point` | Iceberg | A | One row per sampled point (trail id plus sequence) | contracts/trail_point.yaml (internal); published form is `dim_trail_point` |

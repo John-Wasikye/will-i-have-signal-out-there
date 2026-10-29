@@ -7,15 +7,20 @@ rule, as ADR 0002 asks. A disagreement is logged and listed, and the satellite s
 """
 
 import logging
+from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from dtc_selector import (
     OrbitCheckResult,
     altitude_km_from_elements,
     check_orbit,
+    disagreement_rows,
     has_dtc_tag,
+    satellite_rows,
     select_dtc_satellites,
 )
+from lake_write import contract_columns
 
 
 def _row(norad: int, name: str, mean_motion: float, inclination: float, ecc: float = 0.0001):
@@ -112,3 +117,45 @@ def test_select_stops_when_no_satellite_is_tagged():
     # CelesTrak dropping or renaming the tag must fail loudly, not publish an empty sky.
     with pytest.raises(ValueError, match=r"no satellite carries the \[DTC\] tag"):
         select_dtc_satellites([_row(2, "STARLINK-2", IN_BAND, 53.0)])
+
+
+CONTRACTS = Path(__file__).parents[3] / "docs" / "trip-planner" / "contracts"
+FETCHED_AT = datetime(2026, 10, 29, 10, 1, tzinfo=UTC)
+
+
+def _lake_row(norad: int, name: str, mean_motion: float, inclination: float) -> dict:
+    """A celestrak_gp row as the orbit loader writes it."""
+    return _row(norad, name, mean_motion, inclination) | {
+        "epoch_utc": datetime(2026, 10, 29, 6, 0, tzinfo=UTC),
+        "ra_of_asc_node_deg": 120.5,
+        "arg_of_pericenter_deg": 90.1,
+        "mean_anomaly_deg": 270.2,
+        "bstar": 0.00012,
+        "source_url": "https://celestrak.org/x",
+        "fetched_at_utc": FETCHED_AT,
+        "content_sha256": "a" * 64,
+    }
+
+
+def _names(contract: str) -> list[str]:
+    return [column.name for column in contract_columns(CONTRACTS / f"{contract}.yaml", contract)]
+
+
+def test_satellite_rows_have_exactly_the_contract_columns_with_the_altitude():
+    selected, _ = select_dtc_satellites([_lake_row(1, "STARLINK-1 [DTC]", IN_BAND, 53.0)])
+
+    rows = satellite_rows(selected)
+
+    assert list(rows[0]) == _names("dtc_satellite")
+    assert 330 < rows[0]["perigee_km"] < rows[0]["apogee_km"] < 370
+    assert rows[0]["content_sha256"] == "a" * 64
+
+
+def test_disagreement_rows_name_the_problems_and_carry_the_pull():
+    _, disagreements = select_dtc_satellites([_lake_row(2, "STARLINK-2 [DTC]", LOW, 70.0)])
+
+    rows = disagreement_rows(disagreements, {"fetched_at_utc": FETCHED_AT, "content_sha256": "b"})
+
+    assert list(rows[0]) == _names("dtc_disagreement")
+    assert rows[0]["problems"] == "altitude, inclination"
+    assert rows[0]["fetched_at_utc"] == FETCHED_AT

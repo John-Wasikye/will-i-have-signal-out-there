@@ -139,6 +139,9 @@ class FakeSpark:
 
         self.catalog = Catalog()
 
+    def sql(self, statement):
+        self.calls.append(f"sql:{statement}")
+
     def createDataFrame(self, rows, schema=None):  # noqa: N802, Spark method name
         self.rows = rows
         self.schema = schema
@@ -183,3 +186,24 @@ def test_a_rerun_overwrites_only_its_partition():
 def test_the_write_refuses_no_rows():
     with pytest.raises(ValueError, match="no rows"):
         write_run_partition(FakeSpark(False), "t", [], RUN_DATE, columns=COLUMNS, namespace="p")
+
+
+def test_an_empty_night_clears_its_partition_so_a_rerun_keeps_no_old_rows():
+    spark = FakeSpark(table_exists=True)
+
+    written = write_run_partition(
+        spark, "t", [], RUN_DATE, columns=COLUMNS, namespace="p", allow_empty=True
+    )
+
+    assert written == 0
+    assert spark.calls == ["sql:DELETE FROM portfolio.p.t WHERE run_date = DATE '2026-10-28'"]
+
+
+def test_an_empty_first_night_still_creates_the_table_with_its_types():
+    spark = FakeSpark(table_exists=False)
+
+    write_run_partition(spark, "t", [], RUN_DATE, columns=COLUMNS, namespace="p", allow_empty=True)
+
+    assert spark.rows == []
+    assert spark.schema == spark_schema(COLUMNS)
+    assert spark.calls == ["writeTo:portfolio.p.t", "partitionedBy:run_date", "create"]

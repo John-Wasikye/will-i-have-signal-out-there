@@ -1,0 +1,76 @@
+# Data contract (ODCS). Approved by John (Oct 29, 2026). Internal Iceberg table, written by Spark (C2). Not a source or a published table;
+# included because it lists what the cross-check found, and the loader takes its column types from here.
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-dtc-disagreement
+name: dtc_disagreement
+version: 0.1.0
+status: active
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Each selected satellite whose altitude or inclination disagrees with the Direct-to-Cell shells (perigee and apogee between 330 and 370 km; inclination within 0.5 degrees of 43 or 53).
+  limitations: A disagreement does not fail the run or drop the satellite (AC-1A.1). An empty partition means every selected satellite agreed that night.
+  usage: Read by people checking the selector, and by the status page once it lists disagreements.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: iceberg-dtc-disagreement
+    type: s3
+    description: Iceberg table in the lake, written by Spark through the Glue catalog. Separate for dev and live.
+    location: "Lake table portfolio.portfolio_{env}.dtc_disagreement in s3://portfolio-{env}-lake-{account}/."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Rewritten in each nightly run (10:00 UTC), including an empty night, so a rerun never keeps an old disagreement.
+customProperties:
+  - property: openQuestions
+    value: OQ-6, OQ-21
+  - property: adr
+    value: adrs/0002
+schema:
+  - name: dtc_disagreement
+    physicalName: dtc_disagreement
+    physicalType: table
+    description: One row per disagreeing satellite per run. Partition per run date.
+    properties:
+      - name: norad_cat_id
+        logicalType: integer
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: object_name
+        logicalType: string
+        required: true
+      - name: problems
+        logicalType: string
+        required: true
+        description: The checks it failed, comma separated, from altitude and inclination.
+      - name: perigee_km
+        logicalType: number
+        required: true
+      - name: apogee_km
+        logicalType: number
+        required: true
+      - name: inclination_deg
+        logicalType: number
+        required: true
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+      - name: content_sha256
+        logicalType: string
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - norad_cat_id

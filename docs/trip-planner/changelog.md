@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Oct 29, 2026: contracts for the Direct-to-Cell tables
+
+- New `contracts/dtc_satellite.yaml` and `contracts/dtc_disagreement.yaml`, approved by John: the internal Iceberg tables C2 writes. The design doc said their schema lived in code; every lake table now has a contract, as `trail_point` does. The design doc's C2 contract row and table list point to them.
+- The Phase A DAG is `signal_phase_a_nightly` (proposed as `orbit_ingest`), because it runs C1, C8, C2 and C3 together (OQ-21).
+
 ### Oct 29, 2026: trail_point contract
 
 - New `contracts/trail_point.yaml`, approved by John: the internal Iceberg table C3 writes and C4 and C5 read. Before this it was declared only in code. The design doc's table list, C3's contract row and the requirements trace now point to it.
@@ -115,6 +120,13 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 ---
 
 ## Phases
+
+### Oct 29, 2026: Phase A nightly DAG (code)
+
+- `pipelines/signal/dags/signal_phase_a_dag.py` (`signal_phase_a_nightly`, 10:00 UTC): pull CelesTrak, check the file against its contract (C8), load `celestrak_gp`, then select the Direct-to-Cell satellites into `dtc_satellite` and `dtc_disagreement`. The trail load runs beside them. Every task tries twice more, then records an incident and sends an email.
+- `pipelines/signal/signal_nightly.py` holds the steps. A CelesTrak pull from the last 2 hours is reused, so a retry never pulls twice. Every step reads the raw file the pull kept. Trails are kept and loaded only when the NPS pages differ from those the last load came from (ADR 0028). A night with no disagreement clears that night's partition of `dtc_disagreement`.
+- Airflow reads DAGs from all of `pipelines/`; `pipelines/.airflowignore` keeps it to each project's `dags/` folder. The watchdog waits for both nightly DAGs.
+- Not yet on the box: it takes effect after a reinstall.
 
 ### Oct 29, 2026: declared lake column types (code)
 
