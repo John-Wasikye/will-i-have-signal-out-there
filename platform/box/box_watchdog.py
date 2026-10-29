@@ -4,7 +4,8 @@ The box runs the nightly pipelines and then stops, so it only bills while it wor
 are three reasons to stop, and this is their order of priority:
 
 1. AWS is about to take the spot instance back. It sends a notice two minutes ahead.
-2. The nightly run has finished, whether it succeeded or failed.
+2. The nightly run has finished, whether it succeeded or failed. With several nightly DAGs, the
+   run has finished when every one of them has.
 3. The box has been up for the 2-hour nightly maximum.
 
 A box I start by hand is a work session, and I tag it with WorkSessionUntil first. Only a spot
@@ -103,6 +104,22 @@ def run_progress(runs_json: str, box_started_utc: datetime) -> RunProgress:
         return _RUN_STATES[newest["state"]]
     except KeyError:
         raise ValueError(f"unknown run state {newest['state']!r}") from None
+
+
+def combined_progress(progresses: list[RunProgress]) -> RunProgress:
+    """Return the night's progress from the progress of each nightly DAG.
+
+    The night is finished only when every DAG has finished, so a DAG that failed early never
+    powers the box off while another is still working. Then any failure makes the night failed.
+    """
+    if not progresses:
+        raise ValueError("the watchdog needs at least one nightly DAG")
+    for unfinished in (RunProgress.RUNNING, RunProgress.WAITING):
+        if unfinished in progresses:
+            return unfinished
+    if RunProgress.FAILED in progresses:
+        return RunProgress.FAILED
+    return RunProgress.SUCCEEDED
 
 
 def decide(
@@ -381,9 +398,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--alert-topic-arn", required=True, help="the run alerts SNS topic")
     parser.add_argument("--namespace", default="airflow", help="Kubernetes namespace of Airflow")
-    parser.add_argument("--dag-id", default="platform_skeleton_nightly", help="the nightly DAG")
+    parser.add_argument(
+        "--dag-id",
+        dest="dag_ids",
+        action="append",
+        help="a nightly DAG to wait for; repeat it for each one (default: the skeleton)",
+    )
     parser.add_argument("--poll-seconds", type=float, default=30, help="time between checks")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.dag_ids is None:
+        args.dag_ids = ["platform_skeleton_nightly"]
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -408,20 +433,24 @@ def main(argv: list[str] | None = None) -> int:
     boot = box_boot_time(now(), uptime)
 
     def get_progress() -> RunProgress:
-        result = subprocess.run(
-            list_runs_command(args.namespace, args.dag_id),
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return run_progress(result.stdout, boot)
+        progresses = []
+        for dag_id in args.dag_ids:
+            result = subprocess.run(
+                list_runs_command(args.namespace, dag_id),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            progresses.append(run_progress(result.stdout, boot))
+        return combined_progress(progresses)
 
     def save_database() -> None:
         airflow_db_backup.main(["save", "--bucket", args.bucket])
 
     def record_incident(decision: Decision) -> None:
         with tempfile.TemporaryDirectory() as folder:
-            file_stop_incident(client, args.bucket, decision, now(), args.dag_id, Path(folder))
+            pipelines = ", ".join(args.dag_ids)
+            file_stop_incident(client, args.bucket, decision, now(), pipelines, Path(folder))
 
     def send_alert(decision: Decision) -> None:
         if decision.action is Action.STOP_UNPLANNED:

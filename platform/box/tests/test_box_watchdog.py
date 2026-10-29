@@ -17,6 +17,7 @@ from box_watchdog import (
     RunProgress,
     box_boot_time,
     carry_out_stop,
+    combined_progress,
     decide,
     fetch_spot_stop_time,
     fetch_work_session_end,
@@ -103,6 +104,27 @@ def test_an_unknown_run_state_is_an_error_not_a_guess():
 
     with pytest.raises(ValueError, match="unknown run state"):
         run_progress(runs, STARTED)
+
+
+@pytest.mark.parametrize(
+    ("progresses", "expected"),
+    [
+        ([RunProgress.SUCCEEDED, RunProgress.SUCCEEDED], RunProgress.SUCCEEDED),
+        ([RunProgress.SUCCEEDED, RunProgress.FAILED], RunProgress.FAILED),
+        ([RunProgress.FAILED, RunProgress.RUNNING], RunProgress.RUNNING),
+        ([RunProgress.SUCCEEDED, RunProgress.WAITING], RunProgress.WAITING),
+        ([RunProgress.WAITING, RunProgress.RUNNING], RunProgress.RUNNING),
+        ([RunProgress.SUCCEEDED], RunProgress.SUCCEEDED),
+    ],
+)
+def test_the_night_is_finished_only_when_every_nightly_dag_has_finished(progresses, expected):
+    # A DAG that failed early must not power the box off while another is still working.
+    assert combined_progress(progresses) is expected
+
+
+def test_combined_progress_needs_at_least_one_dag():
+    with pytest.raises(ValueError, match="at least one"):
+        combined_progress([])
 
 
 def test_run_progress_refuses_a_naive_box_start_time():
@@ -581,7 +603,7 @@ def test_the_command_line_needs_a_bucket_and_has_sensible_defaults():
     assert args.env == "dev"
     assert args.alert_topic_arn == TOPIC
     assert args.namespace == "airflow"
-    assert args.dag_id == "platform_skeleton_nightly"
+    assert args.dag_ids == ["platform_skeleton_nightly"]
     assert args.poll_seconds == 30
 
     with pytest.raises(SystemExit):
@@ -590,6 +612,17 @@ def test_the_command_line_needs_a_bucket_and_has_sensible_defaults():
         parse_args(["--bucket", "lake", "--env", "dev"])
     with pytest.raises(SystemExit):
         parse_args(["--bucket", "lake", "--env", "staging", "--alert-topic-arn", TOPIC])
+
+
+def test_the_command_line_takes_every_nightly_dag_to_wait_for():
+    args = parse_args(
+        [
+            "--bucket", "lake", "--env", "dev", "--alert-topic-arn", TOPIC,
+            "--dag-id", "platform_skeleton_nightly", "--dag-id", "signal_phase_a_nightly",
+        ]
+    )  # fmt: skip
+
+    assert args.dag_ids == ["platform_skeleton_nightly", "signal_phase_a_nightly"]
 
 
 def test_a_boot_at_the_scheduled_time_is_the_nightly_run():

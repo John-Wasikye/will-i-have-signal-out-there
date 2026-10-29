@@ -38,8 +38,12 @@ RUN spark_jars="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirn
     && rm -f "${spark_jars}"/derby-*.jar "${spark_jars}"/zookeeper-*.jar
 
 COPY --chown=airflow:root pipelines/platform /opt/airflow/pipelines/platform
+COPY --chown=airflow:root pipelines/signal /opt/airflow/pipelines/signal
+# The signal pipelines check each source and take each table's column types from its contract.
+COPY --chown=airflow:root docs/trip-planner/contracts /opt/airflow/contracts
+ENV SIGNAL_CONTRACTS_DIR=/opt/airflow/contracts
 
-# The DAG imports the shared pipeline modules, so their folders go on the import path.
+# The DAGs import the shared pipeline modules, so their folders go on the import path.
 # Airflow reads the DAG straight from the pipeline folder, so the file exists only once.
-ENV PYTHONPATH=/opt/airflow/pipelines/platform/publish:/opt/airflow/pipelines/platform/spark:/opt/airflow/pipelines/platform/dags
+ENV PYTHONPATH=/opt/airflow/pipelines/platform/publish:/opt/airflow/pipelines/platform/spark:/opt/airflow/pipelines/platform/dags:/opt/airflow/pipelines/signal
 ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/pipelines/platform/dags

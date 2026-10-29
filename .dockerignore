@@ -11,3 +11,5 @@
 app/dist
 platform/serving/build
 docs
+# The signal pipelines read their data contracts at run time.
+!docs/trip-planner/contracts
