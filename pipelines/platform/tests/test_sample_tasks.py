@@ -1,10 +1,11 @@
 """Tests for the three separate tasks of the skeleton flow, as the DAG runs them."""
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 import sample_flow
 from sample_flow import (
     PublishOutcome,
@@ -58,6 +59,19 @@ def test_metric_task_writes_success_for_a_passing_outcome(tmp_path):
     assert pq.ParquetFile(path).read().column("status").to_pylist() == ["success"]
 
 
+def test_metric_task_takes_the_time_type_of_a_scheduled_run(tmp_path):
+    # A scheduled run's data_interval_end is a pendulum.DateTime. Before the fix, its time zone
+    # was lost when 24 hours were subtracted, and the metric refused the naive start time.
+    pendulum = pytest.importorskip("pendulum", reason="pendulum comes with Airflow")
+    end = pendulum.datetime(2026, 10, 29, 10, tz="UTC")
+    outcome = publish_sample(end, tmp_path / "published")
+
+    path = emit_sample_metric(end, outcome, tmp_path / "metrics")
+
+    start = pq.ParquetFile(path).read().column("data_interval_start_utc").to_pylist()
+    assert start == [datetime(2026, 10, 28, 10, 0, tzinfo=UTC)]
+
+
 def test_metric_task_writes_failed_for_a_failed_outcome(tmp_path, monkeypatch):
     monkeypatch.setattr(sample_flow, "MAX_ROWS", 0)
     outcome = publish_sample(NOW, tmp_path / "published")
@@ -86,3 +100,16 @@ def test_a_run_started_by_hand_ends_when_it_was_started():
     run_after = datetime(2026, 10, 9, 16, 38, tzinfo=UTC)
 
     assert sample_flow.run_end(None, run_after) == run_after
+
+
+def test_a_scheduled_runs_end_and_date_come_back_as_plain_types():
+    # Spark refuses pendulum's DateTime and Date for a declared TIMESTAMP or DATE column, so
+    # Airflow's types must not get past the point where the DAG reads the run's end.
+    pendulum = pytest.importorskip("pendulum", reason="pendulum comes with Airflow")
+    run_after = datetime(2026, 10, 29, 10, 3, tzinfo=UTC)
+
+    end = sample_flow.run_end(pendulum.datetime(2026, 10, 29, 10, tz="UTC"), run_after)
+
+    assert type(end) is datetime
+    assert type(end.date()) is date
+    assert end == datetime(2026, 10, 29, 10, 0, tzinfo=UTC)

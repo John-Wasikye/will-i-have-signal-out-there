@@ -70,8 +70,9 @@ class FakeSpark:
         self.calls: list[str] = []
         self.catalog = FakeCatalog(existing_tables or set())
 
-    def createDataFrame(self, rows: list[dict]) -> FakeFrame:  # noqa: N802, Spark method name
+    def createDataFrame(self, rows: list[dict], schema: str | None = None) -> FakeFrame:  # noqa: N802, Spark method name
         self.calls.append("createDataFrame")
+        self.schema = schema
         return FakeFrame(rows, self.calls)
 
 
@@ -103,6 +104,23 @@ def test_rerun_overwrites_partitions_and_does_not_recreate_the_table():
         f"writeTo:{FULL_NAME}",
         "overwritePartitions",
     ]
+
+
+def test_the_job_declares_the_column_types_of_the_live_table():
+    # Copied from the live Glue table. Spark must not guess them: it reads Airflow's own time
+    # type as an empty struct, and Iceberg then refuses the write (INC-2026-10-29-01).
+    live_columns = {
+        "freshness_target_hours": "DOUBLE",
+        "key": "STRING",
+        "last_good_run_utc": "TIMESTAMP",
+        "run_date": "DATE",
+        "value": "STRING",
+    }
+    spark = FakeSpark()
+    run_sample_iceberg_job(spark, TABLE, RUN_DATE, NOW, namespace=NAMESPACE, max_rows=100)
+    assert spark.schema is not None
+    declared = dict(column.strip().split(" ", 1) for column in spark.schema.split(","))
+    assert declared == live_columns
 
 
 def test_sample_rows_carry_the_run_date_and_a_utc_time():

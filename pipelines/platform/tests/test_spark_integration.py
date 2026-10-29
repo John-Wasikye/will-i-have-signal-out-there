@@ -74,3 +74,20 @@ def test_maintenance_runs_on_a_real_table_and_keeps_its_rows(spark):
     maintain_tables(spark, ["maintained"], NOW, namespace=NAMESPACE)
 
     assert _row_count(spark, "maintained") == 3
+
+
+class AirflowTime(datetime):
+    """Stands in for pendulum.DateTime, the datetime subclass a scheduled run gets from Airflow."""
+
+
+def test_a_scheduled_runs_time_type_is_written_as_a_timestamp(spark):
+    run_sample_iceberg_job(spark, "scheduled", TODAY, NOW, namespace=NAMESPACE, max_rows=100)
+    scheduled_time = AirflowTime(2026, 10, 11, 10, 0, tzinfo=UTC)
+
+    run_sample_iceberg_job(
+        spark, "scheduled", TOMORROW, scheduled_time, namespace=NAMESPACE, max_rows=100
+    )
+
+    table = spark.table(f"{CATALOG_NAME}.{NAMESPACE}.scheduled")
+    assert table.schema["last_good_run_utc"].dataType.simpleString() == "timestamp"
+    assert table.where(f"run_date = '{TOMORROW}'").count() == 3
