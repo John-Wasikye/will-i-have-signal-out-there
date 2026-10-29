@@ -31,11 +31,12 @@ def run_end(data_interval_end: datetime | None, run_after: datetime) -> datetime
     """Return the time a run covers data up to.
 
     A scheduled run has a data interval. Airflow 3 gives a run started by hand none, so it
-    covers data up to the time it was started.
+    covers data up to the time it was started. The time comes back as a plain UTC datetime,
+    because a scheduled run's pendulum types break Spark and time arithmetic.
     """
     if data_interval_end is not None:
-        return data_interval_end
-    return run_after
+        return require_utc(data_interval_end, "data_interval_end")
+    return require_utc(run_after, "run_after")
 
 
 @dataclass(frozen=True)

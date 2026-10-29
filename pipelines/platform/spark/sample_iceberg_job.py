@@ -19,6 +19,13 @@ ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.12.0"
 ICEBERG_AWS_PACKAGE = "org.apache.iceberg:iceberg-aws-bundle:1.12.0"
 CATALOG_NAME = "portfolio"
 
+# The column types of the sample table, declared so Spark never guesses them from Python values.
+# They match the live table, which Spark created from its guesses on the first hand-started run.
+SAMPLE_SCHEMA = (
+    "freshness_target_hours DOUBLE, key STRING, last_good_run_utc TIMESTAMP, "
+    "run_date DATE, value STRING"
+)
+
 
 class RowLimitExceeded(RuntimeError):
     """Raised before writing when the job would read or write too many rows."""
@@ -84,7 +91,7 @@ def run_sample_iceberg_job(
     if len(rows) > max_rows:
         raise RowLimitExceeded(f"{len(rows)} rows is over the limit of {max_rows}")
 
-    frame = spark.createDataFrame(rows)
+    frame = spark.createDataFrame(rows, schema=SAMPLE_SCHEMA)
     full_name = f"{CATALOG_NAME}.{namespace}.{table_name}"
     if spark.catalog.tableExists(full_name):
         frame.writeTo(full_name).overwritePartitions()

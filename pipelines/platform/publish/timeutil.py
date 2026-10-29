@@ -6,10 +6,16 @@ from datetime import UTC, datetime
 
 
 def require_utc(moment: datetime, name: str) -> datetime:
-    """Return the moment in UTC. Refuse a naive datetime, because its zone is unknown."""
+    """Return the moment in UTC as a plain datetime. Refuse a naive one, its zone is unknown.
+
+    A scheduled Airflow run hands over pendulum.DateTime, a datetime subclass. Spark cannot
+    infer a type for it, and once its zone is the standard library's UTC, pendulum drops the
+    zone in arithmetic. Rebuilding a plain datetime keeps both problems out of my code.
+    """
     if moment.tzinfo is None or moment.utcoffset() is None:
         raise ValueError(f"{name} must be timezone-aware (UTC), got a naive datetime")
-    return moment.astimezone(UTC)
+    utc = moment.astimezone(UTC)
+    return datetime.combine(utc.date(), utc.time(), tzinfo=UTC)
 
 
 def format_utc(moment: datetime) -> str:
