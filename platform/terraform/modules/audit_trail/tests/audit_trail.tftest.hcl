@@ -140,3 +140,12 @@ run "the_size_alarm_notifies_the_given_targets" {
     error_message = "The size alarm must watch the log bucket."
   }
 }
+
+run "the_account_is_checked_for_anything_shared_outside_it" {
+  command = plan
+
+  assert {
+    condition     = aws_accessanalyzer_analyzer.external_access.type == "ACCOUNT"
+    error_message = "The analyzer must look at this account, the free external access kind."
+  }
+}

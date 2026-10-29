@@ -100,3 +100,40 @@ run "the_deploy_can_find_the_distribution_to_clear_its_cache" {
     error_message = "The module must output the distribution ID, which the deploy workflow needs."
   }
 }
+run "every_response_carries_the_security_headers" {
+  # Apply against the mock provider, so the policy gets an ID the behaviors can be compared to.
+  command = apply
+
+  assert {
+    condition = alltrue([
+      for id in concat(
+        [aws_cloudfront_distribution.site.default_cache_behavior[0].response_headers_policy_id],
+        [for b in aws_cloudfront_distribution.site.ordered_cache_behavior : b.response_headers_policy_id],
+      ) : id == aws_cloudfront_response_headers_policy.security.id
+    ])
+    error_message = "Every cache behavior must send the security headers policy."
+  }
+
+  assert {
+    condition     = aws_cloudfront_response_headers_policy.security.security_headers_config[0].strict_transport_security[0].access_control_max_age_sec >= 31536000
+    error_message = "Browsers must be told to use https for at least a year."
+  }
+
+  assert {
+    condition     = aws_cloudfront_response_headers_policy.security.security_headers_config[0].frame_options[0].frame_option == "DENY"
+    error_message = "No other site may show this site in a frame."
+  }
+
+  assert {
+    condition     = aws_cloudfront_response_headers_policy.security.security_headers_config[0].content_type_options[0].override
+    error_message = "Browsers must not guess file types."
+  }
+
+  assert {
+    condition = alltrue([
+      for rule in ["default-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "base-uri 'self'"] :
+      strcontains(aws_cloudfront_response_headers_policy.security.security_headers_config[0].content_security_policy[0].content_security_policy, rule)
+    ])
+    error_message = "The content security policy must allow only this site's own files."
+  }
+}
