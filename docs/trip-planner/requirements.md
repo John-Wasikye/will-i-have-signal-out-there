@@ -302,7 +302,7 @@ No "Done when" checks are recorded for Phase C. The platform rule for the second
 | Requirement group | Design doc section | ADR | Interface spec |
 |---|---|---|---|
 | Orbit ingest and selection (FR-1 to FR-4) | 7 (C1, C2), 8.1 | 0002, 0018 | contracts/celestrak_gp.yaml |
-| Trails and terrain (FR-5, FR-6) | 7 (C3, C4), 7.A | 0004 | contracts/nps_trails.yaml, copernicus_glo30.yaml, contracts/trail_point_horizon.yaml |
+| Trails and terrain (FR-5, FR-6) | 7 (C3, C4), 7.A | 0004 | contracts/nps_trails.yaml, contracts/trail_point.yaml, copernicus_glo30.yaml, contracts/trail_point_horizon.yaml |
 | Windows (FR-7 to FR-11) | 7 (C5), 7.B | 0003, 0005, 0006 | contracts/fct_satellite_window.yaml |
 | Coverage (FR-12, FR-25, FR-26) | 7 (C6, C13) | 0007, 0013 | contracts/fcc_mobile_coverage.yaml, ookla_open_data.yaml, contracts/fct_trail_point_coverage.yaml |
 | Checks and publish (FR-13 to FR-16) | 7 (C7 to C10) | 0018 | all contracts |

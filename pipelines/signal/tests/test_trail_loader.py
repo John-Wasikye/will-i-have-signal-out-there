@@ -7,12 +7,14 @@ Earth's mean radius; that is accurate to a fraction of a percent at this scale.
 
 import json
 import math
+from dataclasses import fields
 from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from contract_diff import BreakingSchemaChange
+from lake_write import contract_columns, spark_schema
 from trail_loader import (
     NPS_TRAILS_QUERY_URL,
     PHASE_A_TRAILS,
@@ -32,6 +34,7 @@ from trail_loader import (
 )
 
 CONTRACT = Path(__file__).parents[3] / "docs" / "trip-planner" / "contracts" / "nps_trails.yaml"
+POINT_CONTRACT = CONTRACT.with_name("trail_point.yaml")
 FETCHED_AT = datetime(2026, 10, 28, 4, 30, tzinfo=UTC)
 
 # About 50 m of longitude at Grand Canyon's latitude.
@@ -275,7 +278,7 @@ def test_trail_point_rows_number_points_from_zero_along_each_trail():
     points = trail_point_rows(lines, 50)
     bright = [p for p in points if p.trail_id == "grca-bright-angel"]
     assert bright[0] == TrailPoint(
-        point_id="grca-bright-angel-00000",
+        trail_point_id="grca-bright-angel-00000",
         trail_id="grca-bright-angel",
         trail_name="Bright Angel",
         unit_code="GRCA",
@@ -284,7 +287,13 @@ def test_trail_point_rows_number_points_from_zero_along_each_trail():
         lat=36.057,
     )
     assert [p.seq for p in bright] == list(range(len(bright)))
-    assert len({p.point_id for p in points}) == len(points)
+    assert len({p.trail_point_id for p in points}) == len(points)
+
+
+def test_the_trail_point_contract_has_one_column_per_trail_point_field():
+    columns = contract_columns(POINT_CONTRACT, "trail_point")
+    assert [column.name for column in columns] == [field.name for field in fields(TrailPoint)]
+    assert {column.name for column in columns if not column.required} == {"trail_name"}
 
 
 def test_trail_line_rows_carry_the_geometry_as_geojson_text_and_the_manifest():
@@ -327,6 +336,7 @@ class FakeSpark:
     def __init__(self):
         self.calls = []
         self.rows = {}
+        self.schemas = {}
 
         class Catalog:
             def tableExists(self, name):  # noqa: N802, Spark method name
@@ -341,6 +351,7 @@ class FakeSpark:
             def writeTo(self, name):  # noqa: N802, Spark method name
                 spark.calls.append(f"writeTo:{name}")
                 spark.rows[name] = rows
+                spark.schemas[name] = schema
                 return FakeWriter(spark.calls)
 
         return Frame()
@@ -355,10 +366,14 @@ def test_load_writes_both_tables_for_the_run_date():
         trail_line_rows(lines, manifest),
         trail_point_rows(lines, 50),
         date(2026, 10, 28),
-        contract_path=CONTRACT,
+        line_contract_path=CONTRACT,
+        point_contract_path=POINT_CONTRACT,
         namespace="portfolio_dev",
     )
     assert counts["nps_trail_line"] == 3
     assert counts["trail_point"] == len(spark.rows["portfolio.portfolio_dev.trail_point"])
     assert spark.rows["portfolio.portfolio_dev.trail_point"][0]["run_date"] == date(2026, 10, 28)
     assert spark.calls[0] == "writeTo:portfolio.portfolio_dev.nps_trail_line"
+    assert spark.schemas["portfolio.portfolio_dev.trail_point"] == spark_schema(
+        contract_columns(POINT_CONTRACT, "trail_point")
+    )

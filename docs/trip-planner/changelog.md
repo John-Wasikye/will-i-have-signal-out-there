@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Oct 29, 2026: trail_point contract
+
+- New `contracts/trail_point.yaml`, approved by John: the internal Iceberg table C3 writes and C4 and C5 read. Before this it was declared only in code. The design doc's table list, C3's contract row and the requirements trace now point to it.
+- The point key is `trail_point_id` (was `point_id` in the `TrailPoint` class), the same name as in `dim_trail_point` and every table built from it (OQ-21).
+
 ### Oct 28, 2026: Phase A first-run checks
 
 The checks ran on John's laptop. Downloads were kept outside the repository. Answers are in design doc section 16.
@@ -110,6 +115,12 @@ Every item below was checked against the build plan, the Build Plan Decisions, t
 ---
 
 ## Phases
+
+### Oct 29, 2026: declared lake column types (code)
+
+- `pipelines/signal/lake_write.py` gives Spark each table's column types from its contract instead of letting Spark guess them. A guess failed the live skeleton run on 2026-10-29 (INC-2026-10-29-01), cannot type a column that is empty in every row, and can make a number column an integer one night and a double the next.
+- Rows are checked before Spark sees them: a missing or extra column, or an empty required one, stops the load with the column's name. Whole numbers in number columns become floats; times and the run date become plain UTC types.
+- `load_gp_partition` takes the `celestrak_gp` contract path; `load_trail_tables` takes the `nps_trails` and `trail_point` contract paths.
 
 ### Oct 28, 2026: C3 trail loader (code)
 
