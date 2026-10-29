@@ -334,7 +334,7 @@ class FakeSpark:
 
         self.catalog = Catalog()
 
-    def createDataFrame(self, rows):  # noqa: N802, Spark method name
+    def createDataFrame(self, rows, schema=None):  # noqa: N802, Spark method name
         spark = self
 
         class Frame:
@@ -355,6 +355,7 @@ def test_load_writes_both_tables_for_the_run_date():
         trail_line_rows(lines, manifest),
         trail_point_rows(lines, 50),
         date(2026, 10, 28),
+        contract_path=CONTRACT,
         namespace="portfolio_dev",
     )
     assert counts["nps_trail_line"] == 3

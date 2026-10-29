@@ -269,7 +269,7 @@ class FakeSpark:
 
         self.catalog = Catalog()
 
-    def createDataFrame(self, rows):  # noqa: N802, Spark method name
+    def createDataFrame(self, rows, schema=None):  # noqa: N802, Spark method name
         frame = FakeFrame(rows, self.calls)
         self.frames.append(frame)
         return frame
@@ -286,7 +286,9 @@ def _rows():
 
 def test_first_load_creates_the_table_partitioned_by_run_date():
     spark = FakeSpark(table_exists=False)
-    written = load_gp_partition(spark, _rows(), date(2026, 10, 28), namespace="portfolio_dev")
+    written = load_gp_partition(
+        spark, _rows(), date(2026, 10, 28), contract_path=CONTRACT, namespace="portfolio_dev"
+    )
     assert written == 2
     assert spark.calls == [
         "writeTo:portfolio.portfolio_dev.celestrak_gp",
@@ -298,10 +300,14 @@ def test_first_load_creates_the_table_partitioned_by_run_date():
 
 def test_a_rerun_overwrites_only_its_partition():
     spark = FakeSpark(table_exists=True)
-    load_gp_partition(spark, _rows(), date(2026, 10, 28), namespace="portfolio_dev")
+    load_gp_partition(
+        spark, _rows(), date(2026, 10, 28), contract_path=CONTRACT, namespace="portfolio_dev"
+    )
     assert spark.calls == ["writeTo:portfolio.portfolio_dev.celestrak_gp", "overwritePartitions"]
 
 
 def test_load_refuses_no_rows():
     with pytest.raises(ValueError, match="no rows"):
-        load_gp_partition(FakeSpark(False), [], date(2026, 10, 28), namespace="portfolio_dev")
+        load_gp_partition(
+            FakeSpark(False), [], date(2026, 10, 28), contract_path=CONTRACT, namespace="p"
+        )

@@ -37,7 +37,7 @@ from contract_diff import (
     load_contract,
     observed_schema_from_records,
 )
-from lake_write import write_run_partition
+from lake_write import Column, contract_columns, write_run_partition
 from raw_store import FetchRefused, RawFile, download, write_raw
 from timeutil import format_utc
 
@@ -77,6 +77,19 @@ class TrailPoint:
     seq: int
     lon: float
     lat: float
+
+
+# The columns of the ``trail_point`` table, one per TrailPoint field. The table has no contract
+# yet, so its types are declared here; ``trail_name`` is empty when the source line has no name.
+TRAIL_POINT_COLUMNS = (
+    Column("point_id", "string", required=True),
+    Column("trail_id", "string", required=True),
+    Column("trail_name", "string", required=False),
+    Column("unit_code", "string", required=True),
+    Column("seq", "integer", required=True),
+    Column("lon", "number", required=True),
+    Column("lat", "number", required=True),
+)
 
 
 def trail_query_url(unit_code: str, offset: int) -> str:
@@ -273,18 +286,29 @@ def load_trail_tables(
     point_rows: list[TrailPoint],
     run_date: date,
     *,
+    contract_path: Path,
     namespace: str,
 ) -> dict[str, int]:
-    """Write ``nps_trail_line`` and ``trail_point`` for the run date; return each row count."""
+    """Write ``nps_trail_line`` and ``trail_point`` for the run date; return each row count.
+
+    ``nps_trail_line`` takes its column types from the contract, ``trail_point`` from
+    TRAIL_POINT_COLUMNS.
+    """
     return {
         "nps_trail_line": write_run_partition(
-            spark, "nps_trail_line", line_rows, run_date, namespace=namespace
+            spark,
+            "nps_trail_line",
+            line_rows,
+            run_date,
+            columns=contract_columns(contract_path, "nps_trail_line"),
+            namespace=namespace,
         ),
         "trail_point": write_run_partition(
             spark,
             "trail_point",
             [asdict(point) for point in point_rows],
             run_date,
+            columns=TRAIL_POINT_COLUMNS,
             namespace=namespace,
         ),
     }
