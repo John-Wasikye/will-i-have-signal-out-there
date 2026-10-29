@@ -34,7 +34,7 @@ data:
 
 config:
   core:
-    dags_folder: /opt/airflow/pipelines/platform/dags
+    dags_folder: /opt/airflow/pipelines
     load_examples: "False"
   # Connection keys are read from Parameter Store, so the database backup holds none.
   secrets:

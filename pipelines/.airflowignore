@@ -1,0 +1,5 @@
+# Airflow reads DAGs from all of pipelines/ (its DAG folder in the image), but only each project's
+# dags/ folder holds DAG files. Every other Python file is code or tests that a DAG imports.
+# Glob syntax, Airflow's default: the last matching line wins.
+*.py
+!*/dags/*.py

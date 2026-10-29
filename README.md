@@ -12,7 +12,7 @@ The project is in its first phase. I am building the data platform first, and it
 | Publish gate, write-audit-publish, status and run metrics | `pipelines/platform/publish` | Built and tested |
 | Spark job that writes an Iceberg table | `pipelines/platform/spark/sample_iceberg_job.py` | Built, tested with a fake Spark session |
 | Iceberg maintenance task | `pipelines/platform/spark/iceberg_maintenance.py` | Built, tested with a fake Spark session |
-| Nightly Airflow DAG | `pipelines/platform/dags` | Built, not run yet (Airflow does not install on Windows) |
+| Nightly Airflow DAGs | `pipelines/platform/dags`, `pipelines/signal/dags` | Built and tested in the Airflow image (Airflow does not install on Windows). The skeleton runs nightly on the box; the Phase A DAG is not installed yet |
 | Site template (React, TypeScript) | `app` | Built and tested |
 | Terraform (storage, catalog, IAM, budget, parameters, visitor data) | `platform/terraform` | Built and validated. Storage and IAM have tests. Nothing applied to AWS |
 | Continuous integration | `.github/workflows/ci.yml` | Written. Not run on GitHub yet |

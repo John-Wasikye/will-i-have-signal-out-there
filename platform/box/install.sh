@@ -187,7 +187,7 @@ step "start the watchdog"
 # when AWS sends its two-minute spot warning. It restarts if it stops, because it is a cost guard.
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
 # Every DAG the nightly run waits for. The box stays on until each one has finished.
-nightly_dags=(platform_skeleton_nightly)
+nightly_dags=(platform_skeleton_nightly signal_phase_a_nightly)
 dag_arguments=""
 for dag in "${nightly_dags[@]}"; do
   dag_arguments+=" --dag-id ${dag}"

@@ -95,3 +95,54 @@ def select_dtc_satellites(rows: Iterable[Mapping]) -> tuple[list[Mapping], list[
             result.inclination_deg,
         )
     return selected, disagreements
+
+
+_ELEMENT_COLUMNS = (
+    "norad_cat_id",
+    "object_name",
+    "epoch_utc",
+    "inclination_deg",
+    "mean_motion_rev_per_day",
+    "eccentricity",
+    "ra_of_asc_node_deg",
+    "arg_of_pericenter_deg",
+    "mean_anomaly_deg",
+    "bstar",
+)
+
+
+def satellite_rows(selected: Iterable[Mapping]) -> list[dict]:
+    """Shape the selected ``celestrak_gp`` rows for ``dtc_satellite``, with their altitude."""
+    rows = []
+    for row in selected:
+        perigee, apogee = altitude_km_from_elements(row)
+        rows.append(
+            {column: row[column] for column in _ELEMENT_COLUMNS}
+            | {
+                "perigee_km": perigee,
+                "apogee_km": apogee,
+                "fetched_at_utc": row["fetched_at_utc"],
+                "content_sha256": row["content_sha256"],
+            }
+        )
+    return rows
+
+
+def disagreement_rows(disagreements: Iterable[OrbitCheckResult], pull: Mapping) -> list[dict]:
+    """Shape the cross-check disagreements for ``dtc_disagreement``.
+
+    ``pull`` gives the ``fetched_at_utc`` and ``content_sha256`` of the CelesTrak file checked.
+    """
+    return [
+        {
+            "norad_cat_id": result.norad_cat_id,
+            "object_name": result.object_name,
+            "problems": ", ".join(result.problems),
+            "perigee_km": result.perigee_km,
+            "apogee_km": result.apogee_km,
+            "inclination_deg": result.inclination_deg,
+            "fetched_at_utc": pull["fetched_at_utc"],
+            "content_sha256": pull["content_sha256"],
+        }
+        for result in disagreements
+    ]

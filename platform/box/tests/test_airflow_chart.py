@@ -105,9 +105,9 @@ def test_no_celery_parts_are_installed(dev_objects):
 
 
 def test_the_dags_come_from_the_pipeline_folder_in_the_image(dev_objects):
-    assert _airflow_cfg(dev_objects)["core"]["dags_folder"] == (
-        "/opt/airflow/pipelines/platform/dags"
-    )
+    # The whole pipelines folder, so each project's dags/ folder is read; .airflowignore there
+    # keeps Airflow away from every other Python file.
+    assert _airflow_cfg(dev_objects)["core"]["dags_folder"] == "/opt/airflow/pipelines"
 
 
 def test_connection_keys_are_read_from_parameter_store(dev_objects):

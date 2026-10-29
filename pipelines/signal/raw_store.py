@@ -68,3 +68,25 @@ def write_raw(client, bucket: str, key: str, manifest_key: str, raw: RawFile) ->
         ContentType="application/json",
     )
     return manifest
+
+
+def latest_manifest(client, bucket: str, prefix: str) -> dict | None:  # noqa: ANN001
+    """Return the newest manifest under ``prefix``, or None if nothing was pulled yet.
+
+    Every pull's folder is named ``fetched_at=<UTC time>``, which sorts in time order, so the
+    newest manifest has the largest key. ``client`` is a boto3 S3 client.
+    """
+    keys = [
+        item["Key"]
+        for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix)
+        for item in page.get("Contents", [])
+        if item["Key"].endswith("manifest.json")
+    ]
+    if not keys:
+        return None
+    return json.loads(read_raw(client, bucket, max(keys)))
+
+
+def read_raw(client, bucket: str, key: str) -> bytes:  # noqa: ANN001
+    """Return a raw file exactly as it was kept. ``client`` is a boto3 S3 client."""
+    return client.get_object(Bucket=bucket, Key=key)["Body"].read()
