@@ -1,60 +1,78 @@
 # Dependabot opens a pull request when a pinned version has a newer release or a security fix.
 # Every pull request still goes through CI and my review, so nothing updates by itself.
-# Updates are grouped per folder and come weekly, so I review a few pull requests, not dozens.
+#
+# It proposes only minor and patch versions, grouped per folder and weekly, so each pull
+# request should pass CI on its own. Major versions break things (TypeScript 7, pyspark 4,
+# duckdb 2), so they are planned work on their own branch.
+#
+# Not here, on purpose, and updated by hand on a normal branch:
+# - Terraform providers. A Dependabot pull request gets no repository secrets, so the
+#   Terraform plan cannot run on it, and a provider change should come with a plan I can read.
+# - The Airflow base image, whose version must match the constraint file in the Dockerfile.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: pip
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       python:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: pip
     directory: /platform/serving
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       serving:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: pip
     directory: /platform/box
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # The Iceberg runtime jar is built for Spark 3.5, so pyspark takes patch versions only.
+      - dependency-name: pyspark
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Airflow's constraint file pins pyarrow in the image, and any other version fails the
+      # build. The host copy moves with it, by hand.
+      - dependency-name: pyarrow
     groups:
       box:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: npm
     directory: /app
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       site:
         patterns: ["*"]
-
-  - package-ecosystem: docker
-    directory: /platform/box
-    schedule:
-      interval: weekly
-
-  - package-ecosystem: terraform
-    directories:
-      - /platform/terraform/bootstrap
-      - /platform/terraform/envs/dev
-      - /platform/terraform/envs/live
-    schedule:
-      interval: weekly
-    groups:
-      terraform:
-        patterns: ["*"]
+        update-types: ["minor", "patch"]
