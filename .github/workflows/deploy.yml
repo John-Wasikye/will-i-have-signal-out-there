@@ -33,7 +33,7 @@ jobs:
     # The session box is arm64, so the image is built on an arm64 runner, not emulated.
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build the image
         run: docker build --file platform/box/Dockerfile.airflow --tag "portfolio-airflow:${GITHUB_SHA}" .
@@ -43,7 +43,7 @@ jobs:
 
       # The same scan as CI. An image with a new critical finding is never deployed.
       - name: Scan the image for critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: portfolio-airflow:${{ github.sha }}
           severity: CRITICAL
@@ -54,7 +54,7 @@ jobs:
       - name: Save the image
         run: docker save "portfolio-airflow:${GITHUB_SHA}" | gzip > airflow-image.tar.gz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: airflow-image
           path: airflow-image.tar.gz

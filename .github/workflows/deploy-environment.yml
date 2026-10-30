@@ -33,9 +33,9 @@ jobs:
       SITE_DISTRIBUTION_ID: ${{ vars.SITE_DISTRIBUTION_ID }}
       AIRFLOW_REPOSITORY: ${{ secrets.AIRFLOW_REPOSITORY }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -50,7 +50,7 @@ jobs:
           npm ci
           npm run build
 
-      - uses: aws-actions/configure-aws-credentials@v6
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -63,7 +63,7 @@ jobs:
           aws s3 sync app/dist "s3://${SITE_BUCKET}" --delete --exclude "published/*" --exclude "status.json"
           aws cloudfront create-invalidation --distribution-id "${SITE_DISTRIBUTION_ID}" --paths "/*"
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: airflow-image
 

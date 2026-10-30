@@ -204,3 +204,13 @@ resource "aws_cloudtrail" "audit" {
 
   depends_on = [aws_s3_bucket_policy.audit]
 }
+
+# --- Access Analyzer ------------------------------------------------------------------------
+
+# Lists every bucket, role, key or function that can be reached from outside this account,
+# under IAM Access Analyzer's findings. The external access kind is free. Like the trail, it
+# covers the whole account, so dev and live alike.
+resource "aws_accessanalyzer_analyzer" "external_access" {
+  analyzer_name = "portfolio-live-external-access"
+  type          = "ACCOUNT"
+}

@@ -9,7 +9,7 @@ output "oidc_provider_arn" {
 }
 
 output "github_subject" {
-  description = "The GitHub token subject that the pipeline roles accept, for example repo:owner/name:ref:refs/heads/main."
+  description = "The GitHub token subject that the pipeline roles accept, for example repo:owner/name:environment:live."
   value       = local.github_subject
 }
 

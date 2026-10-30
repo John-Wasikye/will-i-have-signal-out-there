@@ -8,7 +8,7 @@ Roles are named `portfolio-<env>-<pipeline>`. GitHub Actions assumes them throug
 * use its environment's Glue database and tables.
 * read Parameter Store under `/portfolio/<env>/*`.
 
-Trust rules: live roles accept only the `main` branch of `github_repo`. Dev roles accept any ref in that repository. This is a known gap that I accept for now: a dev role can be requested from any branch. The risk is limited, because dev roles cannot reach live data.
+Trust rules: each role accepts only jobs that name the GitHub environment of the same name (`dev` or `live`) in `github_repo`. Those environments need my approval and allow only the `main` branch. Trusting the branch alone would let any workflow pushed to `main` use a live role without my approval.
 
 An AWS account can have only one GitHub OIDC provider. In my account the NFL project's Terraform (`nfl-player-performance`, `infra/github.tf`) already owns it, so both `envs/live` and `envs/dev` set `create_oidc_provider` to false and trust it by its ARN. Removing that provider from the NFL project would cut off these roles too.
 

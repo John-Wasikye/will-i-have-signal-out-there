@@ -15,6 +15,8 @@ How the logs are kept (requirements PR-20, ADR-0019):
 - A destroy never deletes the logs: the bucket is not emptied on destroy, so it must be emptied by hand first.
 - A size alarm sends to `alarm_actions`. `envs/live` passes the run alerts topic.
 
+It also turns on IAM Access Analyzer (external access, the free kind) for the account, `portfolio-live-external-access`. It lists every bucket, role, key or function that can be reached from outside the account, in the console under IAM, Access Analyzer.
+
 The names start with `portfolio-live-`, so the dev apply role is refused them (see the `github_roles` module).
 
 ## Inputs

@@ -6,6 +6,7 @@ What it does:
 
 - **Private access.** CloudFront signs every request to the bucket. The storage module's bucket policy lets only this distribution read the site bucket.
 - **HTTPS only.** Requests on plain http are redirected to https.
+- **Security headers on every response.** Browsers are told to use https for a year (HSTS, HTTP Strict Transport Security), not to guess file types, never to show the site inside another site's frame, and to send only the site's address as the referrer. The content security policy lets the page load only its own files and call API Gateway addresses in this region, so injected outside scripts do not run.
 - **A fresh status page.** `status.json` is never cached, so the status page always shows the latest run. Everything else uses the managed caching policy.
 - **No public data files.** The Lambda function reads the Parquet files in `published/` directly from the bucket. Readers have no use for them, so a small CloudFront function answers 403 for any request under `published/`.
 - **Page links work.** S3 answers 403 for a missing file when access is private. A missing path returns `index.html` with a 200, so the app can handle its own page links.
