@@ -65,8 +65,14 @@ def test_spark_stays_on_the_line_the_iceberg_runtime_is_built_for():
     assert {"version-update:semver-minor", MAJOR} <= _ignored(box, "pyspark")
 
 
-def test_the_box_pyarrow_stays_on_the_version_airflow_pins():
-    assert _ignored(_update("pip", "/platform/box"), "pyarrow") == {"all"}
+def test_the_box_pyarrow_stays_on_the_version_airflow_pins_but_takes_security_fixes():
+    # A rule without update-types also blocks security updates. A rule that lists them
+    # blocks only routine version updates, so a fix for an advisory still gets through.
+    assert _ignored(_update("pip", "/platform/box"), "pyarrow") == {
+        "version-update:semver-patch",
+        "version-update:semver-minor",
+        MAJOR,
+    }
 
 
 def test_the_root_python_ranges_are_raised_by_hand():
