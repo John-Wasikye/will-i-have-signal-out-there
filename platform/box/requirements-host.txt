@@ -1,4 +1,4 @@
 # Python packages for the scripts that run on the box itself, outside the Airflow image:
 # the database backup and the watchdog. boto3 reaches S3, and pyarrow writes incident files.
-boto3==1.43.97
-pyarrow==19.0.1
+boto3==1.43.119
+pyarrow==26.0.0
