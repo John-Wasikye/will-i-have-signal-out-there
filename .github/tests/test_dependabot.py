@@ -67,3 +67,23 @@ def test_spark_stays_on_the_line_the_iceberg_runtime_is_built_for():
 
 def test_the_box_pyarrow_stays_on_the_version_airflow_pins():
     assert _ignored(_update("pip", "/platform/box"), "pyarrow") == {"all"}
+
+
+def test_the_root_python_ranges_are_raised_by_hand():
+    # The root file holds ranges, and Dependabot raises a range's ceiling across a major
+    # version even with majors ignored. CI already installs the newest version in each range.
+    assert ("pip", "/") not in {(u["package-ecosystem"], u["directory"]) for u in _updates()}
+
+
+def test_the_api_packages_are_updated_by_hand_where_the_plan_runs():
+    # A change under platform/serving starts the Terraform plan, which a Dependabot pull
+    # request cannot sign in for.
+    assert "/platform/serving" not in {u["directory"] for u in _updates()}
+
+
+def test_action_updates_leave_the_terraform_workflows_alone():
+    # A change to these files starts the Terraform plan too.
+    actions = _update("github-actions", "/")
+    assert {".github/workflows/terraform*.yml", ".github/actions/terraform-init/**"} <= set(
+        actions.get("exclude-paths", [])
+    )
