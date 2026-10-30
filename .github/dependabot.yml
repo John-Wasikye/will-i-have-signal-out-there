@@ -5,14 +5,22 @@
 # request should pass CI on its own. Major versions break things (TypeScript 7, pyspark 4,
 # duckdb 2), so they are planned work on their own branch.
 #
-# Not here, on purpose, and updated by hand on a normal branch:
-# - Terraform providers. A Dependabot pull request gets no repository secrets, so the
-#   Terraform plan cannot run on it, and a provider change should come with a plan I can read.
+# Not here, on purpose, and updated by hand on a normal branch. A Dependabot pull request gets
+# no repository secrets, so the Terraform plan cannot run on it, and anything that starts the
+# plan should come with a plan I can read:
+# - Terraform providers.
+# - The API packages in platform/serving, which the Terraform workflow packages.
+# - The actions in the Terraform workflows and the terraform-init action.
 # - The Airflow base image, whose version must match the constraint file in the Dockerfile.
+# - The ranges in the root pyproject.toml. Dependabot raises a range's ceiling across a major
+#   version even with majors ignored, and CI already installs the newest version in each range.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    exclude-paths:
+      - .github/workflows/terraform*.yml
+      - .github/actions/terraform-init/**
     schedule:
       interval: weekly
     ignore:
@@ -20,30 +28,6 @@ updates:
         update-types: ["version-update:semver-major"]
     groups:
       actions:
-        patterns: ["*"]
-        update-types: ["minor", "patch"]
-
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: weekly
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-    groups:
-      python:
-        patterns: ["*"]
-        update-types: ["minor", "patch"]
-
-  - package-ecosystem: pip
-    directory: /platform/serving
-    schedule:
-      interval: weekly
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-    groups:
-      serving:
         patterns: ["*"]
         update-types: ["minor", "patch"]
 
