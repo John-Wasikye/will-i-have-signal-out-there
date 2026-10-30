@@ -42,8 +42,13 @@ updates:
       - dependency-name: pyspark
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
       # Airflow's constraint file pins pyarrow in the image, and any other version fails the
-      # build. The host copy moves with it, by hand.
+      # build. The host copy moves with it, by hand. The update types are listed because a
+      # rule without them also blocks security updates; this one lets a security fix through.
       - dependency-name: pyarrow
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
+          - version-update:semver-major
     groups:
       box:
         patterns: ["*"]

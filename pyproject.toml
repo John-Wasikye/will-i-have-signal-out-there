@@ -7,7 +7,7 @@ dependencies = [
     "duckdb>=1.1,<2",
     "fastapi>=0.110,<1",
     "mangum>=0.17,<1",
-    "pyarrow>=16,<20",
+    "pyarrow>=23.0.1,<26",
     "pydantic>=2.6,<3",
 ]
 
