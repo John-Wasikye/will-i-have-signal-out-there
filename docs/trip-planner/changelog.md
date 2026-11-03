@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 3, 2026: terrain horizon engine (C4)
+
+- New ADR 0038 (proposed, waiting for John): each sector's horizon is the highest of 10 rays one degree apart, angles below the level line are stored as 0, heights come from the nearest grid cell, and the tiles are read by a small GeoTIFF reader instead of rasterio (John's choice).
+- Design doc table 7.A now lists `ElevationGrid` and `read_elevation_grid` (`geotiff.py`), `ElevationTiles` built from grids, and `load_elevation_tiles(paths)`. `ray_elevation_profile` is not a separate function: all rays are sampled at once. `HorizonProfile` and `Window` use `trail_point_id` (were `point_id`).
+
 ### Oct 29, 2026: contracts for the Direct-to-Cell tables
 
 - New `contracts/dtc_satellite.yaml` and `contracts/dtc_disagreement.yaml`, approved by John: the internal Iceberg tables C2 writes. The design doc said their schema lived in code; every lake table now has a contract, as `trail_point` does. The design doc's C2 contract row and table list point to them.
