@@ -12,6 +12,8 @@
   --color-badge-active-bg: #dbe9f6;
   --color-map-line: #b8c4cf;
   --color-map-bg: #eef3f7;
+  --color-banner-bg: #ffd966;
+  --color-banner-text: #1c1c1a;
   --gutter: 16px;
 }
 
@@ -30,6 +32,8 @@
     --color-badge-active-bg: #1d3247;
     --color-map-line: #3d4f60;
     --color-map-bg: #1a2530;
+    --color-banner-bg: #6b4e00;
+    --color-banner-text: #fff3d1;
   }
 }
 
@@ -159,6 +163,35 @@ h1 {
 }
 
 .notice p {
+  margin: 0;
+}
+
+.dev-banner {
+  background: var(--color-banner-bg);
+  color: var(--color-banner-text);
+  border-bottom: 3px solid var(--color-notice-border);
+}
+
+.dev-banner p {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px var(--gutter);
+}
+
+.note {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+}
+
+.note p {
+  margin: 8px 0 0;
+}
+
+.note h2 {
+  font-size: 1.15rem;
   margin: 0;
 }
 

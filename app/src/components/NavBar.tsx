@@ -9,6 +9,9 @@ export function NavBar() {
             <NavLink to="/">Home</NavLink>
           </li>
           <li>
+            <NavLink to="/trails">Trails</NavLink>
+          </li>
+          <li>
             <NavLink to="/lookup">Lookup</NavLink>
           </li>
           <li>
