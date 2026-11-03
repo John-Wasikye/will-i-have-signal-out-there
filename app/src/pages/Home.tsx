@@ -50,8 +50,9 @@ export function Home() {
           results as data files.
         </p>
         <p>
-          This site is plain files with no server of its own. It reads the published data directly, so
-          the page keeps working even when no server is running.
+          The page asks a small web service for the answers, and that service reads the published
+          files. The machine that runs the nightly job is switched off the rest of the day, and the
+          page keeps working without it.
         </p>
       </section>
 

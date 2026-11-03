@@ -21,10 +21,11 @@ describe('Home page', () => {
     expect(text).toContain('next 24 hours')
   })
 
-  it('explains the nightly run, the published data and that no server is needed', () => {
+  it('explains the nightly run and that the page works with the nightly machine off', () => {
     expect(text).toContain('10:00 UTC')
     expect(text).toContain('Coordinated Universal Time')
-    expect(text).toContain('no server of its own')
+    expect(text).toContain('web service')
+    expect(text).toContain('keeps working without it')
   })
 
   it('shows the Direct-to-Cell requirements and the credits', () => {
