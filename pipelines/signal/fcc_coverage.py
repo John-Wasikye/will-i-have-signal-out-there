@@ -13,7 +13,10 @@ from collections.abc import Callable, Collection, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import h3
 from trail_loader import TrailPoint
+
+H3_RESOLUTION = 9
 
 
 class WrongFccFile(RuntimeError):
@@ -101,3 +104,8 @@ def flag_points_covered(
             }
         )
     return rows
+
+
+def point_to_cell(lat: float, lon: float) -> str:
+    """Return the H3 cell at the resolution the FCC files use."""
+    return h3.latlng_to_cell(lat, lon, H3_RESOLUTION)

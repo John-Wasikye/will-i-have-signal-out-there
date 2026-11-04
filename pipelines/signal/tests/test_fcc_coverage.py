@@ -8,7 +8,13 @@ calls the FCC or AWS. A GeoPackage is a SQLite file, so each test builds a tiny 
 import sqlite3
 
 import pytest
-from fcc_coverage import FccCell, WrongFccFile, flag_points_covered, read_fcc_cells
+from fcc_coverage import (
+    FccCell,
+    WrongFccFile,
+    flag_points_covered,
+    point_to_cell,
+    read_fcc_cells,
+)
 from trail_loader import TrailPoint
 
 T_MOBILE_ID = 130403
@@ -126,3 +132,7 @@ def test_cell_lookup_gets_latitude_first():
         lambda lat, lon: seen.append((lat, lon)) or "cell-a",
     )
     assert seen == [(36.0, -112.0)]
+
+
+def test_point_to_cell_gives_the_resolution_9_cell_the_fcc_file_uses():
+    assert point_to_cell(36.1, -112.1) == "892994ced6bffff"
