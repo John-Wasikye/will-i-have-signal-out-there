@@ -166,3 +166,36 @@ run "the_site_record_for_cloudflare_is_output" {
     error_message = "The site record must be a CNAME from the site domain to the distribution."
   }
 }
+
+# The serving API allows requests only from these addresses, so they must follow the domain.
+run "origins_are_only_the_cloudfront_address_until_the_domain_is_attached" {
+  command = plan
+
+  variables {
+    site_domain = "signal.johnwasikye.com"
+  }
+
+  assert {
+    condition     = length(output.origins) == 1 && startswith(output.origins[0], "https://")
+    error_message = "Before the domain is attached, only the https cloudfront.net address may be an origin."
+  }
+
+  assert {
+    condition     = !contains(output.origins, "https://signal.johnwasikye.com")
+    error_message = "A domain that is not attached yet must not be an allowed origin."
+  }
+}
+
+run "an_attached_domain_is_an_origin_next_to_the_cloudfront_address" {
+  command = plan
+
+  variables {
+    site_domain   = "signal.johnwasikye.com"
+    attach_domain = true
+  }
+
+  assert {
+    condition     = length(output.origins) == 2 && output.origins[1] == "https://signal.johnwasikye.com"
+    error_message = "An attached domain must be allowed next to the cloudfront.net address, which keeps working."
+  }
+}
