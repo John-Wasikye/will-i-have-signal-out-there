@@ -47,6 +47,7 @@ def test_every_step_is_a_task(signal_dag):
         "select_dtc",
         "load_trails",
         "compute_horizons",
+        "compute_windows",
     }
 
 
@@ -65,6 +66,13 @@ def test_the_trails_do_not_wait_for_the_orbits(signal_dag):
 
 def test_the_horizons_wait_only_for_the_trails(signal_dag):
     assert signal_dag.get_task("compute_horizons").upstream_task_ids == {"load_trails"}
+
+
+def test_the_windows_wait_for_the_satellites_and_the_horizons(signal_dag):
+    assert signal_dag.get_task("compute_windows").upstream_task_ids == {
+        "select_dtc",
+        "compute_horizons",
+    }
 
 
 def test_a_task_tries_again_after_a_brief_failure(signal_dag):

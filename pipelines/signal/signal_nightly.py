@@ -11,6 +11,9 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
 4. ``select_and_load_dtc`` (C2) writes ``dtc_satellite`` and ``dtc_disagreement``.
 5. ``load_trails_if_changed`` (C3) pulls the NPS trails and loads ``nps_trail_line`` and
    ``trail_point`` only when the pages differ from the last load (ADR 0028).
+6. ``compute_horizons_if_needed`` (C4) gives new trail points their terrain horizons.
+7. ``compute_windows`` (C5) writes ``satellite_window``: when each selected satellite is
+   reachable from each trail point over the next 26 hours.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from elevation_source import (
     store_tile_manifest,
     tiles_covering,
 )
-from lake_write import contract_columns, write_run_partition
+from lake_write import contract_columns, write_frame_partition, write_run_partition
 from orbit_ingest import (
     CELESTRAK_STARLINK_URL,
     MIN_TIME_BETWEEN_FETCHES,
@@ -42,7 +45,14 @@ from orbit_ingest import (
 )
 from raw_store import latest_manifest, read_raw
 from sample_iceberg_job import CATALOG_NAME
-from terrain_horizon import RANGE_M, compute_horizons, validate_horizon
+from satellite_windows import (
+    MAX_WINDOW_ROWS,
+    SatelliteElements,
+    WindowRun,
+    enforce_row_limit,
+    run_window_job,
+)
+from terrain_horizon import RANGE_M, HorizonProfile, compute_horizons, validate_horizon
 from timeutil import require_utc
 from trail_loader import (
     PHASE_A_TRAILS,
@@ -268,6 +278,62 @@ def compute_horizons_if_needed(
     return {"changed": True, "points": len(points), "tiles": len(tiles)}
 
 
+def compute_windows(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    run_date: date,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+    span_start_utc: datetime,
+    run_started_utc: datetime,
+    now_utc: datetime,
+    max_rows: int = MAX_WINDOW_ROWS,
+) -> dict:
+    """Write the run date's satellite windows for every trail point (C5).
+
+    The satellites are the run date's ``dtc_satellite`` selection. The points and their horizons
+    are the newest partitions, because both are reference data (ADR 0028); horizons older than
+    the points would belong to points that are gone, so they stop the step. The windows are
+    built and counted inside Spark, and a count over ``max_rows`` stops the step before anything
+    is written (OQ-1). Returns how many satellites, points and windows there were.
+    """
+    satellites = _dtc_satellites(spark, f"{CATALOG_NAME}.{namespace}.dtc_satellite", run_date)
+    points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
+    horizon_table = f"{CATALOG_NAME}.{namespace}.trail_point_horizon"
+    points_date = _newest_run_date(spark, points_table)
+    if points_date is None:
+        raise ValueError("no trail points are loaded yet, so there is nowhere to find windows for")
+    horizon_date = _newest_run_date(spark, horizon_table)
+    if horizon_date is None:
+        raise ValueError("no terrain horizons are computed yet; compute_horizons runs first")
+    if horizon_date < points_date:
+        raise ValueError(
+            f"the newest horizons ({horizon_date}) are older than the newest trail points "
+            f"({points_date}); compute_horizons must run for the new points first"
+        )
+
+    run = WindowRun(
+        run_date=run_date,
+        span_start_utc=span_start_utc,
+        run_started_utc=run_started_utc,
+        loaded_at_utc=now_utc,
+    )
+    points = _trail_points(spark, points_table, points_date)
+    columns = contract_columns(Path(contracts_dir) / "satellite_window.yaml", "satellite_window")
+    frame = run_window_job(
+        spark, run, satellites, points, _horizons(spark, horizon_table, horizon_date), columns
+    )
+    # Cached, so counting for the limit and writing do not compute every window twice.
+    frame = frame.persist()
+    try:
+        enforce_row_limit(frame, max_rows)
+        windows = frame.count()
+        write_frame_partition(spark, "satellite_window", frame, namespace=namespace)
+    finally:
+        frame.unpersist()
+    return {"satellites": len(satellites), "points": len(points), "windows": windows}
+
+
 def _orbit_rows(s3, raw_bucket: str, manifest: dict, contract: Path) -> list[dict]:  # noqa: ANN001
     """Read the kept CelesTrak file, check it against the contract, and shape its rows."""
     records = parse_gp_records(read_raw(s3, raw_bucket, manifest["raw_key"]), contract)
@@ -301,3 +367,31 @@ def _trail_points(spark, table: str, run_date: date) -> list[TrailPoint]:  # noq
         f"WHERE run_date = DATE '{run_date.isoformat()}' ORDER BY trail_id, seq"
     )
     return [TrailPoint(**{name: row[name] for name in names}) for row in spark.sql(query).collect()]
+
+
+def _dtc_satellites(spark, table: str, run_date: date) -> list[SatelliteElements]:  # noqa: ANN001
+    """Return the run date's selected satellites, or stop if there are none."""
+    names = [field.name for field in fields(SatelliteElements)]
+    plain = date(run_date.year, run_date.month, run_date.day)
+    query = (
+        f"SELECT {', '.join(names)} FROM {table} "
+        f"WHERE run_date = DATE '{plain.isoformat()}' ORDER BY norad_cat_id"
+    )
+    rows = spark.sql(query).collect() if spark.catalog.tableExists(table) else []
+    if not rows:
+        raise ValueError(f"dtc_satellite has no satellites for {plain}; select_dtc runs first")
+    return [SatelliteElements.from_row(row) for row in rows]
+
+
+def _horizons(spark, table: str, run_date: date) -> dict[str, HorizonProfile]:  # noqa: ANN001
+    """Return one partition's horizons by trail point."""
+    query = (
+        f"SELECT trail_point_id, horizon_angles_deg FROM {table} "
+        f"WHERE run_date = DATE '{run_date.isoformat()}'"
+    )
+    return {
+        row["trail_point_id"]: HorizonProfile(
+            row["trail_point_id"], tuple(float(a) for a in row["horizon_angles_deg"])
+        )
+        for row in spark.sql(query).collect()
+    }

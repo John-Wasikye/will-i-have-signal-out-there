@@ -1,10 +1,12 @@
-"""Phase A nightly DAG: satellites (C1, C8, C2) and trails (C3), design doc section 8.1.
+"""Phase A nightly DAG: satellites (C1, C8, C2), trails (C3, C4) and windows (C5), design doc 8.1.
 
 The orbit steps run in order: pull CelesTrak (or reuse a pull from the last 2 hours), check the
 file against its contract, load ``celestrak_gp``, then select the Direct-to-Cell satellites.
 The trail step does not need the orbits, so it runs beside them, and loads only when the NPS
 pages changed (ADR 0028). The terrain horizons (C4) follow the trails and are computed only for
-trail points that have none yet. A task that fails tries twice more, then records an incident and
+trail points that have none yet. The satellite windows (C5) wait for both the selected satellites
+and the horizons, and cover 26 hours from the run's scheduled time (ADR 0019). A task that fails
+tries twice more, then records an incident and
 sends an email, the same as the skeleton.
 
 The DAG only wires tasks together. The logic lives in pipelines/signal/signal_nightly.py.
@@ -23,6 +25,7 @@ import signal_nightly
 from airflow.sdk import dag, task
 from incidents import record_failure
 from sample_iceberg_job import build_spark_session
+from timeutil import require_utc
 
 WAREHOUSE = os.environ.get("PLATFORM_WAREHOUSE", "/data/warehouse")
 USE_GLUE = os.environ.get("PLATFORM_USE_GLUE") == "1"
@@ -177,12 +180,33 @@ def signal_phase_a_nightly():
         finally:
             spark.stop()
 
+    @task
+    def compute_windows(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Write the satellite windows for the next 26 hours from the run's scheduled time."""
+        spark = build_spark_session("signal_compute_windows", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            return signal_nightly.compute_windows(
+                spark,
+                _run_date(dag_run, data_interval_end),
+                contracts_dir=_contracts_dir(),
+                namespace=ICEBERG_NAMESPACE,
+                span_start_utc=sample_flow.run_end(data_interval_end, dag_run.run_after),
+                run_started_utc=require_utc(dag_run.start_date, "start_date"),
+                now_utc=datetime.now(UTC),
+            )
+        finally:
+            spark.stop()
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
     checked >> loaded
-    loaded >> select_dtc(manifest)
-    load_trails() >> compute_horizons()
+    selected = select_dtc(manifest)
+    loaded >> selected
+    horizons = compute_horizons()
+    load_trails() >> horizons
+    windows = compute_windows()
+    [selected, horizons] >> windows
 
 
 signal_phase_a_nightly()

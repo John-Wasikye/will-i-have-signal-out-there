@@ -144,8 +144,24 @@ def write_run_partition(
     frame = spark.createDataFrame(
         conform_rows(rows, columns, run_date), schema=spark_schema(columns)
     )
+    write_frame_partition(spark, table_name, frame, namespace=namespace)
+    return len(rows)
+
+
+def write_frame_partition(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    table_name: str,
+    frame,  # noqa: ANN001, a pyspark DataFrame already in the table's schema, run_date included
+    *,
+    namespace: str,
+) -> None:
+    """Write a DataFrame built inside Spark as its run date's partition of the table.
+
+    For tables too big to pass through Python as rows, such as the satellite windows. The frame
+    must already carry the contract's schema (``spark_schema``), so nothing is guessed here.
+    """
+    full_name = f"{CATALOG_NAME}.{namespace}.{table_name}"
     if spark.catalog.tableExists(full_name):
         frame.writeTo(full_name).overwritePartitions()
     else:
         frame.writeTo(full_name).partitionedBy("run_date").create()
-    return len(rows)
