@@ -668,19 +668,20 @@ Convention proposed here: 36 horizon angles, one per 10-degree compass sector (3
 | Function or class | Purpose | Takes | Returns |
 |---|---|---|---|
 | `TrailPoint` (class) | One sampled point on a trail | `trail_point_id`, `trail_id`, `seq`, `lon`, `lat`, `elevation_m` | Immutable record |
-| `ElevationTiles` (class) | The loaded set of GLO-30 tiles for the park plus margin, with fast lookup | Tile keys or a bounding box | Object with `elevation_at(lon, lat)` and `profile(lon, lat, azimuth_deg, max_range_m, step_m)` |
-| `HorizonProfile` (class) | The 36 angles for one point | `point_id`, `angles_deg` (36 values) | Immutable record |
+| `ElevationGrid` (class, `geotiff.py`) | One GLO-30 tile's heights, cell (0, 0) centred on the tie point ("pixel is point") | Heights, west, north, cell size in degrees | Object with `elevation_at(lon, lat)` (nearest cell, NaN off the grid) |
+| `read_elevation_grid(path)` (`geotiff.py`) | Read one tile with the standard library and numpy; refuse any layout other than the one the first-run check found (ADR 0038) | A tile file | `ElevationGrid` |
+| `ElevationTiles` (class) | The loaded set of GLO-30 tiles for the park plus margin, looked up together | `ElevationGrid` objects | Object with `elevation_at(lon, lat)` |
+| `HorizonProfile` (class) | The 36 angles for one point | `trail_point_id`, `angles_deg` (36 values) | Immutable record |
 | `sample_points_along_line(line, spacing_m)` | Place a point every `spacing_m` (50) along a trail polyline | A line geometry, spacing in meters | Ordered list of `(lon, lat)` |
 | `build_trail_points(spark, trails_df, spacing_m)` | Spark wrapper that numbers points per trail and adds elevation | Spark DataFrame of trail lines, spacing | DataFrame of `TrailPoint` rows |
-| `load_elevation_tiles(bbox)` | Find and open the GLO-30 tiles covering the bounding box plus the horizon range | Bounding box in lon/lat | `ElevationTiles` |
-| `compute_horizon(point, elevation_tiles)` | How high terrain rises in each compass direction around a trail point | A trail point, elevation tiles | 36 horizon angles |
-| `ray_elevation_profile(point, azimuth_deg, elevation_tiles, max_range_m)` | Terrain heights along one compass direction out to about 15 km | Point, azimuth, tiles, range | Arrays of distance and height |
+| `load_elevation_tiles(paths)` | Open the GLO-30 tile files covering the park plus the horizon range (which tiles, and fetching them on the box, come with the nightly wiring) | Tile files | `ElevationTiles` |
+| `compute_horizon(point, elevation_tiles)` | How high terrain rises in each compass direction around a trail point. Each sector's angle is the highest of 10 rays one degree apart (ADR 0038); all rays are sampled at once with numpy, so there is no separate per-ray profile function | A trail point, elevation tiles | `HorizonProfile` |
 | `max_elevation_angle(observer_height_m, distances_m, heights_m)` | The highest angle above the horizontal along one profile (what blocks the sky in that direction) | Observer height, profile arrays | One angle in degrees |
 | `compute_horizons(spark, trail_points_df, tiles_index)` | Run `compute_horizon` for every point in parallel in Spark | Points DataFrame, tile index | DataFrame of `HorizonProfile` rows |
 | `horizon_at(horizon, azimuth_deg)` | Horizon angle for any azimuth, used by the satellite window engine | A `HorizonProfile`, an azimuth | One angle in degrees (selection of sector or interpolation: OQ-24) |
 | `validate_horizon(horizon)` | Value-range check used by tests and the publish gate | A `HorizonProfile` | Pass or a list of violations |
 
-Decided in ADR 0036 (OQ-24): range 15 km; ray step 30 m; observer height 1.7 m; Earth curvature applied; atmospheric refraction not applied (conservative); surface model kept; 36 sectors, final; `horizon_at` interpolates linearly; the AC-1A.2 margin is 5 degrees between the medians of the canyon and rim fixtures.
+Decided in ADR 0036 (OQ-24): range 15 km; ray step 30 m; observer height 1.7 m; Earth curvature applied; atmospheric refraction not applied (conservative); surface model kept; 36 sectors, final; `horizon_at` interpolates linearly; the AC-1A.2 margin is 5 degrees between the medians of the canyon and rim fixtures. Proposed in ADR 0038 (waiting for John): 10 rays per sector, angles below the level line stored as 0, nearest-cell heights, and the small GeoTIFF reader instead of rasterio.
 
 ### 7.B Satellite windows (1A.3): every function and class
 
@@ -688,7 +689,7 @@ Decided in ADR 0036 (OQ-24): range 15 km; ray step 30 m; observer height 1.7 m; 
 |---|---|---|---|
 | `SatelliteElements` (class) | One selected satellite's orbital elements from a GP record | GP record fields | Immutable record with NORAD id, name, epoch, elements |
 | `SatellitePosition` (class) | A satellite's position at one minute | Satellite id, time (UTC), position in an earth-fixed frame | Immutable record |
-| `Window` (class) | One reachable interval for one point and satellite | `point_id`, `satellite_id`, `start_utc`, `end_utc` | Immutable record |
+| `Window` (class) | One reachable interval for one point and satellite | `trail_point_id`, `satellite_id`, `start_utc`, `end_utc` | Immutable record |
 | `WindowRun` (class) | One run's metadata | Run id, logical date, span start, span length, `min_elev_deg`, `valid_until_utc` | Immutable record |
 | `propagate_satellites(elements, start, minutes, step_minutes)` | Position of each selected satellite at 1-minute steps for 26 hours using SGP4 | Elements list, start time, 1,560 minutes (26 hours), 1-minute step | `SatellitePosition` list per satellite |
 | `look_angles(position, point)` | Azimuth and elevation of a satellite seen from a trail point | A `SatellitePosition`, a `TrailPoint` | `(azimuth_deg, elevation_deg)` |
