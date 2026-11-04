@@ -25,12 +25,12 @@ SIGNAL = Path(__file__).parents[1]
 def spark():
     from pyspark.sql import SparkSession
 
-    # Spark's Python workers import modules by name from PYTHONPATH, as the box's image sets it.
-    # pytest adds the folders to this process only, so pass them on before Spark starts.
-    folders = [SIGNAL, SIGNAL.parent / "platform" / "spark", SIGNAL.parent / "platform" / "publish"]
-    os.environ["PYTHONPATH"] = os.pathsep.join(
-        [str(folder) for folder in folders] + [os.environ.get("PYTHONPATH", "")]
-    )
+    # Spark's Python workers import the horizon code by name from PYTHONPATH, which the box's
+    # image sets. It must be in place before the first Spark session of the test run starts, so
+    # CI's Spark job sets it for the whole step; setting it here would be too late.
+    entries = os.environ.get("PYTHONPATH", "").split(os.pathsep)
+    search_path = [Path(entry).resolve() for entry in entries if entry]
+    assert SIGNAL.resolve() in search_path, f"PYTHONPATH must include {SIGNAL}, as the image's does"
     session = SparkSession.builder.master("local[2]").appName("horizon_tests").getOrCreate()
     yield session
     session.stop()
