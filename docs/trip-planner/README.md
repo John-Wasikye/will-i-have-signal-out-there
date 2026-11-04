@@ -6,10 +6,10 @@ This folder is the documentation for Project 1. It is written so that someone wh
 
 | Field | Value |
 |---|---|
-| Status | Approved by John (Oct 28, 2026). **No code exists yet** |
+| Status | Approved by John (Oct 28, 2026). Phase A is being built: C1 to C4 and C8 run nightly, C5 to C7 and C9 to C12 are not built yet |
 | Owner | John |
-| Last updated | Oct 28, 2026 |
-| Live link | None yet. Phase A (live) has not started |
+| Last updated | Nov 4, 2026 |
+| Live link | https://d36nl5bx6y6lm9.cloudfront.net (under development: no coverage or satellite times shown yet) |
 
 ---
 
@@ -123,7 +123,7 @@ Every key is stored in AWS Parameter Store and read at run time. None is written
 - **A schedule.** The documents say what to build, in what order and against what checks. The schedule is kept apart from them.
 - **The platform's own document set.** The platform's documents are not written yet. [../Platform/platform-requirements.md](../platform/platform-requirements.md) holds the parts Project 1 needs.
 - **The reference generated from code.** It does not exist until the code does.
-- **Setup commands.** These are written with the code, in the repository's own README, once there is code to run.
+- **Setup commands.** These are in the repository's own [README](../../README.md).
 - **GitHub issues for the open questions.** These are to be created. They are not created yet.
 
 ## 9. Approval
