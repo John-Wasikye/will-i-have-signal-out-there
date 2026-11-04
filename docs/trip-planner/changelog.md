@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 4, 2026: own domain
+
+- The live link is now https://signal.johnwasikye.com. The site moved there in two steps: first the HTTPS certificate, then the domain itself. The cloudfront.net address still works.
+
 ### Nov 4, 2026: status and live link
 
 - The README's status line says which Phase A components are built, and the live link points to the site, which is up with an "Under development" banner. The repository README now describes what is deployed.
