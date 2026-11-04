@@ -1,0 +1,96 @@
+# Data contract (ODCS). Proposed (Nov 4, 2026), waiting for John's approval. Internal Iceberg table, written by Spark (C5). Not a
+# source or a published table; the design doc (C5) says it follows the columns of fct_satellite_window, and the loader takes its
+# column types from here.
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-satellite-window
+name: satellite_window
+version: 0.1.0
+status: proposed
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: When each selected Direct-to-Cell satellite is reachable from each trail point, at or above the minimum elevation and above the terrain horizon, stored as the first and last reachable minute (never one row per minute).
+  limitations: The run predicts 26 hours from its scheduled time (ADR 0019). Window edges are accurate to the 1-minute step. A run that would write more than 4,000,000 rows stops before it writes (OQ-1). The partition column is run_date, as in the other internal tables; the published mart (fct_satellite_window) names it run_logical_date.
+  usage: Input to the dbt models (C7), which build fct_satellite_window from it.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: iceberg-satellite-window
+    type: s3
+    description: Iceberg table in the lake, written by Spark through the Glue catalog. Separate for dev and live.
+    location: "Lake table portfolio.portfolio_{env}.satellite_window in s3://portfolio-{env}-lake-{account}/."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Rewritten in each nightly run (10:00 UTC). Partition overwrite by run date makes a rerun replace only that day (ADR 0006).
+customProperties:
+  - property: openQuestions
+    value: OQ-1, OQ-9, OQ-21
+  - property: adr
+    value: adrs/0003, adrs/0005, adrs/0006, adrs/0019
+schema:
+  - name: satellite_window
+    physicalName: satellite_window
+    physicalType: table
+    description: One row per trail point, satellite and window. Partition per run date (UTC).
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: satellite_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: NORAD catalog number as text.
+      - name: window_start_utc
+        logicalType: timestamp
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: First minute the satellite is reachable.
+      - name: window_end_utc
+        logicalType: timestamp
+        required: true
+        description: Last minute the satellite is reachable. On or after window_start_utc.
+      - name: min_elevation_deg
+        logicalType: number
+        required: true
+        description: Minimum elevation used for this run (10, ADR 0003).
+      - name: valid_until_utc
+        logicalType: timestamp
+        required: true
+        description: End of the 26-hour prediction span.
+      - name: run_started_utc
+        logicalType: timestamp
+        required: true
+        description: When the Airflow run that wrote these rows started.
+      - name: loaded_at_utc
+        logicalType: timestamp
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+            - satellite_id
+            - window_start_utc
+            - run_date
+      - type: library
+        metric: rowCount
+        mustBeLessThanOrEqualTo: 4000000
+        description: The job stops before writing above this (OQ-1).
+      - type: sql
+        description: Window end is on or after window start.
+        query: SELECT COUNT(*) FROM satellite_window WHERE window_end_utc < window_start_utc
+        mustBe: 0
