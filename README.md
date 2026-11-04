@@ -2,23 +2,25 @@
 
 I am building a trip planner for hikers, campers and backpackers. You pick a trail and see where each phone carrier has coverage, where it drops out, and when a Starlink Direct-to-Cell satellite text could get through. This repository holds the data platform behind the planner and the planner's code.
 
-The project is in its first phase. I am building the data platform first, and it is not deployed to AWS yet.
+The site is live at **https://d36nl5bx6y6lm9.cloudfront.net**, with an "Under development" banner on every page. It shows no coverage or satellite times yet: I am building the Phase A data pipeline first, in build-plan order, and the trail page gets real data only once that data exists. The site will move to signal.johnwasikye.com.
 
 ## What I have built
 
+Everything runs on AWS in two separate environments, dev and live, built with Terraform and deployed by GitHub Actions.
+
 | Part | Folder | Status |
 |---|---|---|
-| Serving API (FastAPI, DuckDB over Parquet, Lambda handler) | `platform/serving` | Built and tested |
-| Publish gate, write-audit-publish, status and run metrics | `pipelines/platform/publish` | Built and tested |
-| Spark job that writes an Iceberg table | `pipelines/platform/spark/sample_iceberg_job.py` | Built, tested with a fake Spark session |
-| Iceberg maintenance task | `pipelines/platform/spark/iceberg_maintenance.py` | Built, tested with a fake Spark session |
-| Nightly Airflow DAGs | `pipelines/platform/dags`, `pipelines/signal/dags` | Built and tested in the Airflow image (Airflow does not install on Windows). The skeleton runs nightly on the box; the Phase A DAG is not installed yet |
-| Site template (React, TypeScript) | `app` | Built and tested |
-| Terraform (storage, catalog, IAM, budget, parameters, visitor data) | `platform/terraform` | Built and validated. Storage and IAM have tests. Nothing applied to AWS |
-| Continuous integration | `.github/workflows/ci.yml` | Written. Not run on GitHub yet |
-| Dev container | `.devcontainer` | Written. Not opened in Codespaces yet |
+| Serving API (FastAPI, DuckDB over Parquet, on Lambda behind API Gateway) | `platform/serving` | Live |
+| Site (Vite, React, TypeScript, on CloudFront) | `app` | Live, with the development banner |
+| Session box: a spot server that boots each night and runs Airflow and Spark on k3s, then stops | `platform/box` | Live. Saves the Airflow database to S3 before it stops |
+| Nightly Airflow DAGs (platform skeleton and the Phase A signal run) | `pipelines/platform/dags`, `pipelines/signal/dags` | Live, every night at 10:00 UTC |
+| Publish gate, write-audit-publish, status file, run metrics and incident records | `pipelines/platform/publish` | Live |
+| Phase A steps: contract diff (C8), orbit ingest (C1), Direct-to-Cell selector (C2), trail loader (C3), terrain horizon (C4) | `pipelines/signal` | Built and running in the nightly DAG |
+| Terraform: storage, Glue catalog, IAM, budget, alerts, audit trail, Parameter Store, registry, serving, session box, site, visitor data | `platform/terraform` | Applied to dev and live |
+| Continuous integration, CodeQL and Dependabot | `.github/workflows` | Running on every pull request |
+| Deploys | `.github/workflows/deploy.yml`, `terraform-apply.yml` | Each merge builds and scans the Airflow image, then deploys to dev and live after I approve each one |
 
-I have not built these yet: the session box (the nightly server that runs Airflow and Spark), the AWS deployment, the Terraform state bucket, the live status page, and the trail data for Project 1.
+Still to build for Phase A: satellite windows (C5), FCC coverage (C6), the dbt models (C7), the publish gate and publisher for trail data (C9, C10), the trail API (C11) and the trail page with real data (C12). The custom domain is also in progress.
 
 ## Run the checks yourself
 
@@ -34,7 +36,7 @@ ruff check .
 pytest
 ```
 
-You should see `All checks passed!` from ruff. Pytest should report the tests passing, with one test skipped because Airflow is not installed on Windows.
+You should see `All checks passed!` from ruff. Pytest should report about 550 tests passing and about 20 skipped. The skipped ones need Airflow, Spark, Helm or Docker, which do not run on Windows here; CI runs them.
 
 ### 2. Site
 

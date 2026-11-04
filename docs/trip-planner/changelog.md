@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 4, 2026: status and live link
+
+- The README's status line says which Phase A components are built, and the live link points to the site, which is up with an "Under development" banner. The repository README now describes what is deployed.
+
 ### Nov 3, 2026: terrain horizon engine (C4)
 
 - New ADR 0038 (proposed, waiting for John): each sector's horizon is the highest of 10 rays one degree apart, angles below the level line are stored as 0, heights come from the nearest grid cell, and the tiles are read by a small GeoTIFF reader instead of rasterio (John's choice).
