@@ -688,23 +688,37 @@ Decided in ADR 0036 (OQ-24): range 15 km; ray step 30 m; observer height 1.7 m; 
 | Function or class | Purpose | Takes | Returns |
 |---|---|---|---|
 | `SatelliteElements` (class) | One selected satellite's orbital elements from a GP record | GP record fields | Immutable record with NORAD id, name, epoch, elements |
-| `SatellitePosition` (class) | A satellite's position at one minute | Satellite id, time (UTC), position in an earth-fixed frame | Immutable record |
+| `SatelliteTrack` (class) | One satellite's earth-fixed positions for every minute of the span. Replaces the proposed per-minute `SatellitePosition`, which would have been about a million small objects a night | Satellite id, positions in km (minutes by 3) | Immutable record |
 | `Window` (class) | One reachable interval for one point and satellite | `trail_point_id`, `satellite_id`, `start_utc`, `end_utc` | Immutable record |
 | `WindowRun` (class) | One run's metadata | Run id, logical date, span start, span length, `min_elev_deg`, `valid_until_utc` | Immutable record |
-| `propagate_satellites(elements, start, minutes, step_minutes)` | Position of each selected satellite at 1-minute steps for 26 hours using SGP4 | Elements list, start time, 1,560 minutes (26 hours), 1-minute step | `SatellitePosition` list per satellite |
-| `look_angles(position, point)` | Azimuth and elevation of a satellite seen from a trail point | A `SatellitePosition`, a `TrailPoint` | `(azimuth_deg, elevation_deg)` |
-| `find_windows(positions, horizon, min_elev)` | When a satellite clears both the minimum elevation and the terrain | Satellite positions, a horizon profile, the minimum elevation | Windows as start and end times |
-| `reachable_flags(positions, horizon, min_elev)` | One true or false value per minute: above `min_elev` and above `horizon_at(horizon, azimuth)` | Same as `find_windows` | Boolean list aligned to the minutes |
+| `minute_times(start, minutes, step_minutes)` | The span's minutes, from the run's scheduled time (its data interval end, engineering standard 3) | A start time with a time zone, 1,560 minutes, 1-minute step | List of UTC times |
+| `teme_positions(elements, times)` | Every satellite at every minute with SGP4 (WGS72 constants, improved mode), in the TEME frame. A satellite SGP4 cannot place stops the run (`PropagationError`) | Elements list, times | Array of km (satellites by minutes by 3) |
+| `teme_to_ecef(teme, times)` | Turn TEME positions earth-fixed by Greenwich mean sidereal time. Polar motion and UT1 minus UTC are left out (together under 100 m) | TEME positions, times | Earth-fixed positions in km |
+| `propagate_satellites(elements, times)` | Propagate once per satellite for all points | Elements list, times | `SatelliteTrack` list |
+| `look_angles(ecef_km, lat_deg, lon_deg, height_m)` | Azimuth and elevation seen from a point on the WGS84 ellipsoid. The height defaults to 0: a rim height of 2.5 km changes an elevation near 10 degrees by about 0.1 degree, below the 1-minute step's accuracy | Positions of any shape ending in 3, the point | `(azimuth_deg, elevation_deg)` arrays |
+| `find_windows(point, track, horizon, times, min_elev)` | When one satellite clears both the minimum elevation and the terrain. Keeps the Documentation Plan's name; the satellite's positions come as a `SatelliteTrack` | A `TrailPoint`, a track, a horizon profile, times, the minimum elevation | `Window` list |
+| `windows_for_point(point, tracks, horizon, times, min_elev)` | The same for every satellite at once, which is how the job runs | A point, all tracks, its horizon, times, the minimum elevation | `Window` list |
+| `reachable_flags(azimuth, elevation, horizon, min_elev)` | One true or false value per minute: at or above `min_elev` and strictly above the terrain, interpolated as `horizon_at` does | Look angles, a horizon profile, the minimum elevation | Boolean array aligned to the minutes |
 | `flags_to_windows(flags, times)` | Collapse consecutive true minutes into start and end times, so no row per minute is ever stored | Flags, times | List of `(start_utc, end_utc)` |
 | `compute_valid_until(span_start, span_minutes)` | The time the run's predictions stop being valid | Span start, span length | A UTC time: the end of the prediction span (ADR 0019); the late test built on it is OQ-23 |
 | `run_window_job(spark, run, satellites_df, points_df, horizons_df)` | Spark job: propagate once per satellite, evaluate against every trail point in parallel, build satellite windows | Run metadata and the three DataFrames | DataFrame of `Window` rows plus the `WindowRun` |
-| `enforce_row_limit(df, max_rows)` | Stop before publishing if the job would write more rows than its limit | DataFrame, limit | The same DataFrame, or raises and opens an incident (limit value: OQ-1, OQ-15) |
+| `enforce_row_limit(df, max_rows)` | Stop before publishing if the job would write more rows than its limit | DataFrame, limit (4,000,000 rows, `MAX_WINDOW_ROWS`) | The same DataFrame, or raises `RowLimitExceeded`; the task's failure callback opens the incident |
 | `write_window_partition(df, logical_date)` | Overwrite only the run date's partition so a rerun replaces only that day | DataFrame, logical date | Iceberg commit |
-| `sensitivity_report(positions, horizons, elevations)` | Count and total length of satellite windows at 5, 10 and 20 degrees for the design note | Positions, horizons, `[5, 10, 20]` | A summary table |
+| `sensitivity_report(points, tracks, horizons, times, elevations)` | Count and total length of satellite windows at 5, 10 and 20 degrees for the design note | Points, tracks, horizons by point, times, `[5, 10, 20]` | Windows and minutes per elevation |
 
 Edge convention proposed for `flags_to_windows`: a satellite window starts at the first minute whose flag is true and ends at the last minute whose flag is true. Because the steps are 1 minute apart, satellite window edges are accurate to 1 minute. This convention is a proposal that John approves with the document (OQ-21).
 
 Partition rule: the partition key is the run's logical date in UTC (engineering standard 3: use the run's data interval, not the current time).
+
+Measured size (Nov 4, 2026, on the laptop, from that night's live tables: 637 selected satellites, 932 trail points, span 10:00 UTC Nov 4 to 12:00 UTC Nov 5). Row counts do not depend on the machine; the runtime on the session box is still to be measured (OQ-1).
+
+| Minimum elevation | Windows (rows) | Reachable satellite-minutes | Windows per point: median (min to max) |
+|---|---|---|---|
+| 5 degrees | 2,295,628 | 7,085,091 | 2,498 (894 to 3,755) |
+| 10 degrees (used) | 2,156,029 | 6,040,937 | 2,350 (894 to 3,197) |
+| 20 degrees | 1,796,746 | 3,951,324 | 1,973 (894 to 2,407) |
+
+At 10 degrees a window lasts 3 minutes at the median and 6 at most. Per trail, the median point has 2,316 windows on Bright Angel, 2,121 on North Kaibab and 2,800 on South Kaibab. The deepest points have the same 894 windows at every minimum elevation, because their canyon walls are above 20 degrees in every direction. Propagating all 637 satellites took 0.5 seconds; the look angles and windows took about 270 seconds per minimum elevation in one laptop process.
 
 ---
 
@@ -1197,7 +1211,7 @@ A row that says "Plan conflict" marks a place where the build plan or the Decisi
 
 | ID | Question | What answering it needs | Affects | Issue |
 |---|---|---|---|---|
-| OQ-1 | How many rows does a satellite-window run for the park write, and how long does it take? The row limit and runtime limit for the satellite window job are set from the answer | A test run on the session box | C5, QR-7, QR-9 | issue: to be created |
+| OQ-1 | How many rows does a satellite-window run for the park write, and how long does it take? The row limit and runtime limit for the satellite window job are set from the answer. **Partly answered (Nov 4, 2026):** 2,156,029 rows at 10 degrees from 637 satellites and 932 points (section 7.B). **Row limit set by John (Nov 4, 2026): 4,000,000**, about twice the measured count, so constellation growth fits and a bug that doubles the rows stops the run. The box runtime and the runtime limit are still to be measured | A test run on the session box | C5, QR-7, QR-9 | issue: to be created |
 | OQ-2 | Are there enough Ookla speed tests along Grand Canyon trails? | Downloading Ookla's open data | C17, F-1B.4 | issue: to be created |
 | OQ-3 | Does an upload to Databricks Free Edition work (Files API)? | John's Databricks account | C17, F-1B.4 | issue: to be created |
 | OQ-4 | Does Snowflake connect to the Glue catalog and refresh? Snowflake's docs list no edition requirement; check in 1B.3 | John's Snowflake trial, run just before Phase B | C15, F-1B.3 | issue: to be created |
@@ -1205,7 +1219,7 @@ A row that says "Plan conflict" marks a place where the build plan or the Decisi
 | OQ-6 | Does the tag-based selection agree with the altitude (about 330 to 370 km) and inclination (43 or 53 degrees) check for all tagged satellites? **Answered by first-run check (Oct 28, 2026):** almost. In the CelesTrak Starlink file pulled at 02:44 UTC, 637 of 11,133 satellites carry `[DTC]`: 327 at 43 degrees and 310 at 53 degrees, median mean altitude 357 km. 636 pass the check (mean altitude 330 to 370 km from `MEAN_MOTION`, inclination within 0.5 degrees of 43 or 53). One fails: STARLINK-11075, catalog number 58706, at about 296 km, probably being lowered. Under ADR 0002 it stays selected and the disagreement is logged. 47 untagged satellites sit in the same band, so the tag is the better selector. C2's exact rule checks perigee and apogee, not mean altitude, and on the same file it also lists STARLINK-11434 (62420), whose apogee is 379 km. | First-run check on a real CelesTrak file | C2, ADR 0002 | closed |
 | OQ-7 | What is the size of the FCC file for Arizona (and of the Ookla and OpenCelliD files)? The build plan says to measure sizes first **Partly answered by first-run check (Oct 28, 2026):** T-Mobile, Arizona, 4G LTE, hexagon coverage, GeoPackage, data as of Dec 31, 2025: 83 MB zipped, 289 MB unzipped, 1,007,438 rows. The Ookla and OpenCelliD sizes (Phase B) are still open. | Downloading the files | C6, C13, QR-9 | issue: to be created |
 | OQ-8 | Do the NPS trail file and the Copernicus elevation tiles for the park download and open correctly? **Answered by first-run check (Oct 28, 2026):** yes. The NPS query for `UNITCODE='GRCA'` returns 106 trail features as GeoJSON (5.9 MB) in one request. Four Copernicus GLO-30 tiles cover the trails plus the 15 km horizon range (N35 and N36, W112 and W113), each 3600 by 3600 cells of 32-bit floats in EPSG:4326, 37 to 40 MB, cloud-optimised GeoTIFF with deflate and the floating-point predictor. Decoded heights: Bright Angel trailhead 2,075 m, Phantom Ranch 783 m, North Kaibab trailhead 2,512 m, which match the published values. | First-run check | C3, C4 | closed |
-| OQ-9 | How do the satellite windows change at 5 and 20 degrees compared with 10? (Decide in 1A.3, starting at 10) | The satellite window job output | C5, ADR 0003 | issue: to be created |
+| OQ-9 | How do the satellite windows change at 5 and 20 degrees compared with 10? (Decide in 1A.3, starting at 10) **Measured (Nov 4, 2026):** against 10 degrees, 5 degrees gives 6% more windows and 17% more reachable minutes, and 20 degrees gives 17% fewer windows and 35% fewer minutes (section 7.B). The choice stays at 10 until John decides | The satellite window job output | C5, ADR 0003 | issue: to be created |
 | OQ-10 | Do the Ookla open-data files for Arizona read correctly from S3? | First-run check | C13 | issue: to be created |
 | OQ-11 | Which FCC technologies are used, and what is the carrier list for Phase B? (Phase A carrier is T-Mobile, Decided by John, Oct 9, 2026, ADR 0020) **Answered (Oct 9, 2026):** every carrier and every technology with an FCC file for the park's area; the file decides the set (ADR 0031). | John's decision | C6, C13 | closed |
 | OQ-12 | What is N, the number of reports in the same cell on the same day that lets reports become labels? (Method decided: N reports in one cell on one day, each a different visitor because of the one-per-cell rule, ADR 0008) | John's decision after seeing traffic; the 50 a day system cap bounds it | C23, ADR 0008 | issue: to be created |

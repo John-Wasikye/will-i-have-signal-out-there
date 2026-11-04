@@ -42,3 +42,26 @@ def test_the_laptop_and_ci_range_allows_no_pyarrow_without_the_fix():
     match = re.search(r'"pyarrow>=([\d.]+),', PYPROJECT.read_text(encoding="utf-8"))
     assert match
     assert _version(match.group(1)) >= FIXED
+
+
+CI_WORKFLOW = BOX.parent.parent / ".github" / "workflows" / "ci.yml"
+SMOKE_TEST = BOX / "smoke_test_airflow_image.sh"
+CI_AIRFLOW_INSTALL = r'"apache-airflow==\$\{AIRFLOW_VERSION\}"([^\n]*)'
+
+
+def test_the_satellite_window_engine_gets_sgp4_everywhere_it_runs():
+    """C5 imports sgp4 in the image, on the laptop and in CI's DAG test job.
+
+    That CI job installs its own package list, so a package missing there fails only in CI.
+    """
+    pinned = _pin(REQUIREMENTS, "sgp4")
+    match = re.search(r'"sgp4>=([\d.]+),<([\d.]+)"', PYPROJECT.read_text(encoding="utf-8"))
+    assert match, "sgp4 has no range in pyproject.toml"
+    assert _version(match.group(1)) <= _version(pinned) < _version(match.group(2))
+
+    install = re.search(CI_AIRFLOW_INSTALL, CI_WORKFLOW.read_text(encoding="utf-8"))
+    packages = [word.partition("==")[0] for word in install.group(1).split()] if install else []
+    assert "sgp4" in packages, "CI's DAG test job does not install sgp4"
+
+    smoke = SMOKE_TEST.read_text(encoding="utf-8")
+    assert re.search(r"import [^\n]*\bsgp4\b", smoke), "the image smoke test does not import sgp4"
