@@ -14,7 +14,7 @@ echo "Java is installed, because Spark needs it"
 in_image java -version
 
 echo "Airflow, PySpark and PyArrow import"
-in_image python -c "import airflow, pyspark, pyarrow"
+in_image python -c "import airflow, pyspark, pyarrow, numpy"
 
 echo "The nightly DAG loads"
 in_image python -c "import platform_skeleton_dag as m; assert m.platform_skeleton_nightly().dag_id == 'platform_skeleton_nightly'"
