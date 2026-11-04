@@ -32,3 +32,11 @@ output "dns_record_2_site" {
     target = aws_cloudfront_distribution.site.domain_name
   }
 }
+
+output "origins" {
+  description = "Addresses the site is served from, for the serving API's allowed_origins. The cloudfront.net address always, and https://<site_domain> once attach_domain is true."
+  value = concat(
+    ["https://${aws_cloudfront_distribution.site.domain_name}"],
+    var.attach_domain ? ["https://${var.site_domain}"] : [],
+  )
+}

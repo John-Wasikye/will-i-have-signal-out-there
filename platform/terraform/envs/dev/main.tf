@@ -98,7 +98,7 @@ module "serving" {
   published_bucket  = module.storage.bucket_names["site"]
   lambda_zip_path   = var.lambda_zip_path
   lambda_zip_sha256 = var.lambda_zip_sha256
-  allowed_origins   = ["https://${module.site.domain_name}"]
+  allowed_origins   = module.site.origins
 
   # The account's whole Lambda limit is 10, shared by dev and live, and AWS keeps 10
   # unreserved, so no reservation can be set. The account limit is the cap until AWS raises it.

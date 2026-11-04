@@ -107,10 +107,10 @@ module "site" {
   env                         = local.env
   bucket_regional_domain_name = module.storage.bucket_regional_domain_names["site"]
 
-  # Phase 1: request the certificate and print its validation record. Flip attach_domain to true
-  # in a later change, once the record is in Cloudflare and the certificate is issued.
+  # Phase 2: the certificate is issued (its validation record is in Cloudflare), so CloudFront
+  # serves the site under the domain. The serving API allows it through module.site.origins.
   site_domain   = "signal.johnwasikye.com"
-  attach_domain = false
+  attach_domain = true
 }
 
 module "serving" {
@@ -120,7 +120,7 @@ module "serving" {
   published_bucket  = module.storage.bucket_names["site"]
   lambda_zip_path   = var.lambda_zip_path
   lambda_zip_sha256 = var.lambda_zip_sha256
-  allowed_origins   = ["https://${module.site.domain_name}"]
+  allowed_origins   = module.site.origins
 
   # The account's whole Lambda limit is 10, shared by dev and live, and AWS keeps 10
   # unreserved, so no reservation can be set. The account limit is the cap until AWS raises it.
