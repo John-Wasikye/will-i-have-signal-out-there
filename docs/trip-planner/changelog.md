@@ -14,6 +14,7 @@ This file records two things: changes to the documents, and, once code exists, c
 
 - New ADR 0038 (proposed, waiting for John): each sector's horizon is the highest of 10 rays one degree apart, angles below the level line are stored as 0, heights come from the nearest grid cell, and the tiles are read by a small GeoTIFF reader instead of rasterio (John's choice).
 - Design doc table 7.A now lists `ElevationGrid` and `read_elevation_grid` (`geotiff.py`), `ElevationTiles` built from grids, and `load_elevation_tiles(paths)`. `ray_elevation_profile` is not a separate function: all rays are sampled at once. `HorizonProfile` and `Window` use `trail_point_id` (were `point_id`).
+- `contracts/trail_point_horizon.yaml` 0.2.0: the angle array declares its items as numbers, and points to ADR 0036 and 0038 instead of the closed OQ-24. The `signal_phase_a_nightly` DAG gains `compute_horizons` after `load_trails` (C4 runs when the newest trail points have no horizon yet). The GLO-30 tile manifest is kept under `signal/copernicus/manifest/` in the raw bucket.
 
 ### Oct 29, 2026: contracts for the Direct-to-Cell tables
 

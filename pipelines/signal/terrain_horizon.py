@@ -12,7 +12,7 @@ line is stored as 0 degrees, the range the trail_point_horizon contract allows; 
 """
 
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +26,8 @@ EYE_HEIGHT_M = 1.7
 SECTORS = 36
 SECTOR_WIDTH_DEG = 360 / SECTORS
 RAYS_PER_SECTOR = 10
+# Each partition holds all four Phase A tiles (about 200 MB), so four fit easily in the scheduler.
+SPARK_PARTITIONS = 4
 
 __all__ = [
     "EARTH_MEAN_RADIUS_M",
@@ -33,6 +35,7 @@ __all__ = [
     "HorizonProfile",
     "MissingElevation",
     "compute_horizon",
+    "compute_horizons",
     "horizon_at",
     "load_elevation_tiles",
     "max_elevation_angle",
@@ -101,6 +104,32 @@ def compute_horizon(point: TrailPoint, elevation_tiles: ElevationTiles) -> Horiz
     return HorizonProfile(
         trail_point_id=point.trail_point_id,
         angles_deg=tuple(float(a) for a in sector_angles),
+    )
+
+
+def compute_horizons(
+    spark,  # noqa: ANN001, a pyspark SparkSession, typed loosely to avoid importing pyspark
+    points: Sequence[TrailPoint],
+    tile_paths: Sequence[Path],
+    *,
+    partitions: int = SPARK_PARTITIONS,
+) -> list[HorizonProfile]:
+    """Compute every point's horizon in parallel with Spark, in the points' order.
+
+    Each partition reads the tiles once from ``tile_paths``, which must be readable where Spark
+    runs its Python workers (the box's local disk: Spark runs in local mode on the session box).
+    """
+    paths = [str(path) for path in tile_paths]
+
+    def horizons_for(chunk: Iterable[TrailPoint]) -> Iterator[HorizonProfile]:
+        tiles = load_elevation_tiles(Path(path) for path in paths)
+        for point in chunk:
+            yield compute_horizon(point, tiles)
+
+    return (
+        spark.sparkContext.parallelize(list(points), partitions)
+        .mapPartitions(horizons_for)
+        .collect()
     )
 
 

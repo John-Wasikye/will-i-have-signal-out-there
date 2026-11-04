@@ -3,7 +3,7 @@
 Airflow does not install on Windows, so these tests skip locally and run where Airflow is
 installed (CI, or the Airflow image). The rules:
 - C1 pulls, C8 checks the file, then C1 loads it and C2 selects from it, in that order
-- C3 does not wait for the orbit steps
+- C3 does not wait for the orbit steps, and C4 gives the trail points their horizons after C3
 - every task tries twice more, then records an incident and sends an email
 - only one run is active at a time, and a fresh install starts the DAG unpaused
 - Airflow reads exactly the two DAG files under pipelines/, nothing else there
@@ -46,6 +46,7 @@ def test_every_step_is_a_task(signal_dag):
         "load_orbits",
         "select_dtc",
         "load_trails",
+        "compute_horizons",
     }
 
 
@@ -60,6 +61,10 @@ def test_the_orbit_steps_run_in_order(signal_dag):
 
 def test_the_trails_do_not_wait_for_the_orbits(signal_dag):
     assert signal_dag.get_task("load_trails").upstream_task_ids == set()
+
+
+def test_the_horizons_wait_only_for_the_trails(signal_dag):
+    assert signal_dag.get_task("compute_horizons").upstream_task_ids == {"load_trails"}
 
 
 def test_a_task_tries_again_after_a_brief_failure(signal_dag):

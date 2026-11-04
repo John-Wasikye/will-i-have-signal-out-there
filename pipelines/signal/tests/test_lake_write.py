@@ -207,3 +207,30 @@ def test_an_empty_first_night_still_creates_the_table_with_its_types():
     assert spark.rows == []
     assert spark.schema == spark_schema(COLUMNS)
     assert spark.calls == ["writeTo:portfolio.p.t", "partitionedBy:run_date", "create"]
+
+
+ANGLES = Column("horizon_angles_deg", "array", required=True, item_type="number")
+
+
+def test_contract_columns_read_the_item_type_of_an_array():
+    columns = contract_columns(CONTRACTS / "trail_point_horizon.yaml", "trail_point_horizon")
+
+    assert columns[1] == ANGLES
+
+
+def test_an_array_of_numbers_is_declared_as_an_array_of_doubles():
+    assert spark_schema((ANGLES,)) == (
+        "horizon_angles_deg ARRAY<DOUBLE> NOT NULL, run_date DATE NOT NULL"
+    )
+
+
+def test_an_array_without_an_item_type_is_refused():
+    with pytest.raises(ValueError, match="horizon_angles_deg: an array needs an item type"):
+        spark_schema((Column("horizon_angles_deg", "array", required=True),))
+
+
+def test_whole_numbers_in_a_number_array_become_floats():
+    rows = conform_rows([{"horizon_angles_deg": (0, 1.5, 2)}], (ANGLES,), RUN_DATE)
+
+    assert rows[0]["horizon_angles_deg"] == [0.0, 1.5, 2.0]
+    assert all(type(value) is float for value in rows[0]["horizon_angles_deg"])

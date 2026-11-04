@@ -18,10 +18,17 @@ from __future__ import annotations
 import hashlib
 import urllib.request
 from collections.abc import Callable
+from dataclasses import fields
 from datetime import UTC, date, datetime
 from pathlib import Path
 
 from dtc_selector import disagreement_rows, satellite_rows, select_dtc_satellites
+from elevation_source import (
+    MANIFEST_PREFIX,
+    fetch_tiles,
+    store_tile_manifest,
+    tiles_covering,
+)
 from lake_write import contract_columns, write_run_partition
 from orbit_ingest import (
     CELESTRAK_STARLINK_URL,
@@ -35,11 +42,13 @@ from orbit_ingest import (
 )
 from raw_store import latest_manifest, read_raw
 from sample_iceberg_job import CATALOG_NAME
+from terrain_horizon import RANGE_M, compute_horizons, validate_horizon
 from timeutil import require_utc
 from trail_loader import (
     PHASE_A_TRAILS,
     PHASE_A_UNIT_CODE,
     POINT_SPACING_M,
+    TrailPoint,
     fetch_trail_pages,
     load_trail_tables,
     parse_trail_geojson,
@@ -48,6 +57,9 @@ from trail_loader import (
     trail_line_rows,
     trail_point_rows,
 )
+
+# Tiles reach 1 km past the horizon range, so no ray from a point near a tile edge runs off them.
+TILE_MARGIN_M = 1_000
 
 
 def pull_orbits(
@@ -189,6 +201,73 @@ def load_trails_if_changed(
     return {"changed": True, **counts}
 
 
+def compute_horizons_if_needed(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    s3,  # noqa: ANN001, a boto3 S3 client
+    raw_bucket: str,
+    run_date: date,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+    now_utc: datetime,
+    work_dir: Path,
+    opener: Callable = urllib.request.urlopen,
+) -> dict:
+    """Give the newest trail points their terrain horizons, unless they already have them (C4).
+
+    The horizon is reference data: it changes only when the trail points do (ADR 0028), so it is
+    computed when the newest ``trail_point`` partition is newer than the newest horizon partition.
+    The GLO-30 tiles are downloaded into ``work_dir`` and only their manifest is kept. Returns
+    ``{"changed": False}``, or how many points and tiles were used.
+    """
+    points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
+    horizon_table = f"{CATALOG_NAME}.{namespace}.trail_point_horizon"
+    points_date = _newest_run_date(spark, points_table)
+    if points_date is None:
+        raise ValueError("no trail points are loaded yet, so there is nothing to give a horizon")
+    horizon_date = _newest_run_date(spark, horizon_table)
+    if horizon_date is not None and horizon_date >= points_date:
+        return {"changed": False}
+
+    points = _trail_points(spark, points_table, points_date)
+    tiles = tiles_covering(points, margin_m=RANGE_M + TILE_MARGIN_M)
+    tile_rows = fetch_tiles(tiles, work_dir, now_utc=now_utc, opener=opener)
+    kept = store_tile_manifest(
+        s3,
+        raw_bucket,
+        tile_rows,
+        previous=latest_manifest(s3, raw_bucket, MANIFEST_PREFIX),
+        fetched_at=now_utc,
+    )
+    tile_paths = [Path(work_dir) / Path(row["tile_key"]).name for row in tile_rows]
+    horizons = compute_horizons(spark, points, tile_paths)
+    for horizon in horizons:
+        problems = validate_horizon(horizon)
+        if problems:
+            raise ValueError(f"horizon for {horizon.trail_point_id}: {'; '.join(problems)}")
+
+    rows = [
+        {
+            "trail_point_id": horizon.trail_point_id,
+            "horizon_angles_deg": list(horizon.angles_deg),
+            "computed_at_utc": now_utc,
+            "elevation_source_manifest_sha256": kept["manifest_sha256"],
+        }
+        for horizon in horizons
+    ]
+    write_run_partition(
+        spark,
+        "trail_point_horizon",
+        rows,
+        run_date,
+        columns=contract_columns(
+            Path(contracts_dir) / "trail_point_horizon.yaml", "trail_point_horizon"
+        ),
+        namespace=namespace,
+    )
+    return {"changed": True, "points": len(points), "tiles": len(tiles)}
+
+
 def _orbit_rows(s3, raw_bucket: str, manifest: dict, contract: Path) -> list[dict]:  # noqa: ANN001
     """Read the kept CelesTrak file, check it against the contract, and shape its rows."""
     records = parse_gp_records(read_raw(s3, raw_bucket, manifest["raw_key"]), contract)
@@ -205,3 +284,20 @@ def _loaded_trail_hashes(spark, namespace: str) -> set[str]:  # noqa: ANN001
         f"WHERE run_date = (SELECT MAX(run_date) FROM {table})"
     )
     return {row["content_sha256"] for row in spark.sql(query).collect()}
+
+
+def _newest_run_date(spark, table: str) -> date | None:  # noqa: ANN001
+    """Return the newest ``run_date`` partition of the table, or None if it has none."""
+    if not spark.catalog.tableExists(table):
+        return None
+    return spark.sql(f"SELECT MAX(run_date) AS newest FROM {table}").collect()[0]["newest"]
+
+
+def _trail_points(spark, table: str, run_date: date) -> list[TrailPoint]:  # noqa: ANN001
+    """Return the trail points of one partition, in trail and sequence order."""
+    names = [field.name for field in fields(TrailPoint)]
+    query = (
+        f"SELECT {', '.join(names)} FROM {table} "
+        f"WHERE run_date = DATE '{run_date.isoformat()}' ORDER BY trail_id, seq"
+    )
+    return [TrailPoint(**{name: row[name] for name in names}) for row in spark.sql(query).collect()]

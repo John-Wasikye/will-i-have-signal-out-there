@@ -3,7 +3,8 @@
 The orbit steps run in order: pull CelesTrak (or reuse a pull from the last 2 hours), check the
 file against its contract, load ``celestrak_gp``, then select the Direct-to-Cell satellites.
 The trail step does not need the orbits, so it runs beside them, and loads only when the NPS
-pages changed (ADR 0028). A task that fails tries twice more, then records an incident and
+pages changed (ADR 0028). The terrain horizons (C4) follow the trails and are computed only for
+trail points that have none yet. A task that fails tries twice more, then records an incident and
 sends an email, the same as the skeleton.
 
 The DAG only wires tasks together. The logic lives in pipelines/signal/signal_nightly.py.
@@ -12,6 +13,7 @@ The DAG only wires tasks together. The logic lives in pipelines/signal/signal_ni
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -155,12 +157,32 @@ def signal_phase_a_nightly():
         finally:
             spark.stop()
 
+    @task
+    def compute_horizons(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Give the newest trail points their terrain horizons, unless they already have them."""
+        spark = build_spark_session("signal_compute_horizons", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            # The four GLO-30 tiles (about 155 MB) are needed only while the step runs.
+            with tempfile.TemporaryDirectory(prefix="glo30-") as work_dir:
+                return signal_nightly.compute_horizons_if_needed(
+                    spark,
+                    aws_client("s3"),
+                    os.environ["PLATFORM_RAW_BUCKET"],
+                    _run_date(dag_run, data_interval_end),
+                    contracts_dir=_contracts_dir(),
+                    namespace=ICEBERG_NAMESPACE,
+                    now_utc=datetime.now(UTC),
+                    work_dir=Path(work_dir),
+                )
+        finally:
+            spark.stop()
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
     checked >> loaded
     loaded >> select_dtc(manifest)
-    load_trails()
+    load_trails() >> compute_horizons()
 
 
 signal_phase_a_nightly()

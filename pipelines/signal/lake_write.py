@@ -39,6 +39,7 @@ class Column:
     name: str
     logical_type: str
     required: bool
+    item_type: str | None = None  # the logical type of each item, for an array column
 
 
 def contract_columns(contract_path: Path, table_name: str) -> tuple[Column, ...]:
@@ -47,7 +48,12 @@ def contract_columns(contract_path: Path, table_name: str) -> tuple[Column, ...]
     for table in contract.get("schema", []):
         if table["name"] == table_name:
             return tuple(
-                Column(column["name"], column["logicalType"], bool(column.get("required", False)))
+                Column(
+                    column["name"],
+                    column["logicalType"],
+                    bool(column.get("required", False)),
+                    column.get("items", {}).get("logicalType"),
+                )
                 for column in table["properties"]
             )
     raise ValueError(f"{contract_path}: no table named {table_name}")
@@ -57,14 +63,21 @@ def spark_schema(columns: Sequence[Column]) -> str:
     """Return the Spark DDL schema for the columns plus the ``run_date`` partition column."""
     declared = []
     for column in columns:
-        if column.logical_type not in SPARK_TYPES:
-            raise ValueError(
-                f"{column.name}: no Spark type for logical type {column.logical_type!r}"
-            )
         not_null = " NOT NULL" if column.required else ""
-        declared.append(f"{column.name} {SPARK_TYPES[column.logical_type]}{not_null}")
+        declared.append(f"{column.name} {_spark_type(column)}{not_null}")
     declared.append("run_date DATE NOT NULL")
     return ", ".join(declared)
+
+
+def _spark_type(column: Column) -> str:
+    if column.logical_type == "array":
+        if column.item_type is None:
+            raise ValueError(f"{column.name}: an array needs an item type")
+        item = Column(column.name, column.item_type, required=True)
+        return f"ARRAY<{_spark_type(item)}>"
+    if column.logical_type not in SPARK_TYPES:
+        raise ValueError(f"{column.name}: no Spark type for logical type {column.logical_type!r}")
+    return SPARK_TYPES[column.logical_type]
 
 
 def conform_rows(rows: Sequence[dict], columns: Sequence[Column], run_date: date) -> list[dict]:
@@ -95,6 +108,9 @@ def _conform_value(value: object, column: Column) -> object:
         if column.required:
             raise ValueError(f"{column.name} is required but a row has no value")
         return None
+    if column.logical_type == "array":
+        item = Column(column.name, column.item_type, required=True)
+        return [_conform_value(each, item) for each in value]
     if column.logical_type == "number" and isinstance(value, int) and not isinstance(value, bool):
         return float(value)
     if column.logical_type == "timestamp" and isinstance(value, datetime):
