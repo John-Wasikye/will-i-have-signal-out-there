@@ -12,7 +12,25 @@ What it does:
 - **Page links work.** S3 answers 403 for a missing file when access is private. A missing path returns `index.html` with a 200, so the app can handle its own page links.
 - **The cheapest price class,** `PriceClass_100`, which stays inside CloudFront's free allowance for my traffic.
 
-I use the default `cloudfront.net` address and certificate for now. A custom domain is a later step.
+Without a custom domain, the site uses the default `cloudfront.net` address and certificate.
+
+## Custom domain in two phases
+
+The site can also be served under its own domain. An ACM (AWS Certificate Manager) certificate proves to AWS that I own the domain. CloudFront only accepts certificates from `us-east-1`, which is where this module's configuration runs. DNS for `johnwasikye.com` is at Cloudflare, so I add the records there by hand. Each record must be "DNS only" (grey cloud), not proxied, or AWS cannot check it.
+
+Phase 1 requests the certificate. Set `site_domain` and leave `attach_domain` false. This is the state of `envs/live` now.
+
+1. Apply. Terraform requests the certificate and does not wait for it.
+2. Read the output `dns_record_1_certificate_validation`. Add the CNAME it shows at Cloudflare, as DNS only. AWS uses it to check the domain.
+3. Wait until the certificate shows as issued in ACM in `us-east-1`.
+
+Phase 2 serves the site under the domain. It is a separate change, made after phase 1 is complete.
+
+1. Read the output `dns_record_2_site`. Add that CNAME at Cloudflare, as DNS only. It points the domain at CloudFront.
+2. In `envs/live/main.tf`, set `attach_domain = true` and add `https://<site_domain>` to the serving module's `allowed_origins`. Without the second change, the API refuses requests from the new address.
+3. Apply. The apply waits for the certificate to be issued. If the validation record is missing, the apply fails after 10 minutes, and CloudFront keeps its default certificate. Once the apply succeeds, CloudFront serves the domain with the certificate and drops its default certificate.
+
+`attach_domain = true` without `site_domain` is refused.
 
 ## Inputs
 
@@ -20,6 +38,8 @@ I use the default `cloudfront.net` address and certificate for now. A custom dom
 |---|---|---|---|
 | `env` | string | none | `dev` or `live`. |
 | `bucket_regional_domain_name` | string | none | Regional domain of the site bucket, from the storage module. |
+| `site_domain` | string | `null` | Own domain for the site. Null keeps the `cloudfront.net` address. Setting it requests the certificate. |
+| `attach_domain` | bool | `false` | True serves the site under `site_domain`. Only set it after the certificate is issued. |
 
 ## Outputs
 
@@ -28,3 +48,5 @@ I use the default `cloudfront.net` address and certificate for now. A custom dom
 | `distribution_arn` | Pass to the storage module as `site_distribution_arn`. |
 | `domain_name` | Address of the site. |
 | `distribution_id` | ID of the distribution. The deploy workflow clears its cache. |
+| `dns_record_1_certificate_validation` | Phase 1 Cloudflare record: the CNAME that validates the certificate. Empty without `site_domain`. |
+| `dns_record_2_site` | Phase 2 Cloudflare record: the CNAME from the site domain to CloudFront. Null without `site_domain`. |

@@ -76,6 +76,32 @@ resource "aws_cloudfront_response_headers_policy" "security" {
   }
 }
 
+# The certificate for the site's own domain. CloudFront accepts only certificates from us-east-1,
+# which is the region this module runs in. Cloudflare holds the DNS, so the validation record is
+# added by hand between the two phases (see the README).
+resource "aws_acm_certificate" "site" {
+  count = var.site_domain == null ? 0 : 1
+
+  domain_name       = var.site_domain
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Waits until AWS has issued the certificate. Only the second phase reads it.
+resource "aws_acm_certificate_validation" "site" {
+  count = var.attach_domain ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.site[0].arn
+  validation_record_fqdns = [for option in aws_acm_certificate.site[0].domain_validation_options : option.resource_record_name]
+
+  timeouts {
+    create = "10m"
+  }
+}
+
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
   comment             = "${var.env} site"
@@ -83,6 +109,7 @@ resource "aws_cloudfront_distribution" "site" {
   price_class         = "PriceClass_100"
   http_version        = "http2and3"
   is_ipv6_enabled     = true
+  aliases             = var.attach_domain ? [var.site_domain] : []
 
   origin {
     domain_name              = var.bucket_regional_domain_name
@@ -149,7 +176,11 @@ resource "aws_cloudfront_distribution" "site" {
     }
   }
 
+  # CloudFront's own *.cloudfront.net certificate until the domain is attached.
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = var.attach_domain ? null : true
+    acm_certificate_arn            = var.attach_domain ? aws_acm_certificate_validation.site[0].certificate_arn : null
+    ssl_support_method             = var.attach_domain ? "sni-only" : null
+    minimum_protocol_version       = var.attach_domain ? "TLSv1.2_2021" : null
   }
 }
