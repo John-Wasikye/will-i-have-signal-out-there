@@ -9,6 +9,7 @@ dependencies = [
     "mangum>=0.17,<1",
     "numpy>=2.4,<2.5",  # terrain horizon (C4); 2.5 needs Python 3.12
     "sgp4>=2.27,<3",  # satellite windows (C5)
+    "h3>=4.5,<5",  # FCC coverage cells (C6)
     "pyarrow>=23.0.1,<26",
     "pydantic>=2.6,<3",
 ]

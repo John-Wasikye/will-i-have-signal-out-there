@@ -65,3 +65,18 @@ def test_the_satellite_window_engine_gets_sgp4_everywhere_it_runs():
 
     smoke = SMOKE_TEST.read_text(encoding="utf-8")
     assert re.search(r"import [^\n]*\bsgp4\b", smoke), "the image smoke test does not import sgp4"
+
+
+def test_the_fcc_coverage_loader_gets_h3_everywhere_it_runs():
+    """C6 imports h3 in the image, on the laptop and in CI's DAG test job."""
+    pinned = _pin(REQUIREMENTS, "h3")
+    match = re.search(r'"h3>=([\d.]+),<([\d.]+)"', PYPROJECT.read_text(encoding="utf-8"))
+    assert match, "h3 has no range in pyproject.toml"
+    assert _version(match.group(1)) <= _version(pinned) < _version(match.group(2))
+
+    install = re.search(CI_AIRFLOW_INSTALL, CI_WORKFLOW.read_text(encoding="utf-8"))
+    packages = [word.partition("==")[0] for word in install.group(1).split()] if install else []
+    assert "h3" in packages, "CI's DAG test job does not install h3"
+
+    smoke = SMOKE_TEST.read_text(encoding="utf-8")
+    assert re.search(r"import [^\n]*\bh3\b", smoke), "the image smoke test does not import h3"

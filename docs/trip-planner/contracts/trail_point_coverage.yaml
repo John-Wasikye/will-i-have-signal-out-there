@@ -1,0 +1,82 @@
+# Data contract (ODCS). Proposed, waiting for John's approval. Internal Iceberg table, written by C6. Not a source or a published table;
+# included because C7 reads it, and the loader takes its column types from here.
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-trail-point-coverage
+name: trail_point_coverage
+version: 0.1.0
+status: proposed
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: One row per trail point and carrier, saying whether the point's H3 resolution 9 cell is listed in the carrier's FCC file.
+  limitations: Coverage is the carrier's modeled claim, not a measurement. Every listed cell counts as covered (OQ-44). Phase A covers T-Mobile 4G LTE only (ADR 0020).
+  usage: Input to int_trail_point_coverage in dbt (C7).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: iceberg-trail-point-coverage
+    type: s3
+    description: Iceberg table in the lake, written by Spark through the Glue catalog. Separate for dev and live.
+    location: "Lake table portfolio.portfolio_{env}.trail_point_coverage in s3://portfolio-{env}-lake-{account}/."
+slaProperties:
+  - property: frequency
+    value: reference data
+    description: Rewritten only when the FCC file or the trail points change (ADR 0028). Partition overwrite by run date makes a rerun safe.
+customProperties:
+  - property: openQuestions
+    value: OQ-11
+  - property: adr
+    value: adrs/0007, adrs/0020, adrs/0028
+schema:
+  - name: trail_point_coverage
+    physicalName: trail_point_coverage
+    physicalType: table
+    description: One row per trail point, carrier and technology. Partition per run date.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: carrier
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: Provider as named in the FCC file.
+      - name: technology
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: Technology as named in the FCC file.
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+        description: The point's H3 resolution 9 cell.
+      - name: covered
+        logicalType: boolean
+        required: true
+        description: True when the carrier's file lists the cell.
+      - name: release
+        logicalType: string
+        required: true
+        description: The FCC release the flag came from.
+      - name: content_sha256
+        logicalType: string
+        required: true
+        description: Hash of the raw FCC file the flag came from.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+            - carrier
+            - technology

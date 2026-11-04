@@ -7,3 +7,5 @@ pyarrow==25.0.1
 numpy==2.4.6
 # sgp4 (the satellite windows, C5) is not in the constraint file, so this pin is the only one.
 sgp4==2.27
+# h3 (the FCC coverage cells, C6).
+h3==4.5.0
