@@ -13,7 +13,8 @@ This file records two things: changes to the documents, and, once code exists, c
 ### Nov 4, 2026: satellite window engine (C5)
 
 - Design doc table 7.B now lists the functions as built: `SatelliteTrack` (one array per satellite) replaces the per-minute `SatellitePosition`, and `minute_times`, `teme_positions`, `teme_to_ecef` and `windows_for_point` are new. `find_windows` keeps its name and takes a point and a track. A satellite counts as reachable at or above the minimum elevation and strictly above the terrain.
-- Section 7.B records the measured size from the Nov 4 live tables, and OQ-1 and OQ-9 say what is answered: about 2.16 million windows a night at 10 degrees, with the 5 and 20 degree comparison. The row limit and the choice of 10 degrees stay John's.
+- Section 7.B records the measured size from the Nov 4 live tables, and OQ-1 and OQ-9 say what is answered: about 2.16 million windows a night at 10 degrees, with the 5 and 20 degree comparison. The choice of 10 degrees stays John's.
+- John set the satellite window row limit to 4,000,000 (OQ-1): about twice the measured 2,156,029, so the constellation can grow but a doubling bug stops the run before anything is written.
 
 ### Nov 4, 2026: own domain
 

@@ -702,7 +702,7 @@ Decided in ADR 0036 (OQ-24): range 15 km; ray step 30 m; observer height 1.7 m; 
 | `flags_to_windows(flags, times)` | Collapse consecutive true minutes into start and end times, so no row per minute is ever stored | Flags, times | List of `(start_utc, end_utc)` |
 | `compute_valid_until(span_start, span_minutes)` | The time the run's predictions stop being valid | Span start, span length | A UTC time: the end of the prediction span (ADR 0019); the late test built on it is OQ-23 |
 | `run_window_job(spark, run, satellites_df, points_df, horizons_df)` | Spark job: propagate once per satellite, evaluate against every trail point in parallel, build satellite windows | Run metadata and the three DataFrames | DataFrame of `Window` rows plus the `WindowRun` |
-| `enforce_row_limit(df, max_rows)` | Stop before publishing if the job would write more rows than its limit | DataFrame, limit | The same DataFrame, or raises and opens an incident (limit value: OQ-1, OQ-15) |
+| `enforce_row_limit(df, max_rows)` | Stop before publishing if the job would write more rows than its limit | DataFrame, limit (4,000,000 rows, `MAX_WINDOW_ROWS`) | The same DataFrame, or raises `RowLimitExceeded`; the task's failure callback opens the incident |
 | `write_window_partition(df, logical_date)` | Overwrite only the run date's partition so a rerun replaces only that day | DataFrame, logical date | Iceberg commit |
 | `sensitivity_report(points, tracks, horizons, times, elevations)` | Count and total length of satellite windows at 5, 10 and 20 degrees for the design note | Points, tracks, horizons by point, times, `[5, 10, 20]` | Windows and minutes per elevation |
 
@@ -1211,7 +1211,7 @@ A row that says "Plan conflict" marks a place where the build plan or the Decisi
 
 | ID | Question | What answering it needs | Affects | Issue |
 |---|---|---|---|---|
-| OQ-1 | How many rows does a satellite-window run for the park write, and how long does it take? The row limit and runtime limit for the satellite window job are set from the answer. **Partly answered (Nov 4, 2026):** 2,156,029 rows at 10 degrees from 637 satellites and 932 points (section 7.B). The row limit is John's to set; the box runtime is still to be measured | A test run on the session box | C5, QR-7, QR-9 | issue: to be created |
+| OQ-1 | How many rows does a satellite-window run for the park write, and how long does it take? The row limit and runtime limit for the satellite window job are set from the answer. **Partly answered (Nov 4, 2026):** 2,156,029 rows at 10 degrees from 637 satellites and 932 points (section 7.B). **Row limit set by John (Nov 4, 2026): 4,000,000**, about twice the measured count, so constellation growth fits and a bug that doubles the rows stops the run. The box runtime and the runtime limit are still to be measured | A test run on the session box | C5, QR-7, QR-9 | issue: to be created |
 | OQ-2 | Are there enough Ookla speed tests along Grand Canyon trails? | Downloading Ookla's open data | C17, F-1B.4 | issue: to be created |
 | OQ-3 | Does an upload to Databricks Free Edition work (Files API)? | John's Databricks account | C17, F-1B.4 | issue: to be created |
 | OQ-4 | Does Snowflake connect to the Glue catalog and refresh? Snowflake's docs list no edition requirement; check in 1B.3 | John's Snowflake trial, run just before Phase B | C15, F-1B.3 | issue: to be created |

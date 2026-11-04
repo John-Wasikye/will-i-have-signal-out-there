@@ -12,13 +12,16 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 from satellite_windows import (
+    MAX_WINDOW_ROWS,
     MIN_ELEVATION_DEG,
     SPAN_MINUTES,
     PropagationError,
+    RowLimitExceeded,
     SatelliteElements,
     SatelliteTrack,
     Window,
     compute_valid_until,
+    enforce_row_limit,
     find_windows,
     flags_to_windows,
     look_angles,
@@ -303,3 +306,28 @@ def test_a_satellite_sgp4_cannot_place_stops_the_run():
     )
     with pytest.raises(PropagationError, match="12345"):
         teme_positions([SAT_00005, decayed], minute_times(START, 60))
+
+
+class _Counted:
+    """Stands in for a Spark DataFrame: only count() is used."""
+
+    def __init__(self, rows: int) -> None:
+        self.rows = rows
+
+    def count(self) -> int:
+        return self.rows
+
+
+def test_the_row_limit_is_4_million():
+    # John's choice (Nov 4, 2026): about twice the 2,156,029 rows measured that night.
+    assert MAX_WINDOW_ROWS == 4_000_000
+
+
+def test_a_run_at_the_limit_goes_through():
+    frame = _Counted(4_000_000)
+    assert enforce_row_limit(frame) is frame
+
+
+def test_a_run_over_the_limit_stops_before_it_is_written():
+    with pytest.raises(RowLimitExceeded, match="4,000,001 .* 4,000,000"):
+        enforce_row_limit(_Counted(4_000_001))

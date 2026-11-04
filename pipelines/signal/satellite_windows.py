@@ -33,11 +33,14 @@ __all__ = [
     "SENSITIVITY_ELEVATIONS_DEG",
     "SPAN_MINUTES",
     "STEP_MINUTES",
+    "MAX_WINDOW_ROWS",
     "PropagationError",
+    "RowLimitExceeded",
     "SatelliteElements",
     "SatelliteTrack",
     "Window",
     "compute_valid_until",
+    "enforce_row_limit",
     "find_windows",
     "flags_to_windows",
     "look_angles",
@@ -54,11 +57,18 @@ STEP_MINUTES = 1
 SPAN_MINUTES = 26 * 60  # 24 hours promised on the page plus the 2-hour nightly maximum (ADR 0019)
 MIN_ELEVATION_DEG = 10.0  # ADR 0003
 SENSITIVITY_ELEVATIONS_DEG = (5.0, 10.0, 20.0)  # the comparison ADR 0003 asks for (OQ-9)
+# John's choice (Nov 4, 2026): about twice the 2,156,029 windows measured from that night's
+# 637 satellites and 932 points, so constellation growth fits but a doubling bug stops (ADR 0005).
+MAX_WINDOW_ROWS = 4_000_000
 
 SGP4_EPOCH_JD = 2433281.5  # SGP4 counts epochs in days from 1949-12-31 00:00 UTC
 WGS84_A_KM = 6378.137
 WGS84_E2 = 6.69437999014e-3
 MINUTES_PER_DAY = 1440.0
+
+
+class RowLimitExceeded(RuntimeError):
+    """A run would write more windows than its limit, so it stops before anything is written."""
 
 
 class PropagationError(RuntimeError):
@@ -255,6 +265,17 @@ def sensitivity_report(
             report[elevation]["windows"] += len(windows)
             report[elevation]["minutes"] += sum(_minutes(w) for w in windows)
     return report
+
+
+def enforce_row_limit(df, max_rows: int = MAX_WINDOW_ROWS):  # noqa: ANN001, ANN201
+    """Return ``df`` unchanged if its row count is within ``max_rows``; otherwise raise.
+
+    The task fails, so its failure callback records an incident and nothing is published.
+    """
+    rows = df.count()
+    if rows > max_rows:
+        raise RowLimitExceeded(f"{rows:,} windows would be written, over the limit of {max_rows:,}")
+    return df
 
 
 def _minutes(window: Window) -> int:
