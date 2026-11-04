@@ -475,8 +475,8 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Job | Load FCC mobile coverage (H3 resolution 9 files) for one carrier (T-Mobile, ADR 0020) in Arizona; mark each trail point covered or not |
 | Inputs | FCC coverage file for one provider, Arizona, per technology (Shapefile or GeoPackage; includes H3 resolution 9 hexagons). The T-Mobile provider name and technology as named in the file: OQ-20 (Phase B carrier list: OQ-11) |
 | Outputs | Raw file with hash; Iceberg `fcc_coverage_cell` (H3 resolution 9 cell, carrier, technology, release); Iceberg `trail_point_coverage` (point, carrier, covered flag) |
-| Main functions and classes (proposed) | `download_fcc_file(provider, state, technology)`; `read_fcc_h3_cells(path)`; `point_to_cell(lat, lon, res=9)` using H3; `flag_points_covered(points_df, coverage_df, carrier)` |
-| Contract | contracts/fcc_mobile_coverage.yaml |
+| Main functions and classes | `read_fcc_cells(path, provider_id, must_contain)`; `point_to_cell(lat, lon)` using H3; `flag_points_covered(points, covered_cells, carrier, cell_of)`; nightly step `load_coverage_if_changed`. There is no download function: the FCC site refuses automated requests, so the file is put in the raw bucket by hand under `signal/fcc/coverage/` with a manifest, and the step reads the newest one |
+| Contract | contracts/fcc_mobile_coverage.yaml, contracts/trail_point_coverage.yaml |
 | ADRs | 0007 |
 
 #### C7 dbt project (F-1A.5)

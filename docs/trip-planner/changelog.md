@@ -14,7 +14,8 @@ This file records two things: changes to the documents, and, once code exists, c
 
 - John decided OQ-44: every cell listed in the FCC file counts as covered. Contract `fcc_mobile_coverage` 0.2.0 stores `environment` and `min_signal_dbm` on each cell, so the rule can change without loading the file again.
 - `pipelines/signal/fcc_coverage.py` reads the GeoPackage with the standard library and refuses another provider's file, another state's file, an empty file and a repeated cell. `flag_points_covered` gives each trail point a covered flag. On the real Arizona file it read 1,007,438 cells in about 7 seconds.
-- Not yet in the nightly run: the H3 lookup, the lake tables and the DAG task come in a later change.
+- `load_coverage_if_changed` and the DAG task `load_coverage` (after `load_trails`) write `fcc_coverage_cell` and `trail_point_coverage`, only when the kept file or the trail points changed (ADR 0028). The FCC site refuses automated requests, so the file is put in the raw bucket by hand with a manifest. New dependency `h3` 4.5.0.
+- On the real Arizona file, 436 of 932 trail points are covered. Contract `trail_point_coverage` 0.1.0 is proposed.
 
 ### Nov 4, 2026: satellite window engine (C5)
 

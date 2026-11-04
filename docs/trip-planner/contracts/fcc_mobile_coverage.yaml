@@ -19,7 +19,7 @@ servers:
   - server: fcc-coverage-download
     type: api
     description: FCC coverage file download per provider, state and technology. Exact location to be fixed in the first-run check (OQ-20).
-    location: "Public FCC download; file names fixed by OQ-20. Raw copies: s3://{env}-signal-raw/fcc/. Lake table: {env}_signal.fcc_coverage_cell."
+    location: "Public FCC download, by hand because the site refuses automated requests. Raw copies: s3://portfolio-{env}-raw-{account}/signal/fcc/coverage/. Lake table: portfolio.portfolio_{env}.fcc_coverage_cell."
 slaProperties:
   - property: frequency
     value: release cadence not recorded

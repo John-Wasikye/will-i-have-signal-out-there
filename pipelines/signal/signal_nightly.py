@@ -14,13 +14,15 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
 6. ``compute_horizons_if_needed`` (C4) gives new trail points their terrain horizons.
 7. ``compute_windows`` (C5) writes ``satellite_window``: when each selected satellite is
    reachable from each trail point over the next 26 hours.
+8. ``load_coverage_if_changed`` (C6) loads the kept FCC file and flags each trail point, only
+   when the file or the points changed (ADR 0028).
 """
 
 from __future__ import annotations
 
 import hashlib
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import fields
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -32,7 +34,26 @@ from elevation_source import (
     store_tile_manifest,
     tiles_covering,
 )
-from lake_write import contract_columns, write_frame_partition, write_run_partition
+from fcc_coverage import (
+    GRAND_CANYON_LON_LAT,
+    PHASE_A_PROVIDER_ID,
+    CellSource,
+    FccCell,
+    WrongFccFile,
+    coverage_prefix,
+    extract_gpkg,
+    flag_points_covered,
+    point_to_cell,
+    read_fcc_cells,
+    release_of,
+    write_cells_parquet,
+)
+from lake_write import (
+    contract_columns,
+    spark_schema,
+    write_frame_partition,
+    write_run_partition,
+)
 from orbit_ingest import (
     CELESTRAK_STARLINK_URL,
     MIN_TIME_BETWEEN_FETCHES,
@@ -181,7 +202,7 @@ def load_trails_if_changed(
     contracts = Path(contracts_dir)
     pages = fetch_trail_pages(PHASE_A_UNIT_CODE, now_utc=now_utc, opener=opener)
     page_hashes = {hashlib.sha256(page.body).hexdigest() for page in pages}
-    if page_hashes == _loaded_trail_hashes(spark, namespace):
+    if page_hashes == _loaded_hashes(spark, f"{CATALOG_NAME}.{namespace}.nps_trail_line"):
         return {"changed": False}
 
     manifests = store_trail_pages(s3, raw_bucket, pages)
@@ -209,6 +230,87 @@ def load_trails_if_changed(
         namespace=namespace,
     )
     return {"changed": True, **counts}
+
+
+def load_coverage_if_changed(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    s3,  # noqa: ANN001, a boto3 S3 client
+    raw_bucket: str,
+    run_date: date,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+    now_utc: datetime,
+    work_dir: Path,
+) -> dict:
+    """Load the newest kept FCC file and flag the newest trail points, if either changed (C6).
+
+    The FCC site refuses automated requests, so the file is put in the raw bucket by hand and this
+    step never downloads it. Coverage is reference data (ADR 0028): it runs when the kept file's
+    hash is not the loaded one, or the trail points are newer than the flags. Returns
+    ``{"changed": False}``, or how many cells and points were used and how many are covered.
+    """
+    points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
+    points_date = _newest_run_date(spark, points_table)
+    if points_date is None:
+        raise ValueError("no trail points are loaded yet, so there is nothing to flag")
+    manifest = latest_manifest(s3, raw_bucket, coverage_prefix())
+    if manifest is None:
+        raise ValueError(f"no FCC file is kept under {coverage_prefix()}")
+    flags_date = _newest_run_date(spark, f"{CATALOG_NAME}.{namespace}.trail_point_coverage")
+    loaded = _loaded_hashes(spark, f"{CATALOG_NAME}.{namespace}.fcc_coverage_cell")
+    if manifest["content_sha256"] in loaded and flags_date and flags_date >= points_date:
+        return {"changed": False}
+
+    body = read_raw(s3, raw_bucket, manifest["raw_key"])
+    if hashlib.sha256(body).hexdigest() != manifest["content_sha256"]:
+        raise WrongFccFile(f"{manifest['raw_key']}: the hash differs from its manifest")
+    gpkg = extract_gpkg(body, work_dir)
+    source = CellSource(
+        release=release_of(manifest["raw_key"]),
+        source_url=manifest["source_url"],
+        fetched_at_utc=datetime.fromisoformat(manifest["fetched_at_utc"]),
+        content_sha256=manifest["content_sha256"],
+        run_date=run_date,
+    )
+
+    def cells() -> Iterator[FccCell]:
+        return read_fcc_cells(
+            gpkg, provider_id=PHASE_A_PROVIDER_ID, must_contain=GRAND_CANYON_LON_LAT
+        )
+
+    parquet = Path(work_dir) / "fcc_coverage_cell.parquet"
+    summary = write_cells_parquet(cells(), parquet, source)
+    contract = Path(contracts_dir) / "fcc_mobile_coverage.yaml"
+    schema = spark_schema(contract_columns(contract, "fcc_coverage_cell"))
+    frame = spark.read.schema(schema).parquet(parquet.as_uri())
+    write_frame_partition(spark, "fcc_coverage_cell", frame, namespace=namespace)
+
+    points = _trail_points(spark, points_table, points_date)
+    wanted = {point_to_cell(point.lat, point.lon) for point in points}
+    listed = {cell.h3_cell_res9 for cell in cells() if cell.h3_cell_res9 in wanted}
+    flags = flag_points_covered(points, listed, summary["carrier"], point_to_cell)
+    origin = {
+        "technology": summary["technology"],
+        "release": source.release,
+        "content_sha256": source.content_sha256,
+    }
+    write_run_partition(
+        spark,
+        "trail_point_coverage",
+        [flag | origin for flag in flags],
+        run_date,
+        columns=contract_columns(
+            Path(contracts_dir) / "trail_point_coverage.yaml", "trail_point_coverage"
+        ),
+        namespace=namespace,
+    )
+    return {
+        "changed": True,
+        "cells": summary["cells"],
+        "points": len(points),
+        "covered": sum(flag["covered"] for flag in flags),
+    }
 
 
 def compute_horizons_if_needed(
@@ -340,9 +442,8 @@ def _orbit_rows(s3, raw_bucket: str, manifest: dict, contract: Path) -> list[dic
     return lake_rows(records, manifest, contract)
 
 
-def _loaded_trail_hashes(spark, namespace: str) -> set[str]:  # noqa: ANN001
-    """Return the page hashes of the newest ``nps_trail_line`` partition, or none."""
-    table = f"{CATALOG_NAME}.{namespace}.nps_trail_line"
+def _loaded_hashes(spark, table: str) -> set[str]:  # noqa: ANN001
+    """Return the source file hashes in the table's newest partition, or none."""
     if not spark.catalog.tableExists(table):
         return set()
     query = (

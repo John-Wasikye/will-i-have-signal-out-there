@@ -181,6 +181,26 @@ def signal_phase_a_nightly():
             spark.stop()
 
     @task
+    def load_coverage(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Load the kept FCC file and flag each trail point, if either changed."""
+        spark = build_spark_session("signal_load_coverage", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            # The unzipped file (about 290 MB) is needed only while the step runs.
+            with tempfile.TemporaryDirectory(prefix="fcc-") as work_dir:
+                return signal_nightly.load_coverage_if_changed(
+                    spark,
+                    aws_client("s3"),
+                    os.environ["PLATFORM_RAW_BUCKET"],
+                    _run_date(dag_run, data_interval_end),
+                    contracts_dir=_contracts_dir(),
+                    namespace=ICEBERG_NAMESPACE,
+                    now_utc=datetime.now(UTC),
+                    work_dir=Path(work_dir),
+                )
+        finally:
+            spark.stop()
+
+    @task
     def compute_windows(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
         """Write the satellite windows for the next 26 hours from the run's scheduled time."""
         spark = build_spark_session("signal_compute_windows", WAREHOUSE, use_glue=USE_GLUE)
@@ -204,7 +224,8 @@ def signal_phase_a_nightly():
     selected = select_dtc(manifest)
     loaded >> selected
     horizons = compute_horizons()
-    load_trails() >> horizons
+    trails = load_trails()
+    trails >> [horizons, load_coverage()]
     windows = compute_windows()
     [selected, horizons] >> windows
 

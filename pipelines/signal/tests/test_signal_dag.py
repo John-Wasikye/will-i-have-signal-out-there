@@ -48,6 +48,7 @@ def test_every_step_is_a_task(signal_dag):
         "load_trails",
         "compute_horizons",
         "compute_windows",
+        "load_coverage",
     }
 
 
@@ -66,6 +67,10 @@ def test_the_trails_do_not_wait_for_the_orbits(signal_dag):
 
 def test_the_horizons_wait_only_for_the_trails(signal_dag):
     assert signal_dag.get_task("compute_horizons").upstream_task_ids == {"load_trails"}
+
+
+def test_the_coverage_waits_only_for_the_trails(signal_dag):
+    assert signal_dag.get_task("load_coverage").upstream_task_ids == {"load_trails"}
 
 
 def test_the_windows_wait_for_the_satellites_and_the_horizons(signal_dag):

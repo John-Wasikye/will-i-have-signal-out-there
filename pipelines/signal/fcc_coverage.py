@@ -8,15 +8,42 @@ the cell so the rule can change later without loading the file again.
 
 from __future__ import annotations
 
+import io
+import re
 import sqlite3
-from collections.abc import Callable, Collection, Iterator, Sequence
-from dataclasses import dataclass
+import zipfile
+from collections.abc import Callable, Collection, Iterable, Iterator, Sequence
+from dataclasses import asdict, dataclass
+from datetime import date, datetime
 from pathlib import Path
 
 import h3
+import pyarrow as pa
+import pyarrow.parquet as pq
 from trail_loader import TrailPoint
 
 H3_RESOLUTION = 9
+RAW_PREFIX = "signal/fcc/coverage"
+PHASE_A_PROVIDER_ID = 130403  # T-Mobile (ADR 0020)
+PHASE_A_STATE = "04"  # Arizona's FIPS code, as in the FCC file names
+GRAND_CANYON_LON_LAT = (-112.1, 36.1)
+PARQUET_BATCH_ROWS = 100_000
+
+# The columns of fcc_coverage_cell in the contract's order, then the partition column.
+CELL_FILE_SCHEMA = pa.schema(
+    [
+        ("h3_cell_res9", pa.string()),
+        ("carrier", pa.string()),
+        ("technology", pa.string()),
+        ("release", pa.string()),
+        ("environment", pa.int64()),
+        ("min_signal_dbm", pa.int64()),
+        ("source_url", pa.string()),
+        ("fetched_at_utc", pa.timestamp("us", tz="UTC")),
+        ("content_sha256", pa.string()),
+        ("run_date", pa.date32()),
+    ]
+)
 
 
 class WrongFccFile(RuntimeError):
@@ -32,6 +59,61 @@ class FccCell:
     technology: str
     environment: int
     min_signal_dbm: int
+
+
+@dataclass(frozen=True)
+class CellSource:
+    """Where a load's cells came from, as each row of ``fcc_coverage_cell`` records it."""
+
+    release: str
+    source_url: str
+    fetched_at_utc: datetime
+    content_sha256: str
+    run_date: date
+
+
+def coverage_prefix(provider_id: int = PHASE_A_PROVIDER_ID, state: str = PHASE_A_STATE) -> str:
+    """Return the raw bucket folder that holds this provider's and state's kept files."""
+    return f"{RAW_PREFIX}/providerid={provider_id}/state={state}/"
+
+
+def release_of(raw_key: str) -> str:
+    """Return the release in an FCC file name, such as ``D25_19oct2026`` (data date, file date)."""
+    match = re.search(r"_(D\d{2}_\d{2}[a-z]{3}\d{4})\.zip$", raw_key)
+    if match is None:
+        raise WrongFccFile(f"{raw_key}: the file name has no release")
+    return match.group(1)
+
+
+def extract_gpkg(zip_body: bytes, work_dir: Path) -> Path:
+    """Unzip the one GeoPackage in the FCC zip into ``work_dir`` and return its path."""
+    with zipfile.ZipFile(io.BytesIO(zip_body)) as archive:
+        names = [name for name in archive.namelist() if name.endswith(".gpkg")]
+        if len(names) != 1:
+            raise WrongFccFile(f"expected one GeoPackage in the zip, found {names}")
+        return Path(archive.extract(names[0], work_dir))
+
+
+def write_cells_parquet(cells: Iterable[FccCell], path: Path, source: CellSource) -> dict:
+    """Write the cells to a Parquet file for Spark, a batch at a time, and describe them.
+
+    A state's cells are too many to pass through Airflow as Python rows, so they reach Spark as a
+    file with declared types. Returns the file's ``carrier``, ``technology`` and ``cells`` count.
+    """
+    summary = {"cells": 0}
+    batch: list[dict] = []
+    with pq.ParquetWriter(path, CELL_FILE_SCHEMA) as writer:
+        for cell in cells:
+            summary.setdefault("carrier", cell.carrier)
+            summary.setdefault("technology", cell.technology)
+            summary["cells"] += 1
+            batch.append(asdict(cell) | asdict(source))
+            if len(batch) == PARQUET_BATCH_ROWS:
+                writer.write_table(pa.Table.from_pylist(batch, schema=CELL_FILE_SCHEMA))
+                batch = []
+        if batch:
+            writer.write_table(pa.Table.from_pylist(batch, schema=CELL_FILE_SCHEMA))
+    return summary
 
 
 def read_fcc_cells(
