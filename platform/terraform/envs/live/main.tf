@@ -106,6 +106,11 @@ module "site" {
 
   env                         = local.env
   bucket_regional_domain_name = module.storage.bucket_regional_domain_names["site"]
+
+  # Phase 1: request the certificate and print its validation record. Flip attach_domain to true
+  # in a later change, once the record is in Cloudflare and the certificate is issued.
+  site_domain   = "signal.johnwasikye.com"
+  attach_domain = false
 }
 
 module "serving" {

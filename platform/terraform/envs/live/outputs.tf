@@ -28,6 +28,16 @@ output "site_url" {
   value       = "https://${module.site.domain_name}"
 }
 
+output "dns_record_1_certificate_validation" {
+  description = "Cloudflare step 1: add this CNAME as DNS only (grey cloud) so AWS can issue the certificate for the site domain."
+  value       = module.site.dns_record_1_certificate_validation
+}
+
+output "dns_record_2_site" {
+  description = "Cloudflare step 2, after attach_domain is true: add this CNAME as DNS only (grey cloud) to point the site domain at CloudFront."
+  value       = module.site.dns_record_2_site
+}
+
 output "api_url" {
   description = "Base URL of the API."
   value       = module.serving.api_url
