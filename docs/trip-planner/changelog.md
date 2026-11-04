@@ -10,6 +10,12 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 4, 2026: OQ-44 decided and C6 file reader
+
+- John decided OQ-44: every cell listed in the FCC file counts as covered. Contract `fcc_mobile_coverage` 0.2.0 stores `environment` and `min_signal_dbm` on each cell, so the rule can change without loading the file again.
+- `pipelines/signal/fcc_coverage.py` reads the GeoPackage with the standard library and refuses another provider's file, another state's file, an empty file and a repeated cell. `flag_points_covered` gives each trail point a covered flag. On the real Arizona file it read 1,007,438 cells in about 7 seconds.
+- Not yet in the nightly run: the H3 lookup, the lake tables and the DAG task come in a later change.
+
 ### Nov 4, 2026: satellite window engine (C5)
 
 - New internal contract `contracts/satellite_window.yaml` (proposed, waiting for John): the columns of `fct_satellite_window`, with `run_date` as the partition column like the other internal tables. The nightly DAG gets a `compute_windows` task after `select_dtc` and `compute_horizons`.

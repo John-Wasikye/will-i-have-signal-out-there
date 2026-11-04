@@ -4,7 +4,7 @@ apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-fcc-mobile-coverage
 name: fcc_mobile_coverage
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
@@ -61,6 +61,14 @@ schema:
         primaryKey: true
         primaryKeyPosition: 4
         description: FCC release identifier or date; basis for SCD Type 2 rows in Phase B. Format open (OQ-20).
+      - name: environment
+        logicalType: integer
+        required: true
+        description: The file's `environmnt` value, 0 for outdoor and standing still, 1 for in a moving vehicle. Kept, not filtered on (OQ-44).
+      - name: min_signal_dbm
+        logicalType: integer
+        required: true
+        description: The file's `minsignal` value in dBm. Kept, not filtered on (OQ-44).
       - name: source_url
         logicalType: string
         required: true
@@ -70,6 +78,7 @@ schema:
       - name: content_sha256
         logicalType: string
         required: true
+    # Every listed cell counts as covered, whatever its environment or signal (John, Nov 4, 2026, OQ-44).
     quality:
       - type: library
         metric: nullValues
