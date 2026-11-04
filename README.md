@@ -2,7 +2,7 @@
 
 I am building a trip planner for hikers, campers and backpackers. You pick a trail and see where each phone carrier has coverage, where it drops out, and when a Starlink Direct-to-Cell satellite text could get through. This repository holds the data platform behind the planner and the planner's code.
 
-The site is live at **https://d36nl5bx6y6lm9.cloudfront.net**, with an "Under development" banner on every page. It shows no coverage or satellite times yet: I am building the Phase A data pipeline first, in build-plan order, and the trail page gets real data only once that data exists. The site will move to signal.johnwasikye.com.
+The site is live at **https://signal.johnwasikye.com**, with an "Under development" banner on every page. It shows no coverage or satellite times yet: I am building the Phase A data pipeline first, in build-plan order, and the trail page gets real data only once that data exists.
 
 ## What I have built
 
@@ -20,7 +20,7 @@ Everything runs on AWS in two separate environments, dev and live, built with Te
 | Continuous integration, CodeQL and Dependabot | `.github/workflows` | Running on every pull request |
 | Deploys | `.github/workflows/deploy.yml`, `terraform-apply.yml` | Each merge builds and scans the Airflow image, then deploys to dev and live after I approve each one |
 
-Still to build for Phase A: satellite windows (C5), FCC coverage (C6), the dbt models (C7), the publish gate and publisher for trail data (C9, C10), the trail API (C11) and the trail page with real data (C12). The custom domain is also in progress.
+Still to build for Phase A: satellite windows (C5), FCC coverage (C6), the dbt models (C7), the publish gate and publisher for trail data (C9, C10), the trail API (C11) and the trail page with real data (C12).
 
 ## Run the checks yourself
 
