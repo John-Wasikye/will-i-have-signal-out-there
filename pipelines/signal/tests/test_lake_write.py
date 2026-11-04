@@ -14,6 +14,7 @@ from lake_write import (
     conform_rows,
     contract_columns,
     spark_schema,
+    write_frame_partition,
     write_run_partition,
 )
 
@@ -234,3 +235,24 @@ def test_whole_numbers_in_a_number_array_become_floats():
 
     assert rows[0]["horizon_angles_deg"] == [0.0, 1.5, 2.0]
     assert all(type(value) is float for value in rows[0]["horizon_angles_deg"])
+
+
+def test_a_frame_built_in_spark_creates_the_table_on_the_first_night():
+    # The satellite windows are built inside Spark (about 2 million rows), not as Python rows.
+    spark = FakeSpark(table_exists=False)
+    frame = spark.createDataFrame([], schema="ignored")
+    spark.calls.clear()
+    write_frame_partition(spark, "satellite_window", frame, namespace="p")
+    assert spark.calls == [
+        "writeTo:portfolio.p.satellite_window",
+        "partitionedBy:run_date",
+        "create",
+    ]
+
+
+def test_a_frame_rerun_overwrites_only_its_partition():
+    spark = FakeSpark(table_exists=True)
+    frame = spark.createDataFrame([], schema="ignored")
+    spark.calls.clear()
+    write_frame_partition(spark, "satellite_window", frame, namespace="p")
+    assert spark.calls == ["writeTo:portfolio.p.satellite_window", "overwritePartitions"]

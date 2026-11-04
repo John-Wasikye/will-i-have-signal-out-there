@@ -45,7 +45,7 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: python -m pip install -e ".[dev,spark]"
-      - name: Run the Spark job, maintenance, the lake writer and the horizons on real Spark
+      - name: Run the Spark job, maintenance, the lake writer, the horizons and the windows on real Spark
         # Spark's Python workers import the job code by name, so they need the same search path
         # the Airflow image sets (platform/box/Dockerfile.airflow).
         env:
@@ -55,6 +55,7 @@ jobs:
           pipelines/platform/tests/test_spark_integration.py
           pipelines/signal/tests/test_lake_write_spark.py
           pipelines/signal/tests/test_terrain_horizon_spark.py
+          pipelines/signal/tests/test_window_job_spark.py
 
   airflow:
     name: Airflow DAG tests

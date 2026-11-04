@@ -18,17 +18,23 @@ the step's accuracy, and the terrain horizon already starts from the ground.
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
+from lake_write import spark_schema
 from sgp4.api import WGS72, Satrec, SatrecArray, jday
 from sgp4.propagation import gstime
 from terrain_horizon import SECTOR_WIDTH_DEG, SECTORS, HorizonProfile
 from trail_loader import TrailPoint
 
 __all__ = [
+    "window_rows",
+    "run_window_job",
+    "WindowRun",
+    "WINDOW_COLUMNS",
+    "SPARK_PARTITIONS",
     "MIN_ELEVATION_DEG",
     "SENSITIVITY_ELEVATIONS_DEG",
     "SPAN_MINUTES",
@@ -306,3 +312,94 @@ def _satrec(e: SatelliteElements) -> Satrec:
         math.radians(e.ra_of_asc_node_deg),
     )
     return satellite
+
+
+# --- the nightly Spark job ------------------------------------------------------------------------
+
+SPARK_PARTITIONS = 4  # as the horizon job: the session box runs Spark in local mode on its cores
+
+# The order of each row handed to Spark: the satellite_window contract's columns, then the
+# run_date partition column the lake writer adds to every internal table.
+WINDOW_COLUMNS = (
+    "trail_point_id",
+    "satellite_id",
+    "window_start_utc",
+    "window_end_utc",
+    "min_elevation_deg",
+    "valid_until_utc",
+    "run_started_utc",
+    "loaded_at_utc",
+    "run_date",
+)
+
+
+@dataclass(frozen=True)
+class WindowRun:
+    """One run's metadata: its partition date, its span, and the times stamped on every row."""
+
+    run_date: date
+    span_start_utc: datetime
+    run_started_utc: datetime
+    loaded_at_utc: datetime
+    min_elevation_deg: float = MIN_ELEVATION_DEG
+    span_minutes: int = SPAN_MINUTES
+
+    @property
+    def valid_until_utc(self) -> datetime:
+        """The end of the span: when this run's predictions stop being valid (ADR 0019)."""
+        return compute_valid_until(self.span_start_utc, self.span_minutes)
+
+
+def window_rows(
+    run: WindowRun,
+    items: Iterable[tuple[TrailPoint, HorizonProfile]],
+    satellite_ids: Sequence[str],
+    ecef_km: np.ndarray,
+) -> Iterator[tuple]:
+    """Yield one row per window for a chunk of points, in ``WINDOW_COLUMNS`` order.
+
+    This runs inside a Spark worker. The tracks come in as one array (satellites, minutes, 3),
+    because rebuilding them there is cheaper than sending 637 objects to every partition.
+    """
+    times = minute_times(run.span_start_utc, run.span_minutes)
+    tracks = [SatelliteTrack(sid, ecef_km[i]) for i, sid in enumerate(satellite_ids)]
+    plain_date = date(run.run_date.year, run.run_date.month, run.run_date.day)
+    stamp = (run.min_elevation_deg, run.valid_until_utc, run.run_started_utc, run.loaded_at_utc)
+    for point, horizon in items:
+        for w in windows_for_point(point, tracks, horizon, times, run.min_elevation_deg):
+            yield (w.trail_point_id, w.satellite_id, w.start_utc, w.end_utc, *stamp, plain_date)
+
+
+def run_window_job(
+    spark,  # noqa: ANN001, a pyspark SparkSession, typed loosely to avoid importing pyspark
+    run: WindowRun,
+    satellites: Sequence[SatelliteElements],
+    points: Sequence[TrailPoint],
+    horizons: Mapping[str, HorizonProfile],
+    columns: Sequence,
+    *,
+    partitions: int = SPARK_PARTITIONS,
+):  # noqa: ANN201, returns a pyspark DataFrame
+    """Return a DataFrame of every window, built in parallel without collecting the rows.
+
+    The satellites are propagated once, here, and the positions are broadcast to the workers,
+    which check their share of the trail points. The frame has the contract's schema, so the
+    caller can check its row count and write it as the run's partition.
+    """
+    if not satellites:
+        raise ValueError("no satellites to propagate; dtc_satellite has no rows for this run")
+    missing = [p.trail_point_id for p in points if p.trail_point_id not in horizons]
+    if missing:
+        raise ValueError(f"no terrain horizon for {len(missing)} trail points: {missing[:5]}")
+
+    times = minute_times(run.span_start_utc, run.span_minutes)
+    tracks = propagate_satellites(satellites, times)
+    satellite_ids = [t.satellite_id for t in tracks]
+    shared = spark.sparkContext.broadcast(np.stack([t.ecef_km for t in tracks]))
+    items = [(p, horizons[p.trail_point_id]) for p in points]
+
+    def rows_for(chunk: Iterable[tuple[TrailPoint, HorizonProfile]]) -> Iterator[tuple]:
+        return window_rows(run, chunk, satellite_ids, shared.value)
+
+    rdd = spark.sparkContext.parallelize(items, partitions).mapPartitions(rows_for)
+    return spark.createDataFrame(rdd, schema=spark_schema(columns))
