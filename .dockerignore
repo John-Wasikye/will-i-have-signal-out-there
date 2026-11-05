@@ -1,6 +1,7 @@
 # Keep the build context small and keep local files out of images.
 .git
 .venv
+.venv-dbt
 .pytest_cache
 .ruff_cache
 **/__pycache__

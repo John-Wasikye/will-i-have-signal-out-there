@@ -1,0 +1,28 @@
+name: signal
+version: "0.1.0"
+profile: signal
+config-version: 2
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+# The nightly run needs no outside calls from dbt: no usage reports and no version lookups.
+flags:
+  send_anonymous_usage_stats: false
+  version_check: false
+
+vars:
+  # The run passes the real time with --vars. A plain `dbt parse` still needs a value.
+  loaded_at_utc: "1970-01-01T00:00:00+00:00"
+
+models:
+  signal:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      # Each mart is one Parquet file in SIGNAL_DBT_OUTPUT_DIR, so the gate and the publisher
+      # read them with PyArrow and Airflow's environment never needs dbt or DuckDB.
+      +materialized: external
+      +format: parquet

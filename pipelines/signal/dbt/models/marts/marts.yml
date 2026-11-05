@@ -1,0 +1,76 @@
+version: 2
+
+models:
+  - name: dim_trail_point
+    columns:
+      - name: trail_point_id
+        data_tests: [unique, not_null]
+      - name: trail_id
+        data_tests: [not_null]
+      - name: unit_code
+        data_tests: [not_null]
+      - name: seq
+        data_tests: [not_null]
+      - name: lon
+        data_tests: [not_null]
+      - name: lat
+        data_tests: [not_null]
+      - name: h3_cell_res9
+        data_tests: [not_null]
+
+  - name: dim_time
+    columns:
+      - name: time_key
+        data_tests: [unique, not_null]
+      - name: time_utc
+        data_tests: [not_null]
+
+  - name: fct_trail_point_coverage
+    data_tests:
+      - unique_columns:
+          arguments:
+            columns: [trail_point_id, carrier]
+    columns:
+      - name: trail_point_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_trail_point')
+                field: trail_point_id
+      - name: carrier
+        data_tests: [not_null]
+      - name: covered
+        data_tests: [not_null]
+      - name: fcc_release
+        data_tests: [not_null]
+
+  - name: fct_satellite_window
+    data_tests:
+      - unique_columns:
+          arguments:
+            columns: [trail_point_id, satellite_id, window_start_utc]
+      - starts_on_or_before_end:
+          arguments:
+            start_column: window_start_utc
+            end_column: window_end_utc
+    columns:
+      - name: trail_point_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_trail_point')
+                field: trail_point_id
+      - name: satellite_id
+        data_tests: [not_null]
+      - name: window_start_utc
+        data_tests: [not_null]
+      - name: window_end_utc
+        data_tests: [not_null]
+      - name: run_logical_date
+        data_tests: [not_null]
+      - name: valid_until_utc
+        data_tests: [not_null]
+      - name: run_started_utc
+        data_tests: [not_null]
