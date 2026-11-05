@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 5, 2026: Phase A deployed
+
+- C12 built and deployed. The README states what is live. Box runtime recorded in OQ-1 and section 7.B.
+
 ### Nov 5, 2026: C11 built
 
 - GET /trails and GET /trails/{trail_id}/signal read the published files. `WindowOut` in openapi.yaml no longer has `satellite_id`: a window is now a reachable period (John's choice).
