@@ -49,6 +49,7 @@ def test_every_step_is_a_task(signal_dag):
         "compute_horizons",
         "compute_windows",
         "load_coverage",
+        "build_marts",
     }
 
 
@@ -77,6 +78,13 @@ def test_the_windows_wait_for_the_satellites_and_the_horizons(signal_dag):
     assert signal_dag.get_task("compute_windows").upstream_task_ids == {
         "select_dtc",
         "compute_horizons",
+    }
+
+
+def test_the_marts_wait_for_the_windows_and_the_coverage(signal_dag):
+    assert signal_dag.get_task("build_marts").upstream_task_ids == {
+        "compute_windows",
+        "load_coverage",
     }
 
 

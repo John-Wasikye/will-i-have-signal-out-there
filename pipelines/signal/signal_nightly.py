@@ -436,6 +436,57 @@ def compute_windows(
     return {"satellites": len(satellites), "points": len(points), "windows": windows}
 
 
+def copy_tables_for_dbt(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    run_date: date,
+    *,
+    namespace: str,
+    input_dir: Path,
+) -> dict:
+    """Copy the partitions tonight's dbt models read to plain Parquet (C7, OQ-40).
+
+    dbt on DuckDB does not read Iceberg. Trail points and their coverage flags are reference data,
+    so their newest partitions count (ADR 0028); flags older than the points would belong to
+    points that are gone, so they stop the step. The windows must be tonight's. Returns which
+    partitions were copied and how many windows there are.
+    """
+    points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
+    coverage_table = f"{CATALOG_NAME}.{namespace}.trail_point_coverage"
+    windows_table = f"{CATALOG_NAME}.{namespace}.satellite_window"
+    points_date = _newest_run_date(spark, points_table)
+    if points_date is None:
+        raise ValueError("no trail points are loaded yet, so dbt has nothing to build from")
+    coverage_date = _newest_run_date(spark, coverage_table)
+    if coverage_date is None:
+        raise ValueError("no coverage flags are loaded yet; load_coverage runs first")
+    if coverage_date < points_date:
+        raise ValueError(
+            f"the newest coverage flags ({coverage_date}) are older than the newest trail points "
+            f"({points_date}); load_coverage must run for the new points first"
+        )
+    tonight = f"run_date = DATE '{run_date.isoformat()}'"
+    query = f"SELECT COUNT(*) AS rows FROM {windows_table} WHERE {tonight}"
+    windows = spark.sql(query).collect()[0]["rows"]
+    if windows == 0:
+        raise ValueError(f"no satellite windows for {run_date}; compute_windows runs first")
+
+    # Spark's default time format has no time zone. This one stores the UTC instant itself.
+    spark.conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
+    copies = {
+        "trail_point": (points_table, f"run_date = DATE '{points_date.isoformat()}'"),
+        "trail_point_coverage": (coverage_table, f"run_date = DATE '{coverage_date.isoformat()}'"),
+        "satellite_window": (windows_table, tonight),
+    }
+    for name, (table, partition) in copies.items():
+        frame = spark.sql(f"SELECT * FROM {table} WHERE {partition}").coalesce(1)
+        frame.write.mode("overwrite").parquet((Path(input_dir) / name).as_uri())
+    return {
+        "trail_point_date": points_date.isoformat(),
+        "coverage_date": coverage_date.isoformat(),
+        "windows": windows,
+    }
+
+
 def _orbit_rows(s3, raw_bucket: str, manifest: dict, contract: Path) -> list[dict]:  # noqa: ANN001
     """Read the kept CelesTrak file, check it against the contract, and shape its rows."""
     records = parse_gp_records(read_raw(s3, raw_bucket, manifest["raw_key"]), contract)
