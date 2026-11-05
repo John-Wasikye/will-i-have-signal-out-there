@@ -6,7 +6,8 @@ The trail step does not need the orbits, so it runs beside them, and loads only 
 pages changed (ADR 0028). The terrain horizons (C4) follow the trails and are computed only for
 trail points that have none yet. The satellite windows (C5) wait for both the selected satellites
 and the horizons, and cover 26 hours from the run's scheduled time (ADR 0019). The dbt marts (C7)
-wait for the windows and the coverage flags. A task that fails
+wait for the windows and the coverage flags. The gate and publisher (C9, C10) come last, and a
+failed check leaves the files already live in place. A task that fails
 tries twice more, then records an incident and
 sends an email, the same as the skeleton.
 
@@ -23,6 +24,7 @@ from pathlib import Path
 import alerts
 import sample_flow
 import signal_nightly
+import trail_publish
 from airflow.sdk import dag, task
 from dbt_runner import run_dbt
 from incidents import record_failure
@@ -34,6 +36,8 @@ USE_GLUE = os.environ.get("PLATFORM_USE_GLUE") == "1"
 ICEBERG_NAMESPACE = os.environ.get("PLATFORM_ICEBERG_NAMESPACE", "platform")
 INCIDENTS_DIR = Path(os.environ.get("PLATFORM_INCIDENTS_DIR", "/data/incidents"))
 MARTS_DIR = Path(os.environ.get("PLATFORM_MARTS_DIR", "/data/marts"))
+TRAIL_PUBLISHED_DIR = Path(os.environ.get("PLATFORM_TRAIL_PUBLISHED_DIR", "/data/trail-published"))
+METRICS_DIR = Path(os.environ.get("PLATFORM_METRICS_DIR", "/data/metrics"))
 
 
 def aws_client(service: str):  # noqa: ANN201
@@ -245,6 +249,22 @@ def signal_phase_a_nightly():
             )
         return copied
 
+    @task
+    def publish_marts(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Gate the marts, publish them, and copy them to where the API reads them (C9, C10)."""
+        now_utc = datetime.now(UTC)
+        summary = trail_publish.publish_marts(MARTS_DIR, TRAIL_PUBLISHED_DIR, now_utc)
+        run_end = sample_flow.run_end(data_interval_end, dag_run.run_after)
+        trail_publish.emit_publish_metric(summary, run_end, now_utc, METRICS_DIR)
+        trail_publish.upload_published(
+            aws_client("s3"),
+            os.environ["PLATFORM_SITE_BUCKET"],
+            os.environ["PLATFORM_LAKE_BUCKET"],
+            TRAIL_PUBLISHED_DIR,
+            METRICS_DIR,
+        )
+        return summary
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
@@ -257,7 +277,7 @@ def signal_phase_a_nightly():
     trails >> [horizons, coverage]
     windows = compute_windows()
     [selected, horizons] >> windows
-    [windows, coverage] >> build_marts()
+    [windows, coverage] >> build_marts() >> publish_marts()
 
 
 signal_phase_a_nightly()
