@@ -1,11 +1,11 @@
-# Data contract (ODCS). Proposed, waiting for John's approval. Internal Iceberg table, written by C6. Not a source or a published table;
+# Data contract (ODCS). Approved by John (Nov 4, 2026). Internal Iceberg table, written by C6. Not a source or a published table;
 # included because C7 reads it, and the loader takes its column types from here.
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-trail-point-coverage
 name: trail_point_coverage
 version: 0.1.0
-status: proposed
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
