@@ -300,7 +300,7 @@ flowchart TB
   c5["C5 Satellite window engine"]:::cont
   subgraph SERVE["Serving"]
     c11["C11 Serving API: FastAPI, DuckDB, Lambda"]:::cont
-    c12["C12 Trail page: React, strip map, expiry"]:::cont
+    c12["C12 Trail page: React, trail map, expiry"]:::cont
   end
   subgraph PB["Phase B additions"]
     c14["C14 Orbit stream (B): Kafka, Structured Streaming"]:::phb
@@ -537,10 +537,10 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 
 | Item | Detail |
 |---|---|
-| Job | Let the visitor pick a trail and show a strip map (a line along the trail with bars where the carrier has coverage and no bars where it does not) and the next satellite windows; show "Predictions valid until [time]" in local time; when the data is late or the run failed, keep showing the old data with a visible late notice that includes the time of the last good run (ADR 0006, amended); show credits, the T-Mobile and supported-phone statement and the cold-start notice |
+| Job | Let the visitor pick a trail and show a trail map (a line along the real trail, colored by what works on each stretch, with a key) and the next satellite windows; show "Predictions valid until [time]" in local time; when the data is late or the run failed, keep showing the old data with a visible late notice that includes the time of the last good run (ADR 0006, amended); show credits, the T-Mobile and supported-phone statement and the cold-start notice |
 | Inputs | Serving API responses |
 | Outputs | The page in the browser |
-| Main functions and classes (proposed) | React components `TrailPicker`, `StripMap`, `WindowList`, `ValidUntilBanner`, `Credits`, `ColdStartNotice`, `DtcRequirementsNote`; `LateNotice` (the visible late notice); functions `isRunLate(validUntilUtc, now)` (definition of late: OQ-23), `formatLocalTime(utcIso)`, `windowsWithLateFlag(windows, now)` (marks each satellite window as late or current and never hides data); a timer that re-evaluates lateness while the page stays open |
+| Main functions and classes (proposed) | React components `TrailPicker`, `TrailMap`, `WindowList`, `ValidUntilBanner`, `Credits`, `ColdStartNotice`, `DtcRequirementsNote`; `LateNotice` (the visible late notice); functions `isRunLate(validUntilUtc, now)` (definition of late: OQ-23), `formatLocalTime(utcIso)`, `windowsWithLateFlag(windows, now)` (marks each satellite window as late or current and never hides data); a timer that re-evaluates lateness while the page stays open |
 | ADRs | 0006 |
 
 ### 7.2 Phase B components

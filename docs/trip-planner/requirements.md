@@ -89,7 +89,7 @@ Scope (ADR 0001, ADR 0020): Grand Canyon National Park's Bright Angel, South Kai
 | F-1A.3 | Satellite windows | SGP4 propagation at 1-minute steps for 26 hours (the page says the next 24 hours); satellite windows per trail point when a satellite is above 10 degrees and above the terrain horizon; each run stamped with a valid until time |
 | F-1A.4 | Cell coverage | FCC mobile coverage (H3 resolution 9 files) for one carrier in Arizona; each trail point marked covered or not |
 | F-1A.5 | Models and checks | dbt on DuckDB (staging, intermediate, small star schema); contracts for CelesTrak, FCC, NPS trails and elevation; publish gate |
-| F-1A.6 | Trail page | Gold tables published; React page with a strip map (bars where the carrier has coverage, no bars where it does not) and the next satellite windows along the trail; "Predictions valid until [time]"; late data shown with a visible late notice and the time of the last good run |
+| F-1A.6 | Trail page | Gold tables published; React page with a trail map (a line along the real trail, colored by what works on each stretch, with a key) and the next satellite windows along the trail; "Predictions valid until [time]"; late data shown with a visible late notice and the time of the last good run |
 
 ### 3.2 Phase B: depth
 
@@ -147,7 +147,7 @@ Numbering note: IDs are never renumbered. Some IDs appear out of order because r
 | FR-14 | The project keeps a contract for CelesTrak, FCC, NPS trails and elevation, and the contract diff (C8) compares each source's schema with its contract before loading | F-1A.5 | ADR 0018 |
 | FR-15 | The publish gate (C9) checks freshness, empty results and value ranges; new data lands in staging, passes the checks, and only then goes live | F-1A.5 | Engineering standard 4 |
 | FR-16 | The publisher (C10) publishes the gold tables (the finished tables the page reads) as Parquet | F-1A.6 | Platform serving template |
-| FR-17 | The trail page (C12) lets the visitor pick a trail and shows a strip map (bars where the carrier has coverage, no bars where it does not) and the next satellite windows along the trail, with credits | F-1A.6 | Build plan 1A.6 |
+| FR-17 | The trail page (C12) lets the visitor pick a trail and shows a trail map (a line along the real trail, colored by what works on each stretch, with a key) and the next satellite windows along the trail, with credits | F-1A.6 | Build plan 1A.6 |
 | FR-18 | The trail page (C12) shows "Predictions valid until [time]" in the hiker's local time. When the data is late or the run failed, the page still shows the old data with a visible late notice that includes the time of the last good run, and does not hide the data | F-1A.6 | ADR 0006 (amended) |
 | FR-19 | The trail page (C12) states that Direct-to-Cell texting needs T-Mobile service (in the United States) and a supported phone, and that T-Mobile is the Phase A carrier | F-1A.6 | Build plan project description |
 | FR-20 | The trail page (C12) shows the cold-start notice: "The first request after a period of inactivity may take up to 10 seconds while the service initializes." | F-1A.6 | Build plan 0.4, Decisions "Cold starts" |
