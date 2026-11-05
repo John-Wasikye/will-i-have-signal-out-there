@@ -13,6 +13,9 @@ import app as serving_app
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONTRACT = REPO_ROOT / "docs" / "platform" / "openapi-serving-template.yaml"
+TRIP_PLANNER_CONTRACT = REPO_ROOT / "docs" / "trip-planner" / "openapi.yaml"
+# Only the trail routes are built so far. The others in that contract are Phase B.
+TRAIL_ROUTES = {("/trails", "get"), ("/trails/{trail_id}/signal", "get")}
 METHODS = {"get", "put", "post", "delete", "patch", "head", "options"}
 
 
@@ -27,5 +30,7 @@ def _routes(spec: dict) -> set[tuple[str, str]]:
 
 def test_the_app_serves_exactly_the_routes_in_the_contract():
     contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+    trip_planner = yaml.safe_load(TRIP_PLANNER_CONTRACT.read_text(encoding="utf-8"))
 
-    assert _routes(serving_app.app.openapi()) == _routes(contract)
+    assert TRAIL_ROUTES <= _routes(trip_planner)
+    assert _routes(serving_app.app.openapi()) == _routes(contract) | TRAIL_ROUTES

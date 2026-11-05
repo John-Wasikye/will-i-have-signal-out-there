@@ -50,7 +50,7 @@ paths:
       operationId: getTrailSignal
       summary: Coverage, satellite windows and (Phase B) confidence along one trail
       description: |
-        Returns every sampled point of the trail with its coverage flag per carrier and its satellite windows.
+        Returns every sampled point of the trail with its coverage flag per carrier and its windows: the periods when at least one satellite is reachable. Overlapping satellite windows are merged, because every window of a trail would not fit in one answer.
         The response carries the run's valid until time and the time of the last good run. When the data is late, the page still shows it with a visible late notice and does not hide it (ADR 0006, amended).
       parameters:
         - name: trail_id
@@ -308,10 +308,9 @@ components:
               description: Null when status is not_enough_measurements. The page then shows "Not enough measurements here; the coverage map's claim is unverified."
     WindowOut:
       type: object
-      required: [satellite_id, start_utc, end_utc]
+      description: One period when at least one satellite is reachable (fct_reachable_period).
+      required: [start_utc, end_utc]
       properties:
-        satellite_id:
-          type: string
         start_utc:
           type: string
           format: date-time

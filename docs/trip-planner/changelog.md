@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 5, 2026: C11 built
+
+- GET /trails and GET /trails/{trail_id}/signal read the published files. `WindowOut` in openapi.yaml no longer has `satellite_id`: a window is now a reachable period (John's choice).
+
 ### Nov 5, 2026: reachable periods
 
 - Every window of a trail would not fit in one API answer: 984,227 windows on North Kaibab against Lambda's 6 MB limit. John chose to merge overlapping windows into reachable periods per point: 20,956 on North Kaibab.

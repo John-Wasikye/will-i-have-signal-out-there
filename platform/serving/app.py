@@ -16,6 +16,7 @@ from typing import Annotated
 from duckdb_query import query_rows
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
+from trails import router as trails_router
 
 PUBLISHED_DIR = Path(os.environ.get("PUBLISHED_DIR", "published"))
 SAMPLE_TABLE = PUBLISHED_DIR / "sample_answer.parquet"
@@ -28,6 +29,9 @@ app = FastAPI(
         "while the service initializes."
     ),
 )
+
+
+app.include_router(trails_router)
 
 
 class Health(BaseModel):
