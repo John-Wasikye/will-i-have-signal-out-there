@@ -485,7 +485,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 |---|---|
 | Job | Build staging, intermediate and a small star schema (a central fact table joined to descriptive tables; here trail point, time, coverage and satellite windows) on DuckDB; `source()` only in staging; unique and not_null tests on keys |
 | Inputs | Parquet copies of `trail_point`, `trail_point_coverage` and `satellite_window`, made by Spark from the Iceberg tables just before dbt starts (OQ-40) |
-| Outputs | Marts `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window`, one Parquet file each |
+| Outputs | Marts `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window`, `fct_reachable_period`, one Parquet file each |
 | Models (as built) | Staging: `stg_trail_point`, `stg_fcc_coverage`, `stg_satellite_window`. Intermediate: `int_trail_point_coverage`. Marts as above. The other proposed models fed no mart, so I left them out |
 | Environment | dbt has its own Python environment (`platform/box/requirements-dbt.txt`), because Airflow's constraint file refuses it (`pathspec`). `dbt-core` 1.11.16 and `dbt-duckdb` 1.11.1: `dbt-core` 1.12 needs a parser with only pre-releases. The nightly run starts dbt as a separate program |
 | Contracts | contracts/*.yaml |
@@ -518,7 +518,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 |---|---|
 | Job | Write gold tables as Parquet to the published location read by the serving Lambda |
 | Inputs | Mart tables that passed the gate |
-| Outputs | Parquet files for `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window` |
+| Outputs | Parquet files for `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window`, `fct_reachable_period` |
 | Main functions and classes (as built) | `publish_marts` (as C9) and `upload_published(client, site_bucket, lake_bucket, published_dir, metrics_dir)`. One file per mart, each replaced whole by the next good run: `fct_satellite_window` measured 7.5 MB, so no split by trail |
 | ADRs | 0006 |
 
@@ -871,6 +871,7 @@ Every row carries event time and a source key (engineering standard 2). All time
 | `dim_time` | Mart, published Parquet | A | One row per UTC minute (OQ-33, ADR 0028) | contracts/dim_time.yaml |
 | `fct_trail_point_coverage` | Mart, published Parquet | A | Trail point by carrier | contracts/fct_trail_point_coverage.yaml |
 | `fct_satellite_window` | Mart, published Parquet | A | Trail point by satellite by satellite window; run date and valid until | contracts/fct_satellite_window.yaml |
+| `fct_reachable_period` | Mart, published Parquet | A | Trail point by reachable period: overlapping windows merged. What the API reads | contracts/fct_reachable_period.yaml |
 | Ookla raw tile files | Raw (manifest) | B | Per quarterly file | contracts/ookla_open_data.yaml |
 | `ookla_tile` | Iceberg | B | One row per tile and quarter, with H3 res 8 | same |
 | `dim_carrier_coverage_history` | Snowflake mart (SCD Type 2) | B | One row per cell, carrier and validity range | contracts/dim_carrier_coverage_history.yaml |

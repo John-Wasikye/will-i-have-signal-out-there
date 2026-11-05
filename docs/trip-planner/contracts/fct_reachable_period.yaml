@@ -1,0 +1,83 @@
+# Data contract (ODCS). Proposed, waiting for John's approval of the columns. Published gold table (Parquet).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-published-fct-reachable-period
+name: fct_reachable_period
+version: 0.1.0
+status: proposed
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: When at least one Direct-to-Cell satellite is reachable from each trail point, as start and end times. Overlapping and touching satellite windows are merged, because a hiker needs to know when a satellite is reachable, not which one, and every window of a trail would not fit in one API answer.
+  limitations: The run predicts 26 hours (24 plus the 2-hour nightly maximum, ADR 0019). A period is a prediction from orbits and terrain, not a confirmed connection.
+  usage: Read by the serving Lambda; shown on the page with a late notice when late. The windows per satellite stay in fct_satellite_window.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: published-parquet
+    type: s3
+    description: Published gold Parquet in the site bucket, one file replaced whole by the next good run. Separate for dev and live.
+    location: "published/fct_reachable_period.parquet in the site bucket of each environment."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Rebuilt in each nightly run at 10:00 UTC, hard maximum 2 hours.
+customProperties:
+  - property: adr
+    value: adrs/0003, adrs/0006, adrs/0019
+schema:
+  - name: fct_reachable_period
+    physicalName: fct_reachable_period
+    physicalType: table
+    description: One row per trail point and reachable period.
+    properties:
+      - name: trail_point_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: period_start_utc
+        logicalType: timestamp
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: First minute a satellite is reachable.
+      - name: period_end_utc
+        logicalType: timestamp
+        required: true
+        description: Last minute a satellite is reachable. On or after period_start_utc.
+      - name: min_elevation_deg
+        logicalType: number
+        required: true
+        description: Minimum elevation used for this run (10 in the starting configuration, ADR 0003).
+      - name: run_logical_date
+        logicalType: date
+        required: true
+      - name: valid_until_utc
+        logicalType: timestamp
+        required: true
+        description: Time the run's predictions stop being valid (end of the 26-hour prediction span).
+      - name: run_started_utc
+        logicalType: timestamp
+        required: true
+        description: Start time of the last good run that produced these rows; shown in the late notice.
+      - name: loaded_at_utc
+        logicalType: timestamp
+        required: true
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - trail_point_id
+            - period_start_utc
+      - type: sql
+        description: A period ends on or after it starts.
+        query: SELECT COUNT(*) FROM fct_reachable_period WHERE period_end_utc < period_start_utc
+        mustBe: 0

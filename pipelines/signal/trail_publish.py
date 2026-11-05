@@ -26,6 +26,7 @@ MART_NAMES = (
     "dim_time",
     "fct_trail_point_coverage",
     "fct_satellite_window",
+    "fct_reachable_period",
 )
 # The decided main trails (ADR 0020). The trail page must answer for each one (AC-1A.6).
 MAIN_TRAILS = ("grca-bright-angel", "grca-north-kaibab", "grca-south-kaibab")
