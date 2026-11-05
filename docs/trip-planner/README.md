@@ -6,7 +6,7 @@ This folder is the documentation for Project 1. It is written so that someone wh
 
 | Field | Value |
 |---|---|
-| Status | Approved by John (Oct 28, 2026). Phase A is being built: C1 to C4 and C8 run nightly, C5 to C7 and C9 to C12 are not built yet |
+| Status | Approved by John (Oct 28, 2026). Phase A is built and deployed: C1 to C12 run nightly or serve the site. Phase B is next |
 | Owner | John |
 | Last updated | Nov 4, 2026 |
 | Live link | https://signal.johnwasikye.com (under development: no coverage or satellite times shown yet) |

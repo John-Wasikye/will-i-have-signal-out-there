@@ -713,6 +713,8 @@ Partition rule: the partition key is the run's logical date in UTC (engineering 
 
 Measured size (Nov 4, 2026, on the laptop, from that night's live tables: 637 selected satellites, 932 trail points, span 10:00 UTC Nov 4 to 12:00 UTC Nov 5). Row counts do not depend on the machine; the runtime on the session box is still to be measured (OQ-1).
 
+On the live box (Nov 5, 2026) the same run wrote 2,156,029 rows to one 6.3 MB Parquet file in 77 seconds.
+
 | Minimum elevation | Windows (rows) | Reachable satellite-minutes | Windows per point: median (min to max) |
 |---|---|---|---|
 | 5 degrees | 2,295,628 | 7,085,091 | 2,498 (894 to 3,755) |
@@ -1213,7 +1215,7 @@ A row that says "Plan conflict" marks a place where the build plan or the Decisi
 
 | ID | Question | What answering it needs | Affects | Issue |
 |---|---|---|---|---|
-| OQ-1 | How many rows does a satellite-window run for the park write, and how long does it take? The row limit and runtime limit for the satellite window job are set from the answer. **Partly answered (Nov 4, 2026):** 2,156,029 rows at 10 degrees from 637 satellites and 932 points (section 7.B). **Row limit set by John (Nov 4, 2026): 4,000,000**, about twice the measured count, so constellation growth fits and a bug that doubles the rows stops the run. The box runtime and the runtime limit are still to be measured | A test run on the session box | C5, QR-7, QR-9 | issue: to be created |
+| OQ-1 | How many rows does a satellite-window run for the park write, and how long does it take? The row limit and runtime limit for the satellite window job are set from the answer. **Partly answered (Nov 4, 2026):** 2,156,029 rows at 10 degrees from 637 satellites and 932 points (section 7.B). **Row limit set by John (Nov 4, 2026): 4,000,000**, about twice the measured count, so constellation growth fits and a bug that doubles the rows stops the run. **Box runtime measured (Nov 5, 2026):** `compute_windows` took 77 seconds on the live box, first try, with the Spark process peaking at about 947 MB at the default 1 GB driver setting. The runtime limit stays open for John (OQ-15). | A test run on the session box | C5, QR-7, QR-9 | issue: to be created |
 | OQ-2 | Are there enough Ookla speed tests along Grand Canyon trails? | Downloading Ookla's open data | C17, F-1B.4 | issue: to be created |
 | OQ-3 | Does an upload to Databricks Free Edition work (Files API)? | John's Databricks account | C17, F-1B.4 | issue: to be created |
 | OQ-4 | Does Snowflake connect to the Glue catalog and refresh? Snowflake's docs list no edition requirement; check in 1B.3 | John's Snowflake trial, run just before Phase B | C15, F-1B.3 | issue: to be created |
