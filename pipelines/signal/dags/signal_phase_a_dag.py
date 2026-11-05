@@ -5,7 +5,8 @@ file against its contract, load ``celestrak_gp``, then select the Direct-to-Cell
 The trail step does not need the orbits, so it runs beside them, and loads only when the NPS
 pages changed (ADR 0028). The terrain horizons (C4) follow the trails and are computed only for
 trail points that have none yet. The satellite windows (C5) wait for both the selected satellites
-and the horizons, and cover 26 hours from the run's scheduled time (ADR 0019). A task that fails
+and the horizons, and cover 26 hours from the run's scheduled time (ADR 0019). The dbt marts (C7)
+wait for the windows and the coverage flags. A task that fails
 tries twice more, then records an incident and
 sends an email, the same as the skeleton.
 
@@ -23,6 +24,7 @@ import alerts
 import sample_flow
 import signal_nightly
 from airflow.sdk import dag, task
+from dbt_runner import run_dbt
 from incidents import record_failure
 from sample_iceberg_job import build_spark_session
 from timeutil import require_utc
@@ -31,6 +33,7 @@ WAREHOUSE = os.environ.get("PLATFORM_WAREHOUSE", "/data/warehouse")
 USE_GLUE = os.environ.get("PLATFORM_USE_GLUE") == "1"
 ICEBERG_NAMESPACE = os.environ.get("PLATFORM_ICEBERG_NAMESPACE", "platform")
 INCIDENTS_DIR = Path(os.environ.get("PLATFORM_INCIDENTS_DIR", "/data/incidents"))
+MARTS_DIR = Path(os.environ.get("PLATFORM_MARTS_DIR", "/data/marts"))
 
 
 def aws_client(service: str):  # noqa: ANN201
@@ -217,6 +220,31 @@ def signal_phase_a_nightly():
         finally:
             spark.stop()
 
+    @task
+    def build_marts(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Copy tonight's tables to Parquet, then build and test the dbt marts (C7)."""
+        spark = build_spark_session("signal_build_marts", WAREHOUSE, use_glue=USE_GLUE)
+        with tempfile.TemporaryDirectory(prefix="dbt-") as folder:
+            work_dir = Path(folder)
+            try:
+                copied = signal_nightly.copy_tables_for_dbt(
+                    spark,
+                    _run_date(dag_run, data_interval_end),
+                    namespace=ICEBERG_NAMESPACE,
+                    input_dir=work_dir / "input",
+                )
+            finally:
+                spark.stop()
+            run_dbt(
+                dbt_bin=Path(os.environ["SIGNAL_DBT_BIN"]),
+                project_dir=Path(os.environ["SIGNAL_DBT_PROJECT_DIR"]),
+                input_dir=work_dir / "input",
+                output_dir=MARTS_DIR,
+                work_dir=work_dir / "work",
+                loaded_at_utc=datetime.now(UTC),
+            )
+        return copied
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
@@ -225,9 +253,11 @@ def signal_phase_a_nightly():
     loaded >> selected
     horizons = compute_horizons()
     trails = load_trails()
-    trails >> [horizons, load_coverage()]
+    coverage = load_coverage()
+    trails >> [horizons, coverage]
     windows = compute_windows()
     [selected, horizons] >> windows
+    [windows, coverage] >> build_marts()
 
 
 signal_phase_a_nightly()

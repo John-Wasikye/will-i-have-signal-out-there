@@ -37,6 +37,10 @@ echo "The signal pipelines' contracts are in the image"
 # shellcheck disable=SC2016  # The variable is set in the image, so it expands there, not here.
 in_image bash -c 'for table in celestrak_gp nps_trails trail_point dtc_satellite dtc_disagreement; do test -f "${SIGNAL_CONTRACTS_DIR}/${table}.yaml"; done'
 
+echo "dbt runs from its own environment and reads the project"
+# shellcheck disable=SC2016  # The variables are set in the image, so they expand there, not here.
+in_image bash -c 'mkdir -p /tmp/dbt-smoke && SIGNAL_DBT_INPUT_DIR=/tmp/dbt-smoke SIGNAL_DBT_OUTPUT_DIR=/tmp/dbt-smoke SIGNAL_DBT_WORK_DIR=/tmp/dbt-smoke DBT_TARGET_PATH=/tmp/dbt-smoke/target DBT_LOG_PATH=/tmp/dbt-smoke/logs DBT_PROFILES_DIR="${SIGNAL_DBT_PROJECT_DIR}" "${SIGNAL_DBT_BIN}" parse --project-dir "${SIGNAL_DBT_PROJECT_DIR}"'
+
 echo "The image does not run as root"
 test "$(in_image id -un)" = "airflow"
 

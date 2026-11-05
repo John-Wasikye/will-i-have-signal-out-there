@@ -1,0 +1,10 @@
+signal:
+  target: nightly
+  outputs:
+    nightly:
+      type: duckdb
+      path: "{{ env_var('SIGNAL_DBT_WORK_DIR') }}/signal.duckdb"
+      external_root: "{{ env_var('SIGNAL_DBT_OUTPUT_DIR') }}"
+      threads: 1
+      settings:
+        TimeZone: UTC

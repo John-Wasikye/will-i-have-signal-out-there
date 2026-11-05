@@ -484,9 +484,10 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Item | Detail |
 |---|---|
 | Job | Build staging, intermediate and a small star schema (a central fact table joined to descriptive tables; here trail point, time, coverage and satellite windows) on DuckDB; `source()` only in staging; unique and not_null tests on keys |
-| Inputs | Iceberg tables from C1 to C6 (how dbt on DuckDB reads Iceberg is a platform matter, OQ-40) |
-| Outputs | Marts `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window` |
-| Models (proposed) | Staging: `stg_celestrak_gp`, `stg_nps_trail`, `stg_trail_point_horizon`, `stg_fcc_coverage`, `stg_satellite_window`. Intermediate: `int_trail_point_coverage`, `int_trail_point_windows`. Marts as above |
+| Inputs | Parquet copies of `trail_point`, `trail_point_coverage` and `satellite_window`, made by Spark from the Iceberg tables just before dbt starts (OQ-40) |
+| Outputs | Marts `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window`, one Parquet file each |
+| Models (as built) | Staging: `stg_trail_point`, `stg_fcc_coverage`, `stg_satellite_window`. Intermediate: `int_trail_point_coverage`. Marts as above. The other proposed models fed no mart, so I left them out |
+| Environment | dbt has its own Python environment (`platform/box/requirements-dbt.txt`), because Airflow's constraint file refuses it (`pathspec`). `dbt-core` 1.11.16 and `dbt-duckdb` 1.11.1: `dbt-core` 1.12 needs a parser with only pre-releases. The nightly run starts dbt as a separate program |
 | Contracts | contracts/*.yaml |
 | ADRs | 0018 |
 
@@ -667,7 +668,7 @@ Convention proposed here: 36 horizon angles, one per 10-degree compass sector (3
 
 | Function or class | Purpose | Takes | Returns |
 |---|---|---|---|
-| `TrailPoint` (class) | One sampled point on a trail | `trail_point_id`, `trail_id`, `seq`, `lon`, `lat`, `elevation_m` | Immutable record |
+| `TrailPoint` (class) | One sampled point on a trail | `trail_point_id`, `trail_id`, `seq`, `lon`, `lat` | Immutable record |
 | `ElevationGrid` (class, `geotiff.py`) | One GLO-30 tile's heights, cell (0, 0) centred on the tie point ("pixel is point") | Heights, west, north, cell size in degrees | Object with `elevation_at(lon, lat)` (nearest cell, NaN off the grid) |
 | `read_elevation_grid(path)` (`geotiff.py`) | Read one tile with the standard library and numpy; refuse any layout other than the one the first-run check found (ADR 0038) | A tile file | `ElevationGrid` |
 | `ElevationTiles` (class) | The loaded set of GLO-30 tiles for the park plus margin, looked up together | `ElevationGrid` objects | Object with `elevation_at(lon, lat)` |
@@ -1246,7 +1247,7 @@ A row that says "Plan conflict" marks a place where the build plan or the Decisi
 | OQ-36 | Do the NPS TRLNAME values match Bright Angel, South Kaibab and North Kaibab (decided trails, ADR 0020), and is each one line or several segments? **Answered by first-run check (Oct 28, 2026):** yes, each is one `LineString` with status `Existing` and no heights: `Bright Angel` 12.7 km, `South Kaibab` 10.4 km, `North Kaibab` 23.3 km. The loader matches the whole name, because `Old Bright Angel`, `Bright Angel Point` and `Rim to Bright Angel Connector` also contain "Bright Angel". | First-run download of the NPS file | C3, AC-1A.6 | closed |
 | OQ-38 | What is the visitor ID format (type, length) and how is it transported? **Answered (Oct 9, 2026):** 16 random bytes written as 32 hexadecimal characters; sent only in the header, over HTTPS; stored on the server as a keyed HMAC (ADR 0025). | John's decision | C21, C22 | closed |
 | OQ-39 | Which model (the cheapest) and which API account are used, how long are votes kept, does a vote carry any visitor identity, and are votes rate-limited (the 429 response on POST /feedback depends on it)? **Partly answered (Oct 9, 2026):** votes carry no visitor ID and are kept 90 days; question text is not stored by the project (ADR 0033). Provider chosen by John: the Anthropic API, on the cheapest Claude model (ADR 0034). Still open: recording the provider's terms before the first call. | John's decision | C18, C20, openapi.yaml | issue: to be created |
-| OQ-40 | How does dbt on DuckDB read Iceberg tables (platform-owned)? | Platform design | C7 | issue: to be created |
+| OQ-40 | How does dbt on DuckDB read Iceberg tables (platform-owned)? **Answered (John, Nov 4, 2026):** it does not. Spark copies the needed partitions to plain Parquet, and dbt reads those. | Platform design | C7 | Closed |
 | OQ-41 | Does the limit-counters table also have point-in-time recovery off? It holds visitor IDs for a short time, and the decision covers only the reports table (ADR 0022) **Answered (Oct 9, 2026):** point-in-time recovery is off for the counters table (ADR 0025). | John's decision | C22 | closed |
 | OQ-42 | Which AWS region and accounts hold the dev and live environments? The build plan does not name a region **Answered by John (Oct 9, 2026):** us-east-1 (N. Virginia) for dev and live (ADR 0034). | John's decision | platform, section 9.1, every contract | closed |
 | OQ-43 | How long are the lake and Snowflake copies of reports (`signal_report`, `signal_report_set_aside`) kept? The 30-day rule covers DynamoDB rows only **Answered by John (Oct 9, 2026):** raw report rows deleted 30 days after the copy in DynamoDB, the lake and Snowflake; daily per-cell counts are kept; set-aside rows follow the same rule (ADR 0034). | John's decision (privacy) | C23, hiker_signal_reports, security-and-privacy.md | closed |

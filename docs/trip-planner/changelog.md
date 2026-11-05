@@ -10,6 +10,16 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 5, 2026: elevation removed from dim_trail_point
+
+- Contract `dim_trail_point` 0.2.0: John removed `elevation_m`. No step stored it, and neither the API nor the page reads it. It can come back when something needs it.
+
+### Nov 4, 2026: OQ-40 decided and C7 built
+
+- OQ-40 answered by John: Spark copies the needed partitions to plain Parquet, and dbt reads those.
+- Design doc C7 now lists the models as built, and dbt's own Python environment.
+- Contract `trail_point_coverage` 0.1.0 approved by John: status active.
+
 ### Nov 4, 2026: OQ-44 decided and C6 file reader
 
 - John decided OQ-44: every cell listed in the FCC file counts as covered. Contract `fcc_mobile_coverage` 0.2.0 stores `environment` and `min_signal_dbm` on each cell, so the rule can change without loading the file again.

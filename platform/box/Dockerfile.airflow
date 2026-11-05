@@ -37,6 +37,16 @@ RUN pip install --no-cache-dir "pip==26.2.2" "certifi==2026.10.19" "uv==0.13.5" 
 RUN spark_jars="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')" \
     && rm -f "${spark_jars}"/derby-*.jar "${spark_jars}"/zookeeper-*.jar
 
+# dbt gets its own environment, because Airflow's constraint file refuses it (pathspec). It has no
+# pip of its own: the image's pip, already patched above, installs into it. requirements-dbt.txt
+# lists every package, so nothing is resolved here.
+COPY --chown=airflow:root platform/box/requirements-dbt.txt /tmp/requirements-dbt.txt
+RUN python -m venv --without-pip /home/airflow/dbt \
+    && pip --python /home/airflow/dbt/bin/python install --no-cache-dir --no-deps \
+        --only-binary :all: --requirement /tmp/requirements-dbt.txt
+ENV SIGNAL_DBT_BIN=/home/airflow/dbt/bin/dbt
+ENV SIGNAL_DBT_PROJECT_DIR=/opt/airflow/pipelines/signal/dbt
+
 # Both projects' pipelines, with the .airflowignore that tells Airflow only dags/ holds DAGs.
 COPY --chown=airflow:root pipelines /opt/airflow/pipelines
 # The signal pipelines check each source and take each table's column types from its contract.

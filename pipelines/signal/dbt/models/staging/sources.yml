@@ -1,0 +1,12 @@
+version: 2
+
+# Spark copies these Iceberg tables to plain Parquet before dbt starts (OQ-40), so dbt on DuckDB
+# never reads Iceberg itself. One folder per table, holding only the partition this run uses.
+sources:
+  - name: lake
+    meta:
+      external_location: "{{ env_var('SIGNAL_DBT_INPUT_DIR') }}/{name}/*.parquet"
+    tables:
+      - name: trail_point
+      - name: trail_point_coverage
+      - name: satellite_window

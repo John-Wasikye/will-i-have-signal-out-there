@@ -67,6 +67,44 @@ def test_the_satellite_window_engine_gets_sgp4_everywhere_it_runs():
     assert re.search(r"import [^\n]*\bsgp4\b", smoke), "the image smoke test does not import sgp4"
 
 
+DBT_REQUIREMENTS = BOX / "requirements-dbt.txt"
+DOCKERFILE = BOX / "Dockerfile.airflow"
+SERVING_REQUIREMENTS = BOX.parent / "serving" / "requirements.txt"
+
+
+def test_dbt_stays_out_of_airflows_python_environment():
+    """Airflow's constraint file pins pathspec 1.1.1 and dbt-core needs it below 0.13."""
+    text = REQUIREMENTS.read_text(encoding="utf-8")
+    assert "dbt" not in re.sub(r"#.*", "", text)
+
+
+def test_every_dbt_package_is_pinned_so_it_installs_without_a_resolver():
+    lines = [
+        line
+        for line in DBT_REQUIREMENTS.read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+    ]
+    assert all(re.fullmatch(r"[a-z0-9-]+==[^\s=]+", line) for line in lines), lines
+    assert {"dbt-core==1.11.16", "dbt-duckdb==1.11.1"} <= set(lines)
+
+
+def test_dbt_and_the_api_use_the_same_duckdb():
+    assert _pin(DBT_REQUIREMENTS, "duckdb") == _pin(SERVING_REQUIREMENTS, "duckdb")
+
+
+def test_the_image_builds_dbt_its_own_environment_and_says_where_it_is():
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert "requirements-dbt.txt" in text
+    assert "--no-deps" in text
+    assert "ENV SIGNAL_DBT_BIN=" in text
+    assert "ENV SIGNAL_DBT_PROJECT_DIR=" in text
+
+
+def test_the_image_smoke_test_and_ci_run_dbt():
+    assert "SIGNAL_DBT_BIN" in SMOKE_TEST.read_text(encoding="utf-8")
+    assert "requirements-dbt.txt" in CI_WORKFLOW.read_text(encoding="utf-8")
+
+
 def test_the_fcc_coverage_loader_gets_h3_everywhere_it_runs():
     """C6 imports h3 in the image, on the laptop and in CI's DAG test job."""
     pinned = _pin(REQUIREMENTS, "h3")

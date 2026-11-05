@@ -1,9 +1,9 @@
-# Data contract (ODCS). Approved by John (Oct 28, 2026). Published gold table (Parquet). Column names are proposals (OQ-21).
+# Data contract (ODCS). Approved by John (Oct 28, 2026; 0.2.0 on Nov 5, 2026). Published gold table (Parquet). Column names are proposals (OQ-21).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-published-dim-trail-point
 name: dim_trail_point
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
@@ -63,10 +63,6 @@ schema:
       - name: lat
         logicalType: number
         required: true
-      - name: elevation_m
-        logicalType: number
-        required: true
-        description: From the surface model (EGM2008 datum).
       - name: h3_cell_res9
         logicalType: string
         required: true
