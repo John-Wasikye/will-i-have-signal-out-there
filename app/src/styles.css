@@ -15,6 +15,8 @@
   --color-passed: #6c6962;
   --color-coverage: #4f7349;
   --color-reach: #b8602e;
+  --color-none: #a39b8e;
+  --color-sun: #efb36b;
   --color-sky-top: #dfe5d8;
   --color-sky-bottom: #f2dcbd;
   --color-ridge-far: #d3ae88;
@@ -46,6 +48,8 @@
     --color-passed: #a5a199;
     --color-coverage: #8db57f;
     --color-reach: #e8955c;
+    --color-none: #7d756a;
+    --color-sun: #c97f45;
     --color-sky-top: #14171a;
     --color-sky-bottom: #33261f;
     --color-ridge-far: #54402f;
@@ -319,7 +323,6 @@ label {
   font-weight: 600;
 }
 
-select,
 .lookup-form input {
   width: 100%;
   padding: 10px 12px;
@@ -358,52 +361,328 @@ select,
   font-weight: 600;
 }
 
-.strip-map {
-  margin: 14px 0;
+.hero-text {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px var(--gutter) 0;
 }
 
-.strip-map figcaption {
-  margin-bottom: 4px;
+.hero-text h1 {
+  max-width: 13em;
+  margin: 0 0 8px;
+  font-size: clamp(2.3rem, 6vw, 3.8rem);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+.hero-text p {
+  max-width: 34em;
+  margin: 0;
+  font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+}
+
+.hero-scene {
+  position: relative;
+}
+
+.hero .mountains {
+  height: clamp(110px, 15vw, 230px);
+}
+
+.hero-hiker {
+  position: absolute;
+  bottom: 24%;
+  left: 18%;
+}
+
+.hero-hiker .logo {
+  display: block;
+  width: clamp(44px, 5.5vw, 76px);
+  height: clamp(44px, 5.5vw, 76px);
+}
+
+.sun {
+  fill: var(--color-sun);
+  stroke: none;
+}
+
+.walk-heading {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  margin: 0;
+}
+
+.trail-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.trail-choices-label {
+  grid-column: 1 / -1;
+  margin: 0;
   font-weight: 600;
+}
+
+.trail-choice {
+  min-height: 48px;
+  padding: 10px 8px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-card);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.trail-choice:hover {
+  border-color: var(--color-accent);
+}
+
+.trail-choice[aria-pressed='true'] {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.walker {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.walker .panel {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .walker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.strip-map {
+  margin: 0;
 }
 
 .strip-map svg {
   display: block;
   width: 100%;
-  height: 30px;
-  border-radius: 8px;
+  height: auto;
+  cursor: pointer;
+  border-radius: 10px;
+  background: var(--color-map-bg);
 }
 
-.strip-map rect {
-  shape-rendering: crispEdges;
+.strip-map polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.strip-track {
-  fill: var(--color-map-bg);
+.trail-casing {
+  stroke: var(--color-card);
+  stroke-width: 13;
 }
 
-.strip-bar {
+.trail-run {
+  stroke-width: 7;
+}
+
+.trail-run-covered {
+  stroke: var(--color-coverage);
+}
+
+.trail-run-satellite {
+  stroke: var(--color-reach);
+  stroke-dasharray: 12 11;
+}
+
+.trail-run-none {
+  stroke: var(--color-none);
+  stroke-dasharray: 1 11;
+}
+
+.trail-end {
+  fill: var(--color-card);
+  stroke: var(--color-text);
+  stroke-width: 3;
+}
+
+.trail-label {
+  fill: var(--color-text);
+  font-size: 24px;
+  font-weight: 700;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--color-map-bg);
+  stroke-width: 5;
+}
+
+.trail-you {
+  fill: var(--color-text);
+  stroke: var(--color-card);
+  stroke-width: 3;
+}
+
+.trail-you-halo {
+  fill: var(--color-text);
+  opacity: 0.2;
+}
+
+.map-key {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 6px 16px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.95rem;
+}
+
+.panel .map-key li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.key-line {
+  flex: none;
+  width: 34px;
+  height: 0;
+  border-top: 6px solid var(--color-coverage);
+  border-radius: 3px;
+}
+
+.key-satellite {
+  border-top-style: dashed;
+  border-top-color: var(--color-reach);
+}
+
+.key-none {
+  border-top-style: dotted;
+  border-top-color: var(--color-none);
+}
+
+.key-you {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0 9px;
+  border-radius: 50%;
+  background: var(--color-text);
+  box-shadow: 0 0 0 4px var(--color-map-bg);
+}
+
+.walk-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.walk-button {
+  padding: 12px 22px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.walk-slider {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.point-detail h3 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+}
+
+.point-detail h4 {
+  margin: 16px 0 0;
+}
+
+.answer-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.answer-tile {
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.answer-label {
+  margin: 0 0 4px;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.answer-value,
+.panel .point-coverage {
+  margin: 4px 0 0;
+  font-weight: 700;
+}
+
+.signal-bars {
+  display: block;
+  width: 34px;
+  height: 28px;
+  fill: var(--color-none);
+}
+
+.signal-bars-on {
   fill: var(--color-coverage);
 }
 
-.strip-reach {
-  fill: var(--color-reach);
+.freshness {
+  margin: 16px 0 32px;
+  padding: 20px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-left: 6px solid var(--color-coverage);
+  border-radius: var(--radius);
+}
+
+.freshness-late {
+  border-left-color: var(--color-notice-border);
+}
+
+.freshness-state {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.freshness-meter {
+  display: block;
+  width: 100%;
+  height: 16px;
+  margin: 12px 0 16px;
+  accent-color: var(--color-coverage);
 }
 
 .note-text {
   color: var(--color-muted);
 }
 
-input[type='range'],
-select {
-  display: block;
-  max-width: 480px;
-  margin: 6px 0 4px;
-}
-
 input[type='range'] {
+  display: block;
   width: 100%;
-  margin-bottom: 16px;
+  margin: 6px 0 4px;
   accent-color: var(--color-accent);
 }
 
@@ -413,9 +692,9 @@ input[type='range'] {
 }
 
 .window-list {
-  max-height: 320px;
+  max-height: 260px;
   overflow-y: auto;
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   padding-left: 0;
   list-style: none;
   border-top: 1px solid var(--color-border);

@@ -2,22 +2,22 @@ import { Link } from 'react-router-dom'
 import { Credits } from '../components/Credits'
 import { DtcRequirementsNote } from '../components/DtcRequirementsNote'
 
-export function Home() {
+export function About() {
   return (
     <>
-      <h1>Will I have signal out there?</h1>
+      <h1>How it works</h1>
       <p className="lede">
         I am building a trip planner for hikers at Grand Canyon National Park. It shows where
-        T-Mobile claims coverage along a trail, and when a satellite text could get through. Pick a{' '}
-        <Link to="/trails">trail</Link> or check the <Link to="/status">status page</Link>.
+        T-Mobile claims coverage along a trail, and when a satellite text could get through. Try a{' '}
+        <Link to="/">trail</Link> or check the <Link to="/status">status page</Link>.
       </p>
 
       <section className="panel" aria-labelledby="will-do-heading">
         <h2 id="will-do-heading">What the planner does</h2>
         <ul>
           <li>
-            A strip map shows coverage bars along a trail. Bars mark where T-Mobile has coverage, and
-            no bars mark where it does not.
+            A trail map colors each stretch of a trail, so you can see where T-Mobile has coverage
+            and where it does not.
           </li>
           <li>
             Satellite text windows show when a Direct-to-Cell text, sent through a Starlink satellite
@@ -41,7 +41,7 @@ export function Home() {
       </section>
 
       <section className="panel" aria-labelledby="how-heading">
-        <h2 id="how-heading">How it works</h2>
+        <h2 id="how-heading">Behind the scenes</h2>
         <p>
           An automated job runs every night at 10:00 UTC (Coordinated Universal Time). It collects
           the latest data, checks it, and publishes the results as data files.

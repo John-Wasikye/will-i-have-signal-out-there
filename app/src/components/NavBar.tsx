@@ -1,8 +1,12 @@
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import { Hero } from './Hero'
 import { Logo } from './Logo'
 import { MountainBackdrop } from './MountainBackdrop'
 
+const TRAIL_TOOL_PATHS = ['/', '/trails']
+
 export function NavBar() {
+  const { pathname } = useLocation()
   return (
     <header className="site-header">
       <div className="header-bar">
@@ -13,13 +17,12 @@ export function NavBar() {
         <nav aria-label="Main">
           <ul className="nav-list">
             <li>
-              <NavLink to="/">Home</NavLink>
+              <NavLink to="/" end>
+                Trails
+              </NavLink>
             </li>
             <li>
-              <NavLink to="/trails">Trails</NavLink>
-            </li>
-            <li>
-              <NavLink to="/lookup">Lookup</NavLink>
+              <NavLink to="/about">How it works</NavLink>
             </li>
             <li>
               <NavLink to="/status">Status</NavLink>
@@ -27,7 +30,7 @@ export function NavBar() {
           </ul>
         </nav>
       </div>
-      <MountainBackdrop />
+      {TRAIL_TOOL_PATHS.includes(pathname) ? <Hero /> : <MountainBackdrop />}
     </header>
   )
 }

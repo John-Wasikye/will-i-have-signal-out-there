@@ -33,15 +33,49 @@ function render(when: Date): string {
   return renderMarkup(createElement(TrailSignalView, { signal, now: when }))
 }
 
-const stripBars = (markup: string): number => markup.match(/class="strip-bar"/g)?.length ?? 0
+const coveredRuns = (markup: string): number =>
+  markup.match(/class="trail-run trail-run-covered"/g)?.length ?? 0
 
 describe('TrailSignalView', () => {
   it('shows when the predictions stop being valid', () => {
     expect(visibleText(render(now))).toContain('Predictions valid until')
   })
 
-  it('draws a coverage bar only where the carrier has coverage', () => {
-    expect(stripBars(render(now))).toBe(2)
+  it('colors the trail line only where the carrier has coverage', () => {
+    expect(coveredRuns(render(now))).toBe(2)
+    expect(render(now).match(/class="trail-run trail-run-none"/g)?.length).toBe(1)
+  })
+
+  it('has a key that says what every line on the map means', () => {
+    const text = visibleText(render(now))
+    expect(text).toContain('T-Mobile claims coverage')
+    expect(text).toContain('No T-Mobile, but a satellite is reachable now')
+    expect(text).toContain('Neither right now')
+    expect(text).toContain('You are here')
+  })
+
+  it('marks the start and the end of the trail', () => {
+    const text = visibleText(render(now))
+    expect(text).toContain('Start')
+    expect(text).toContain('End')
+  })
+
+  it('lets the reader walk the trail', () => {
+    expect(visibleText(render(now))).toContain('Walk the trail')
+    expect(render(now)).toContain('class="trail-you"')
+  })
+
+  it('says in words what the phone and the satellite can do at the chosen spot', () => {
+    const text = visibleText(render(now))
+    expect(text).toContain('Phone')
+    expect(text).toContain('Satellite')
+    expect(text).toContain('Reachable now')
+  })
+
+  it('leaves the satellite out of the key when the data is late', () => {
+    const text = visibleText(render(late))
+    expect(text).not.toContain('a satellite is reachable now')
+    expect(text).toContain('No coverage claimed')
   })
 
   it('says how many points have coverage, for readers who cannot see the bars', () => {
@@ -81,7 +115,7 @@ describe('TrailSignalView', () => {
     expect(visibleText(markup)).toContain('Data is late. Last good run:')
     expect(visibleText(markup)).toContain('Predictions valid until:')
     expect(markup.indexOf('Data is late')).toBeLessThan(markup.indexOf('strip-map'))
-    expect(stripBars(markup)).toBe(2)
+    expect(coveredRuns(markup)).toBe(2)
     expect(markup.match(/class="window window-passed"/g)?.length).toBe(2)
   })
 

@@ -28,6 +28,7 @@ export function MountainBackdrop() {
       aria-hidden="true"
       focusable="false"
     >
+      <circle className="sun" cx="1110" cy="92" r="44" />
       {RIDGES.map((ridge) => (
         <path key={ridge.name} className={ridge.name} d={ridge.path} />
       ))}

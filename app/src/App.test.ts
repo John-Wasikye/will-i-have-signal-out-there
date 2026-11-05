@@ -8,7 +8,7 @@ function renderPage(path: string): string {
   return renderMarkup(createElement(MemoryRouter, { initialEntries: [path] }, createElement(App)))
 }
 
-const pages = ['/', '/trails', '/lookup', '/status', '/no-such-page']
+const pages = ['/', '/trails', '/about', '/lookup', '/status', '/no-such-page']
 
 describe('the development banner', () => {
   it.each(pages)('is shown above the navigation on %s', (path) => {
@@ -33,12 +33,38 @@ describe('the site header', () => {
 })
 
 describe('the navigation', () => {
-  it('links to the new trails page', () => {
-    expect(renderPage('/')).toContain('href="/trails"')
+  it('links to the trails, how it works and status pages', () => {
+    const text = visibleText(renderPage('/').split('</header>')[0])
+    expect(text).toContain('Trails')
+    expect(text).toContain('How it works')
+    expect(text).toContain('Status')
+  })
+
+  it('leaves out the lookup page, which is a developer sample', () => {
+    expect(renderPage('/')).not.toContain('href="/lookup"')
   })
 })
 
 describe('routes', () => {
+  it('makes the trail tool the home page', () => {
+    const text = visibleText(renderPage('/'))
+    expect(text).toContain('Choose a trail')
+    expect(text).not.toContain('Page not found')
+  })
+
+  it('opens with a big title only on the trail tool', () => {
+    expect(renderPage('/')).toContain('class="hero"')
+    expect(renderPage('/trails')).toContain('class="hero"')
+    expect(renderPage('/about')).not.toContain('class="hero"')
+  })
+
+  it('moves the explanation to /about', () => {
+    const text = visibleText(renderPage('/about'))
+    expect(text).toContain('How it works')
+    expect(text).toContain('Phase A')
+    expect(text).not.toContain('Page not found')
+  })
+
   it('serves the trails page at /trails', () => {
     const text = visibleText(renderPage('/trails'))
     expect(text).toContain('Bright Angel')
