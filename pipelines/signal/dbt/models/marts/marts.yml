@@ -74,3 +74,29 @@ models:
         data_tests: [not_null]
       - name: run_started_utc
         data_tests: [not_null]
+
+  - name: fct_reachable_period
+    data_tests:
+      - unique_columns:
+          arguments:
+            columns: [trail_point_id, period_start_utc]
+      - starts_on_or_before_end:
+          arguments:
+            start_column: period_start_utc
+            end_column: period_end_utc
+    columns:
+      - name: trail_point_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_trail_point')
+                field: trail_point_id
+      - name: period_start_utc
+        data_tests: [not_null]
+      - name: period_end_utc
+        data_tests: [not_null]
+      - name: valid_until_utc
+        data_tests: [not_null]
+      - name: run_started_utc
+        data_tests: [not_null]

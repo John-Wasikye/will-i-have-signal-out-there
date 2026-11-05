@@ -161,7 +161,14 @@ def _rows(marts: Path, name: str) -> list[dict]:
 
 
 @pytest.mark.parametrize(
-    "mart", ["dim_trail_point", "dim_time", "fct_trail_point_coverage", "fct_satellite_window"]
+    "mart",
+    [
+        "dim_trail_point",
+        "dim_time",
+        "fct_trail_point_coverage",
+        "fct_satellite_window",
+        "fct_reachable_period",
+    ],
 )
 def test_each_mart_has_exactly_its_contract_columns(marts, mart):
     contract = yaml.safe_load((CONTRACTS / f"{mart}.yaml").read_text(encoding="utf-8"))
@@ -174,6 +181,62 @@ def test_satellite_window_fact_renames_the_partition_to_the_run_logical_date(mar
     assert row["run_logical_date"] == RUN_DATE
     assert row["window_start_utc"] == WINDOW["window_start_utc"]
     assert row["valid_until_utc"] == VALID_UNTIL
+
+
+def _window(point: int, satellite: str, start: int, end: int) -> dict:
+    return {
+        **WINDOW,
+        "trail_point_id": f"grca-bright-angel-0000{point}",
+        "satellite_id": satellite,
+        "window_start_utc": SPAN_START + timedelta(minutes=start),
+        "window_end_utc": SPAN_START + timedelta(minutes=end),
+    }
+
+
+def _periods(tmp_path: Path, windows: list[dict]) -> list[tuple]:
+    rows = _rows(_build(tmp_path, windows), "fct_reachable_period")
+    minute = timedelta(minutes=1)
+    return sorted(
+        (
+            row["trail_point_id"][-1],
+            (row["period_start_utc"] - SPAN_START) // minute,
+            (row["period_end_utc"] - SPAN_START) // minute,
+        )
+        for row in rows
+    )
+
+
+def test_overlapping_windows_become_one_period(tmp_path):
+    windows = [_window(0, "1", 5, 8), _window(0, "2", 7, 12)]
+    assert _periods(tmp_path, windows) == [("0", 5, 12)]
+
+
+def test_a_window_inside_another_does_not_end_the_period_early(tmp_path):
+    windows = [_window(0, "1", 5, 20), _window(0, "2", 7, 9), _window(0, "3", 18, 25)]
+    assert _periods(tmp_path, windows) == [("0", 5, 25)]
+
+
+def test_windows_in_neighboring_minutes_become_one_period(tmp_path):
+    windows = [_window(0, "1", 5, 8), _window(0, "2", 9, 12)]
+    assert _periods(tmp_path, windows) == [("0", 5, 12)]
+
+
+def test_a_minute_with_no_satellite_splits_the_periods(tmp_path):
+    windows = [_window(0, "1", 5, 8), _window(0, "2", 10, 12)]
+    assert _periods(tmp_path, windows) == [("0", 5, 8), ("0", 10, 12)]
+
+
+def test_each_point_has_its_own_periods(tmp_path):
+    windows = [_window(0, "1", 5, 8), _window(1, "1", 7, 12)]
+    assert _periods(tmp_path, windows) == [("0", 5, 8), ("1", 7, 12)]
+
+
+def test_a_period_carries_the_run_stamps_the_page_shows(marts):
+    (row,) = _rows(marts, "fct_reachable_period")
+    assert row["valid_until_utc"] == VALID_UNTIL
+    assert row["run_started_utc"] == RUN_STARTED
+    assert row["run_logical_date"] == RUN_DATE
+    assert row["min_elevation_deg"] == 10.0
 
 
 def test_time_dimension_has_one_row_for_each_minute_of_the_26_hour_span(marts):

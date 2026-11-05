@@ -63,6 +63,7 @@ def _tables(windows=None, points=MAIN_TRAILS, coverage=MAIN_TRAILS) -> dict[str,
             [{"trail_point_id": _point(trail), "covered": True} for trail in coverage]
         ),
         "fct_satellite_window": pa.Table.from_pylist(rows, schema=SCHEMA),
+        "fct_reachable_period": pa.Table.from_pylist([{"trail_point_id": _point(points[0])}]),
     }
 
 
@@ -132,6 +133,12 @@ def test_a_window_that_ends_before_it_starts_fails_the_gate():
     assert "1 windows end before they start" in _failures(_tables(rows))
 
 
+def test_no_reachable_periods_fail_the_gate():
+    tables = _tables()
+    tables["fct_reachable_period"] = tables["fct_reachable_period"].slice(0, 0)
+    assert "fct_reachable_period: no rows" in _failures(tables)
+
+
 def test_a_missing_mart_file_stops_the_read(tmp_path):
     tables = _tables()
     del tables["dim_time"]
@@ -148,12 +155,13 @@ def test_good_marts_are_published_with_their_times_unchanged(tmp_path):
         "dim_time.parquet",
         "fct_trail_point_coverage.parquet",
         "fct_satellite_window.parquet",
+        "fct_reachable_period.parquet",
     }
     table = pq.read_table(tmp_path / "published" / "fct_satellite_window.parquet")
     assert table.schema.field("window_start_utc").type == UTC_US
     assert table.to_pylist()[0]["window_start_utc"] == RUN_END
     assert summary == {
-        "tables": 4,
+        "tables": 5,
         "windows": 3,
         "points": 3,
         "run_started_utc": RUN_STARTED.isoformat(),
@@ -172,7 +180,7 @@ def test_a_failed_gate_publishes_nothing_and_keeps_the_last_files(tmp_path):
 
 
 def test_the_run_metric_records_the_rows_and_the_freshest_time(tmp_path):
-    summary = {"tables": 4, "windows": 3, "points": 3, "run_started_utc": RUN_STARTED.isoformat()}
+    summary = {"tables": 5, "windows": 3, "points": 3, "run_started_utc": RUN_STARTED.isoformat()}
     path = emit_publish_metric(summary, RUN_END, NOW, tmp_path)
     (row,) = pq.read_table(path).to_pylist()
     assert path.parent.parent.name == "dag_id=signal_phase_a_nightly"

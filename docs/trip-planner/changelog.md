@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 5, 2026: reachable periods
+
+- Every window of a trail would not fit in one API answer: 984,227 windows on North Kaibab against Lambda's 6 MB limit. John chose to merge overlapping windows into reachable periods per point: 20,956 on North Kaibab.
+- New mart `fct_reachable_period` and contract 0.1.0 (proposed). `fct_satellite_window` stays published with the detail.
+
 ### Nov 5, 2026: C9 and C10 built
 
 - John chose the existing publish gate over Great Expectations for Phase A, and set the gate's limits (OQ-15). FR-15, F-1A.5 and design doc C9 changed.
