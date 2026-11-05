@@ -2,11 +2,11 @@ import { createElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect } from 'vitest'
 import { renderMarkup, visibleText } from '../testing/markup'
-import { Home } from './Home'
+import { About } from './About'
 
-describe('Home page', () => {
+describe('About page', () => {
   // The page has router links, so it renders inside a router as it does in the app.
-  const text = visibleText(renderMarkup(createElement(MemoryRouter, null, createElement(Home))))
+  const text = visibleText(renderMarkup(createElement(MemoryRouter, null, createElement(About))))
 
   it('no longer says the planner shows no data', () => {
     expect(text).not.toContain('does not show any coverage')
@@ -14,7 +14,7 @@ describe('Home page', () => {
   })
 
   it('describes what the planner does', () => {
-    expect(text).toContain('coverage bars along a trail')
+    expect(text).toContain('colors each stretch of a trail')
     expect(text).toContain('canyon walls')
     expect(text).toContain('Predictions valid until')
   })

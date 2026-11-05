@@ -2,7 +2,7 @@ import { DATA_SOURCES } from '../lib/sources'
 
 export function Credits() {
   return (
-    <section aria-labelledby="credits-heading">
+    <section className="panel" aria-labelledby="credits-heading">
       <h2 id="credits-heading">Data sources and credits</h2>
       <ul>
         {DATA_SOURCES.map((source) => (

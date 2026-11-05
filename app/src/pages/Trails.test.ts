@@ -26,6 +26,10 @@ describe('Trails page', () => {
     expect(text).toContain('Trail data: National Park Service.')
   })
 
+  it('offers the trail map before any choice, so there is something to try at once', () => {
+    expect(text).toContain('Walk')
+  })
+
   it('shows the cold start notice', () => {
     expect(text).toContain('may take up to 10 seconds')
   })

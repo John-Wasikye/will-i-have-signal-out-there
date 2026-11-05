@@ -10,6 +10,12 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 5, 2026: site redesign
+
+- John approved a new look for the site. The trail tool is now the home page, and the old home text is at `/about`. The strip map became a trail map on real terrain, with a key, so FR-17, F-1A.6 and the C12 design now say trail map.
+- `pipelines/signal/trail_terrain_art.py` draws each trail's terrain picture and height list by hand from the GLO-30 tiles. It is not part of the nightly run. The trail photos come from Wikimedia Commons, and each is credited beside the photo.
+- The lookup page stays at `/lookup` because PR-12 names it, but it is no longer in the navigation.
+
 ### Nov 5, 2026: Phase A deployed
 
 - C12 built and deployed. The README states what is live. Box runtime recorded in OQ-1 and section 7.B.

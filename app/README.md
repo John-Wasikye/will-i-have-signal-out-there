@@ -1,6 +1,6 @@
 # Site
 
-This is the public website for my trip planner, Will I have signal out there? It has a home page, a trails page, a status page that shows whether the nightly data run is up to date, and a lookup page. A banner on every page says the site is under development and shows no real coverage or satellite times yet. I built it with Vite, React and TypeScript. It compiles to plain static files, so the site has no server of its own. Only the lookup page calls the API.
+This is the public website for my trip planner, Will I have signal out there? The trail tool is the home page, and it also answers at `/trails`. There is a how it works page at `/about`, a status page that shows whether the data is up to date, and a developer lookup page at `/lookup` that is not in the navigation. A banner on every page says the site is under development. I built it with Vite, React and TypeScript. It compiles to plain static files, so the site has no server of its own. The trail tool, the status page and the lookup page call the API.
 
 ## Run it
 
@@ -25,4 +25,4 @@ For local work, I copy `.env.example` to `.env.local` and set the value there. V
 
 The site is static files. The status page reads `/status.json` from the same site. Locally, `public/status.json` holds a sample pipeline, so the page works without the nightly job. In production, the nightly job publishes the real file next to the site.
 
-The lookup page calls the API. The first request after a quiet period may be slow, and the page says so while it waits.
+The first request after a quiet period may be slow, and the page says so while it waits.
