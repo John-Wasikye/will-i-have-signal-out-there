@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // styles.test.ts reads the real stylesheet; by default Vitest replaces CSS with an empty file.
+    css: true,
   },
 })

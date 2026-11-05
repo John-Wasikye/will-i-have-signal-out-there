@@ -38,9 +38,9 @@ export function Lookup() {
   return (
     <>
       <h1>Lookup</h1>
-      <p>Enter a sample key to see its value and when it was last refreshed.</p>
+      <p className="lede">Enter a sample key to see its value and when it was last refreshed.</p>
 
-      <form onSubmit={handleSubmit} className="lookup-form">
+      <form onSubmit={handleSubmit} className="panel lookup-form">
         <label htmlFor="sample-key">Sample key</label>
         <input
           id="sample-key"

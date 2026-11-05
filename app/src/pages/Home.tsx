@@ -6,13 +6,13 @@ export function Home() {
   return (
     <>
       <h1>Will I have signal out there?</h1>
-      <p>
+      <p className="lede">
         I am building a trip planner for hikers at Grand Canyon National Park. It shows where
         T-Mobile claims coverage along a trail, and when a satellite text could get through. Pick a{' '}
         <Link to="/trails">trail</Link> or check the <Link to="/status">status page</Link>.
       </p>
 
-      <section aria-labelledby="will-do-heading">
+      <section className="panel" aria-labelledby="will-do-heading">
         <h2 id="will-do-heading">What the planner does</h2>
         <ul>
           <li>
@@ -31,7 +31,7 @@ export function Home() {
         </ul>
       </section>
 
-      <section aria-labelledby="scope-heading">
+      <section className="panel" aria-labelledby="scope-heading">
         <h2 id="scope-heading">Phase A scope</h2>
         <ul>
           <li>The main trails at Grand Canyon National Park: Bright Angel, South Kaibab and North Kaibab.</li>
@@ -40,7 +40,7 @@ export function Home() {
         </ul>
       </section>
 
-      <section aria-labelledby="how-heading">
+      <section className="panel" aria-labelledby="how-heading">
         <h2 id="how-heading">How it works</h2>
         <p>
           An automated job runs every night at 10:00 UTC (Coordinated Universal Time). It collects

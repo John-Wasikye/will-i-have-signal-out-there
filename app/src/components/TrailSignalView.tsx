@@ -88,7 +88,7 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
   const point = signal.points[Math.min(selected, signal.points.length - 1)]
 
   return (
-    <>
+    <div className="panel">
       {late ? (
         <div className="notice notice-late" role="status">
           <p>
@@ -134,6 +134,6 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
         onChange={(event) => setSelected(Number(event.target.value))}
       />
       <PointDetail point={point} now={now} />
-    </>
+    </div>
   )
 }

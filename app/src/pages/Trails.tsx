@@ -52,20 +52,22 @@ export function Trails() {
   return (
     <>
       <h1>Trails</h1>
-      <p>
+      <p className="lede">
         I cover three main trails at Grand Canyon National Park: {PHASE_A_TRAILS.join(', ')}. Pick
         one to see where T-Mobile claims coverage and when a satellite could be reachable.
       </p>
 
-      <label htmlFor="trail">Choose a trail</label>
-      <select id="trail" value={trailId} onChange={(event) => chooseTrail(event.target.value)}>
-        <option value="">Choose a trail</option>
-        {trails.map((trail) => (
-          <option key={trail.trail_id} value={trail.trail_id}>
-            {trail.trail_name ?? trail.trail_id}
-          </option>
-        ))}
-      </select>
+      <div className="panel">
+        <label htmlFor="trail">Choose a trail</label>
+        <select id="trail" value={trailId} onChange={(event) => chooseTrail(event.target.value)}>
+          <option value="">Choose a trail</option>
+          {trails.map((trail) => (
+            <option key={trail.trail_id} value={trail.trail_id}>
+              {trail.trail_name ?? trail.trail_id}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {loading && <ColdStartNotice />}
       {failed && (

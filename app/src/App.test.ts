@@ -19,6 +19,19 @@ describe('the development banner', () => {
   })
 })
 
+describe('the site header', () => {
+  it.each(pages)('shows the logo and site name as a link home on %s', (path) => {
+    const header = renderPage(path).split('</header>')[0]
+    expect(header).toMatch(/<a [^>]*class="brand[^>]*href="\/"|<a [^>]*href="\/"[^>]*class="brand/)
+    expect(header).toContain('logo-hiker')
+    expect(visibleText(header)).toContain('Will I have signal out there?')
+  })
+
+  it.each(pages)('draws the mountain ridgelines on %s', (path) => {
+    expect(renderPage(path).split('</header>')[0]).toContain('ridge-far')
+  })
+})
+
 describe('the navigation', () => {
   it('links to the new trails page', () => {
     expect(renderPage('/')).toContain('href="/trails"')
