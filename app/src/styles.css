@@ -15,6 +15,7 @@
   --color-passed: #6c6962;
   --color-coverage: #4f7349;
   --color-reach: #b8602e;
+  --color-satellite: #17607f;
   --color-none: #a39b8e;
   --color-sun: #efb36b;
   --color-sky-top: #dfe5d8;
@@ -48,6 +49,7 @@
     --color-passed: #a5a199;
     --color-coverage: #8db57f;
     --color-reach: #e8955c;
+    --color-satellite: #6fd0ee;
     --color-none: #7d756a;
     --color-sun: #c97f45;
     --color-sky-top: #14171a;
@@ -260,7 +262,7 @@ h1 {
   margin: 24px 0;
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 }
 
 .card {
@@ -483,8 +485,8 @@ label {
 }
 
 .trail-casing {
-  stroke: var(--color-card);
-  stroke-width: 13;
+  stroke: #fffaf0;
+  stroke-width: 12;
 }
 
 .trail-run {
@@ -496,7 +498,7 @@ label {
 }
 
 .trail-run-satellite {
-  stroke: var(--color-reach);
+  stroke: var(--color-satellite);
   stroke-dasharray: 12 11;
 }
 
@@ -559,7 +561,7 @@ label {
 
 .key-satellite {
   border-top-style: dashed;
-  border-top-color: var(--color-reach);
+  border-top-color: var(--color-satellite);
 }
 
 .key-none {
@@ -673,6 +675,138 @@ label {
   height: 16px;
   margin: 12px 0 16px;
   accent-color: var(--color-coverage);
+}
+
+.trail-terrain {
+  filter: saturate(1.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  .trail-terrain {
+    filter: brightness(0.62) saturate(0.9);
+  }
+}
+
+.profile {
+  margin: 12px 0 0;
+}
+
+.profile figcaption {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.elevation-profile {
+  display: block;
+  width: 100%;
+  height: 90px;
+  cursor: pointer;
+  border-radius: 10px;
+  background: var(--color-sky-top);
+}
+
+.profile-ground {
+  fill: var(--color-ridge-mid);
+}
+
+.profile-line {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.profile-you {
+  stroke: var(--color-text);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.profile-scale {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.trail-photo {
+  margin: 0 0 14px;
+}
+
+.trail-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--color-map-bg);
+}
+
+.trail-photo figcaption {
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.point-height {
+  margin: -6px 0 12px;
+  font-weight: 600;
+}
+
+.state-badge {
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.state-ok {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.state-late {
+  color: var(--color-text);
+  background: var(--color-notice-bg);
+  box-shadow: inset 0 0 0 1px var(--color-notice-border);
+}
+
+.state-failed {
+  color: var(--color-on-accent);
+  background: var(--color-error);
+}
+
+.card h3 {
+  margin: 8px 0 4px;
+  font-size: 1.15rem;
+}
+
+.card p {
+  margin: 4px 0 10px;
+}
+
+.state-key {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 16px 20px;
+  list-style: none;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.state-key li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.state-key .state-badge {
+  justify-self: start;
 }
 
 .note-text {

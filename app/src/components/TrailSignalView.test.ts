@@ -13,6 +13,9 @@ const point = (seq: number, covered: boolean, windows: PointSignal['windows']): 
   windows,
 })
 
+const manyPoints = (count: number): PointSignal[] =>
+  Array.from({ length: count }, (_, seq) => ({ ...point(seq, true, []), lon: -112 + seq / 1000 }))
+
 const passed = { start_utc: '2026-11-05T10:05:00Z', end_utc: '2026-11-05T10:08:00Z' }
 const current = { start_utc: '2026-11-05T11:00:00Z', end_utc: '2026-11-05T13:00:00Z' }
 
@@ -52,6 +55,35 @@ describe('TrailSignalView', () => {
     expect(text).toContain('No T-Mobile, but a satellite is reachable now')
     expect(text).toContain('Neither right now')
     expect(text).toContain('You are here')
+  })
+
+  it('draws the real terrain under the trail line', () => {
+    const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
+    const markup = renderMarkup(createElement(TrailSignalView, { signal: known, now }))
+    expect(markup).toContain('href="/trails/grca-bright-angel-terrain.png"')
+    expect(markup.indexOf('trail-terrain')).toBeLessThan(markup.indexOf('trail-run'))
+  })
+
+  it('shows how the ground rises and falls, and the height at the chosen spot', () => {
+    const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
+    const markup = renderMarkup(createElement(TrailSignalView, { signal: known, now }))
+    expect(markup).toContain('class="elevation-profile"')
+    expect(visibleText(markup)).toMatch(/Elevation about [\d,]+ m \([\d,]+ ft\)/)
+  })
+
+  it('shows a photo of the trail with its credit', () => {
+    const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
+    const markup = renderMarkup(createElement(TrailSignalView, { signal: known, now }))
+    expect(markup).toContain('src="/trails/grca-bright-angel.jpg"')
+    expect(visibleText(markup)).toContain('Photo:')
+  })
+
+  it('still works for a trail with no terrain or photo', () => {
+    const unknown = { ...signal, trail_id: 'no-such-trail' }
+    const markup = renderMarkup(createElement(TrailSignalView, { signal: unknown, now }))
+    expect(markup).not.toContain('trail-terrain')
+    expect(markup).not.toContain('<img')
+    expect(markup).not.toContain('elevation-profile')
   })
 
   it('marks the start and the end of the trail', () => {

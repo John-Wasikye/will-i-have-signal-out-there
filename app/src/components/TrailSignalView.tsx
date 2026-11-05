@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { formatUtc } from '../lib/status'
+import { photoFor, profileLine, terrainFor, toFeet, type TrailPhoto } from '../lib/trailMedia'
 import {
   distanceKm,
   isReachableAt,
@@ -21,6 +22,8 @@ const MAP_WIDTH = 600
 const MAP_HEIGHT = 420
 const MAP_PADDING = 34
 const WALK_TICK_MS = 50
+const PROFILE_HEIGHT = 110
+const PROFILE_MARGIN = 8
 const FULL_SIGNAL_BARS = [1, 2, 3, 4]
 
 function linePoints(shape: MapPoint[]): string {
@@ -37,10 +40,11 @@ interface TrailMapProps {
   states: PointState[]
   selected: number
   label: string
+  terrainUrl?: string
   onSelect: (index: number) => void
 }
 
-function TrailMap({ shape, states, selected, label, onSelect }: TrailMapProps) {
+function TrailMap({ shape, states, selected, label, terrainUrl, onSelect }: TrailMapProps) {
   const you = shape[selected]
   const start = shape[0]
   const end = shape[shape.length - 1]
@@ -55,6 +59,15 @@ function TrailMap({ shape, states, selected, label, onSelect }: TrailMapProps) {
   return (
     <figure className="strip-map">
       <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} role="img" aria-label={label} onClick={selectNearest}>
+        {terrainUrl && (
+          <image
+            className="trail-terrain"
+            href={terrainUrl}
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+            preserveAspectRatio="none"
+          />
+        )}
         <polyline className="trail-casing" points={linePoints(shape)} />
         {trailRuns(states).map((run) => (
           <polyline
@@ -74,6 +87,68 @@ function TrailMap({ shape, states, selected, label, onSelect }: TrailMapProps) {
         <circle className="trail-you-halo" cx={you.x} cy={you.y} r={17} />
         <circle className="trail-you" cx={you.x} cy={you.y} r={9} />
       </svg>
+    </figure>
+  )
+}
+
+interface ElevationProfileProps {
+  elevations: number[]
+  selected: number
+  onSelect: (index: number) => void
+}
+
+/** The ground along the trail. Tapping it moves the hiker, the same as tapping the map. */
+function ElevationProfile({ elevations, selected, onSelect }: ElevationProfileProps) {
+  const inner = PROFILE_HEIGHT - 2 * PROFILE_MARGIN
+  const line = profileLine(elevations, MAP_WIDTH, inner).map(({ x, y }) => ({
+    x,
+    y: y + PROFILE_MARGIN,
+  }))
+  const you = line[selected]
+  const high = Math.max(...elevations)
+  const low = Math.min(...elevations)
+
+  function selectAlong(event: MouseEvent<SVGSVGElement>) {
+    const box = event.currentTarget.getBoundingClientRect()
+    const share = (event.clientX - box.left) / box.width
+    onSelect(Math.round(share * (elevations.length - 1)))
+  }
+
+  return (
+    <figure className="profile">
+      <figcaption>The ground along the trail</figcaption>
+      <svg
+        className="elevation-profile"
+        viewBox={`0 0 ${MAP_WIDTH} ${PROFILE_HEIGHT}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`Elevation along the trail, between ${low} and ${high} meters`}
+        onClick={selectAlong}
+      >
+        <polygon
+          className="profile-ground"
+          points={`0,${PROFILE_HEIGHT} ${linePoints(line)} ${MAP_WIDTH},${PROFILE_HEIGHT}`}
+        />
+        <polyline className="profile-line" points={linePoints(line)} />
+        <line className="profile-you" x1={you.x} x2={you.x} y1={0} y2={PROFILE_HEIGHT} />
+      </svg>
+      <p className="profile-scale">
+        <span>Highest {high.toLocaleString('en-US')} m</span>
+        <span>Lowest {low.toLocaleString('en-US')} m</span>
+      </p>
+    </figure>
+  )
+}
+
+function Photo({ photo }: { photo: TrailPhoto }) {
+  return (
+    <figure className="trail-photo">
+      <img src={photo.url} alt={photo.alt} loading="lazy" />
+      <figcaption>
+        <a href={photo.sourceUrl} rel="noopener noreferrer">
+          {photo.credit}
+        </a>
+      </figcaption>
     </figure>
   )
 }
@@ -120,12 +195,25 @@ function satelliteAnswer(point: PointSignal, now: Date, late: boolean): string {
   return next ? `Next: ${formatUtc(next.start_utc)}` : 'No window predicted'
 }
 
-function PointDetail({ point, now, late }: { point: PointSignal; now: Date; late: boolean }) {
+interface PointDetailProps {
+  point: PointSignal
+  elevationM?: number
+  now: Date
+  late: boolean
+}
+
+function PointDetail({ point, elevationM, now, late }: PointDetailProps) {
   const windows = windowsWithPassedFlag(point.windows, now)
   const covered = point.coverage.some((item) => item.covered)
   return (
     <section className="point-detail" aria-labelledby="point-heading">
       <h3 id="point-heading">About {distanceKm(point.seq).toFixed(2)} km along the trail</h3>
+      {elevationM !== undefined && (
+        <p className="point-height">
+          Elevation about {elevationM.toLocaleString('en-US')} m (
+          {toFeet(elevationM).toLocaleString('en-US')} ft)
+        </p>
+      )}
       <div className="answer-tiles">
         <div className={covered ? 'answer-tile answer-yes' : 'answer-tile'}>
           <p className="answer-label">Phone</p>
@@ -189,6 +277,9 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
     [signal.points, now],
   )
   const carrier = signal.carriers[0]
+  const terrain = terrainFor(signal.trail_id, signal.points.length)
+  const photo = photoFor(signal.trail_id)
+  const shownIndex = Math.min(selected, lastIndex)
   const coveredCount = signal.points.filter((item) =>
     item.coverage.some((flag) => flag.covered),
   ).length
@@ -243,7 +334,7 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
                 type="range"
                 min={0}
                 max={lastIndex}
-                value={Math.min(selected, lastIndex)}
+                value={shownIndex}
                 onChange={(event) => jumpTo(Number(event.target.value))}
               />
             </div>
@@ -251,14 +342,28 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
           <TrailMap
             shape={shape}
             states={states}
-            selected={Math.min(selected, lastIndex)}
+            selected={shownIndex}
             label={late ? coverageLabel : `${coverageLabel} ${reachLabel}`}
+            terrainUrl={terrain?.imageUrl}
             onSelect={jumpTo}
           />
           <MapKey carrier={carrier} late={late} />
+          {terrain && (
+            <ElevationProfile
+              elevations={terrain.elevationsM}
+              selected={shownIndex}
+              onSelect={jumpTo}
+            />
+          )}
         </div>
         <div className="panel walker-detail">
-          <PointDetail point={point} now={now} late={late} />
+          {photo && <Photo photo={photo} />}
+          <PointDetail
+            point={point}
+            elevationM={terrain?.elevationsM[shownIndex]}
+            now={now}
+            late={late}
+          />
         </div>
       </div>
 
