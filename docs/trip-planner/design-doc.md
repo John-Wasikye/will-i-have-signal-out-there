@@ -668,7 +668,7 @@ Convention proposed here: 36 horizon angles, one per 10-degree compass sector (3
 
 | Function or class | Purpose | Takes | Returns |
 |---|---|---|---|
-| `TrailPoint` (class) | One sampled point on a trail | `trail_point_id`, `trail_id`, `seq`, `lon`, `lat`, `elevation_m` | Immutable record |
+| `TrailPoint` (class) | One sampled point on a trail | `trail_point_id`, `trail_id`, `seq`, `lon`, `lat` | Immutable record |
 | `ElevationGrid` (class, `geotiff.py`) | One GLO-30 tile's heights, cell (0, 0) centred on the tie point ("pixel is point") | Heights, west, north, cell size in degrees | Object with `elevation_at(lon, lat)` (nearest cell, NaN off the grid) |
 | `read_elevation_grid(path)` (`geotiff.py`) | Read one tile with the standard library and numpy; refuse any layout other than the one the first-run check found (ADR 0038) | A tile file | `ElevationGrid` |
 | `ElevationTiles` (class) | The loaded set of GLO-30 tiles for the park plus margin, looked up together | `ElevationGrid` objects | Object with `elevation_at(lon, lat)` |

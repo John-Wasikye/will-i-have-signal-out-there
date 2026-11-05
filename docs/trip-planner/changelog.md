@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 5, 2026: elevation removed from dim_trail_point
+
+- Contract `dim_trail_point` 0.2.0: John removed `elevation_m`. No step stored it, and neither the API nor the page reads it. It can come back when something needs it.
+
 ### Nov 4, 2026: OQ-40 decided and C7 built
 
 - OQ-40 answered by John: Spark copies the needed partitions to plain Parquet, and dbt reads those.
