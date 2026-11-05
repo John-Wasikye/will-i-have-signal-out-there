@@ -123,6 +123,8 @@ env:
     value: /opt/airflow/data/published
   - name: PLATFORM_MARTS_DIR
     value: /opt/airflow/data/marts
+  - name: PLATFORM_TRAIL_PUBLISHED_DIR
+    value: /opt/airflow/data/trail-published
   - name: PLATFORM_METRICS_DIR
     value: /opt/airflow/data/metrics
   - name: PLATFORM_INCIDENTS_DIR
