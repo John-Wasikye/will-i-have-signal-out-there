@@ -4,17 +4,19 @@ import { renderMarkup, visibleText } from '../testing/markup'
 import { DevelopmentBanner } from './DevelopmentBanner'
 
 describe('DevelopmentBanner', () => {
-  it('announces in a status region that the site does not show real data yet', () => {
+  it('announces in a status region that the site is still being built', () => {
     const markup = renderMarkup(createElement(DevelopmentBanner))
     expect(markup).toContain('role="status"')
-    expect(visibleText(markup)).toContain(
-      'Under development: this site does not show real coverage or satellite times yet.',
-    )
+    expect(visibleText(markup)).toContain('Under development:')
   })
 
-  it('says the data pipeline is still being built', () => {
+  it('warns not to rely on it for safety', () => {
     const text = visibleText(renderMarkup(createElement(DevelopmentBanner)))
-    expect(text).toContain('The data pipeline')
-    expect(text).toContain('still being built')
+    expect(text).toContain('Do not rely on it for your safety')
+  })
+
+  it('no longer says the site has no real data', () => {
+    const text = visibleText(renderMarkup(createElement(DevelopmentBanner)))
+    expect(text).not.toContain('does not show real')
   })
 })

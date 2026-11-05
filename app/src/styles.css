@@ -10,7 +10,6 @@
   --color-error: #9b2226;
   --color-badge-bg: #e7e7e1;
   --color-badge-active-bg: #dbe9f6;
-  --color-map-line: #b8c4cf;
   --color-map-bg: #eef3f7;
   --color-banner-bg: #ffd966;
   --color-banner-text: #1c1c1a;
@@ -30,7 +29,6 @@
     --color-error: #ff8a8f;
     --color-badge-bg: #2c2d2a;
     --color-badge-active-bg: #1d3247;
-    --color-map-line: #3d4f60;
     --color-map-bg: #1a2530;
     --color-banner-bg: #6b4e00;
     --color-banner-text: #fff3d1;
@@ -233,28 +231,51 @@ h1 {
   cursor: progress;
 }
 
-.map {
-  margin: 16px 0;
-  max-width: 320px;
+.valid-until {
+  font-weight: 600;
 }
 
-.map svg {
+.strip-map {
+  margin: 12px 0;
+}
+
+.strip-map svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 32px;
 }
 
-.map-bg {
+.strip-track {
   fill: var(--color-map-bg);
 }
 
-.map-line {
-  stroke: var(--color-map-line);
-  stroke-width: 1;
+.strip-bar {
+  fill: var(--color-accent);
 }
 
-.map figcaption {
+.strip-reach {
+  fill: var(--color-notice-border);
+}
+
+.note-text {
   color: var(--color-muted);
-  font-size: 0.9rem;
-  margin-top: 8px;
+}
+
+input[type='range'],
+select {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  margin: 4px 0 16px;
+}
+
+.window-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-left: 0;
+  list-style: none;
+}
+
+.window-passed {
+  color: var(--color-muted);
 }

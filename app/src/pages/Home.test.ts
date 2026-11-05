@@ -8,7 +8,12 @@ describe('Home page', () => {
   // The page has router links, so it renders inside a router as it does in the app.
   const text = visibleText(renderMarkup(createElement(MemoryRouter, null, createElement(Home))))
 
-  it('describes what the planner will do', () => {
+  it('no longer says the planner shows no data', () => {
+    expect(text).not.toContain('does not show any coverage')
+    expect(text).not.toContain('Once the data pipeline is finished')
+  })
+
+  it('describes what the planner does', () => {
     expect(text).toContain('coverage bars along a trail')
     expect(text).toContain('canyon walls')
     expect(text).toContain('Predictions valid until')

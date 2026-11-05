@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import contract from '../../../docs/platform/openapi-serving-template.yaml?raw'
-import { sampleUrl } from './api'
+import tripPlannerContract from '../../../docs/trip-planner/openapi.yaml?raw'
+import { sampleUrl, trailSignalUrl, trailsUrl } from './api'
 
 // The API's routes, as the contract lists them under `paths:` (two spaces, then /name:).
 // platform/serving/tests/test_contract.py checks the API serves exactly these, so an address
@@ -30,6 +31,28 @@ describe('sampleUrl', () => {
 
   it('accepts a base address that ends in a slash', () => {
     expect(pathOf(sampleUrl('https://api.example.com/', 'x'))).toBe('/sample')
+  })
+})
+
+const tripPlannerPaths = [...tripPlannerContract.matchAll(/^ {2}(\/[^:\s]*):\s*$/gm)].map(
+  (match) => match[1],
+)
+
+describe('trailsUrl', () => {
+  it('asks for a route in the trip planner contract', () => {
+    expect(tripPlannerPaths).toContain(pathOf(trailsUrl('https://api.example.com/')))
+  })
+})
+
+describe('trailSignalUrl', () => {
+  it('asks for a route in the trip planner contract', () => {
+    const path = pathOf(trailSignalUrl('https://api.example.com', 'grca-bright-angel'))
+    expect(path).toBe('/trails/grca-bright-angel/signal')
+    expect(tripPlannerPaths).toContain('/trails/{trail_id}/signal')
+  })
+
+  it('encodes the trail ID, so it cannot change the address', () => {
+    expect(pathOf(trailSignalUrl('https://api.example.com', 'a/b'))).toBe('/trails/a%2Fb/signal')
   })
 })
 
