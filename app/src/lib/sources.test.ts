@@ -11,9 +11,12 @@ describe('DATA_SOURCES', () => {
     ])
   })
 
-  it('says what each source provides', () => {
-    for (const source of DATA_SOURCES) {
-      expect(source.provides.length).toBeGreaterThan(0)
-    }
+  it('gives each source its decided credit line (ADR 0037)', () => {
+    expect(DATA_SOURCES.map((source) => source.credit)).toEqual([
+      'Orbital data: CelesTrak (celestrak.org), maintained by Dr. T.S. Kelso.',
+      'Trail data: National Park Service.',
+      'Coverage data: FCC National Broadband Map (broadbandmap.fcc.gov).',
+      'Terrain produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.',
+    ])
   })
 })

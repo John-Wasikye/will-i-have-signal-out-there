@@ -3,8 +3,6 @@ import { describe, it, expect } from 'vitest'
 import { renderMarkup, visibleText } from '../testing/markup'
 import { Trails } from './Trails'
 
-const comingSoon = 'Coverage and satellite times coming soon'
-
 describe('Trails page', () => {
   const text = visibleText(renderMarkup(createElement(Trails)))
 
@@ -14,16 +12,21 @@ describe('Trails page', () => {
     expect(text).toContain('North Kaibab')
   })
 
-  it('marks each trail as coming soon', () => {
-    expect(text.split(comingSoon).length - 1).toBe(3)
+  it('no longer says the data is coming soon', () => {
+    expect(text).not.toContain('coming soon')
+    expect(text).not.toContain('not ready yet')
   })
 
-  it('shows no numbers, bars or times', () => {
-    expect(text).not.toMatch(/\d/)
+  it('asks the reader to pick a trail', () => {
+    expect(text).toContain('Choose a trail')
   })
 
-  it('states the Direct-to-Cell requirements and lists the data sources', () => {
+  it('states the Direct-to-Cell requirements and credits the data sources', () => {
     expect(text).toContain('Direct-to-Cell')
-    expect(text).toContain('Full credits')
+    expect(text).toContain('Trail data: National Park Service.')
+  })
+
+  it('shows the cold start notice', () => {
+    expect(text).toContain('may take up to 10 seconds')
   })
 })

@@ -1,21 +1,19 @@
 import { Link } from 'react-router-dom'
 import { Credits } from '../components/Credits'
 import { DtcRequirementsNote } from '../components/DtcRequirementsNote'
-import { MapView } from '../components/MapView'
 
 export function Home() {
   return (
     <>
       <h1>Will I have signal out there?</h1>
       <p>
-        I am building a trip planner for hikers at Grand Canyon National Park. It will show where
-        T-Mobile has coverage along a trail, and when a satellite text could get through. The planner
-        is not finished, so it does not show any coverage or satellite times yet. You can see the{' '}
-        <Link to="/trails">trail names</Link> or check the <Link to="/status">status page</Link>.
+        I am building a trip planner for hikers at Grand Canyon National Park. It shows where
+        T-Mobile claims coverage along a trail, and when a satellite text could get through. Pick a{' '}
+        <Link to="/trails">trail</Link> or check the <Link to="/status">status page</Link>.
       </p>
 
       <section aria-labelledby="will-do-heading">
-        <h2 id="will-do-heading">What the planner will do</h2>
+        <h2 id="will-do-heading">What the planner does</h2>
         <ul>
           <li>
             A strip map shows coverage bars along a trail. Bars mark where T-Mobile has coverage, and
@@ -45,20 +43,14 @@ export function Home() {
       <section aria-labelledby="how-heading">
         <h2 id="how-heading">How it works</h2>
         <p>
-          Once the data pipeline is finished, an automated job will run every night at 10:00 UTC
-          (Coordinated Universal Time). It will collect the latest data, check it, and publish the
-          results as data files.
+          An automated job runs every night at 10:00 UTC (Coordinated Universal Time). It collects
+          the latest data, checks it, and publishes the results as data files.
         </p>
         <p>
           The page asks a small web service for the answers, and that service reads the published
           files. The machine that runs the nightly job is switched off the rest of the day, and the
           page keeps working without it.
         </p>
-      </section>
-
-      <section aria-labelledby="map-heading">
-        <h2 id="map-heading">Map preview</h2>
-        <MapView />
       </section>
 
       <DtcRequirementsNote />

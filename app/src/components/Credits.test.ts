@@ -4,17 +4,23 @@ import { renderMarkup, visibleText } from '../testing/markup'
 import { Credits } from './Credits'
 
 describe('Credits', () => {
-  it('names each planned data source', () => {
+  it('credits each data source', () => {
     const text = visibleText(renderMarkup(createElement(Credits)))
     expect(text).toContain('CelesTrak')
     expect(text).toContain('National Park Service')
-    expect(text).toContain('Federal Communications Commission (FCC)')
+    expect(text).toContain('FCC National Broadband Map')
     expect(text).toContain('Copernicus')
   })
 
-  it('says full credits come with the live data', () => {
+  it('gives the exact Copernicus notice for modified data', () => {
     const text = visibleText(renderMarkup(createElement(Credits)))
-    expect(text).toContain('Full credits')
-    expect(text).toContain('live data')
+    expect(text).toContain('produced using Copernicus WorldDEM-30')
+    expect(text).toContain('all rights reserved.')
+  })
+
+  it('no longer says the credits are still to come', () => {
+    const text = visibleText(renderMarkup(createElement(Credits)))
+    expect(text).not.toContain('will draw on')
+    expect(text).not.toContain('come with the live data')
   })
 })
