@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 5, 2026: C9 and C10 built
+
+- John chose the existing publish gate over Great Expectations for Phase A, and set the gate's limits (OQ-15). FR-15, F-1A.5 and design doc C9 changed.
+- C10 publishes one Parquet file per mart. `fct_satellite_window` is 7.5 MB, so it is not split by trail.
+
 ### Nov 5, 2026: elevation removed from dim_trail_point
 
 - Contract `dim_trail_point` 0.2.0: John removed `elevation_m`. No step stored it, and neither the API nor the page reads it. It can come back when something needs it.

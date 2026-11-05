@@ -141,7 +141,7 @@ The full set is in [requirements.md](requirements.md). Summary:
 
 **Functional (76 requirements, FR-1 to FR-76; numbers are never reused and a few are out of order, see the note in requirements.md section 4)**
 
-- Phase A (FR-1 to FR-24, FR-75, FR-76): orbit ingest and Direct-to-Cell selection; trail sampling at 50 m; terrain horizon to about 15 km; SGP4 at 1-minute steps for 26 hours; reachability above 10 degrees and the terrain horizon; satellite windows as start and end times with a valid until stamp; FCC coverage flag per trail point for one carrier; dbt on DuckDB; contracts; Great Expectations publish gate; gold Parquet; React trail page with the late notice and credits.
+- Phase A (FR-1 to FR-24, FR-75, FR-76): orbit ingest and Direct-to-Cell selection; trail sampling at 50 m; terrain horizon to about 15 km; SGP4 at 1-minute steps for 26 hours; reachability above 10 degrees and the terrain horizon; satellite windows as start and end times with a valid until stamp; FCC coverage flag per trail point for one carrier; dbt on DuckDB; contracts; publish gate; gold Parquet; React trail page with the late notice and credits.
 - Phase B (FR-25 to FR-62, FR-66 to FR-74): every carrier; Ookla tiles with license notice; orbit update stream; Snowflake marts with SCD Type 2; MetricFlow, Superset, Marquez; confidence model with a repo copy; AI foundations; trip-planning assistant; evals in CI; hiker reports with offline queue and limits; operations hardening.
 - Phase C (FR-63 to FR-65): national scope and route upload, offline trip pack, model comparison.
 
@@ -233,7 +233,7 @@ flowchart LR
   src["Public sources: CelesTrak, FCC, NPS, Copernicus, Ookla"]:::ext
   pipe["Nightly pipelines: Airflow and Spark on the session box"]:::cont
   dbt["dbt project: DuckDB, Snowflake in B"]:::cont
-  gate["Publish gate: Great Expectations"]:::cont
+  gate["Publish gate"]:::cont
   lake[("Lake and raw files: S3, Iceberg, Glue")]:::store
   ddb[("Visitor tables (B): DynamoDB")]:::store
   stream["Orbit update stream (B): Kafka"]:::phb
@@ -505,11 +505,11 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 
 | Item | Detail |
 |---|---|
-| Job | Write, audit, publish: new data lands in staging, passes Great Expectations checks (freshness, empty results, value ranges), then goes live; publishing stops when a check fails |
+| Job | Write, audit, publish: new data lands in staging, passes the publish gate's checks (freshness, empty results, value ranges), then goes live; publishing stops when a check fails. John chose the existing gate (`pipelines/platform/publish/gate.py`) over Great Expectations for Phase A (Nov 5, 2026) |
 | Inputs | Staged mart tables |
 | Outputs | Pass or fail result; on pass, promotion to the publish location |
-| Main functions and classes (proposed) | `run_publish_gate(staged_tables, suite)`; expectation suites `suite_satellite_window`, `suite_trail_point_coverage`, `suite_trail_point`; `promote_to_published(staged_path, published_path)` |
-| Value-range limits | Two checks need no recorded number: a satellite window never starts after it ends, and elevation angles are between 0 and 90 degrees. Freshness thresholds and all other value ranges are open (OQ-15) |
+| Main functions and classes (as built) | `gate_marts(tables, now_utc)` and `publish_marts(marts_dir, published_dir, now_utc)` in `pipelines/signal/trail_publish.py` |
+| Limits (John, Nov 5, 2026, OQ-15) | At least 1 and at most 4,000,000 satellite windows; each of the 3 main trails has points and windows; every point has a coverage flag; the run started within 26 hours; minimum elevation between 0 and 90 degrees; no window ends before it starts |
 | ADRs | 0006, 0018 |
 
 #### C10 Publisher (F-1A.6)
@@ -519,7 +519,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Job | Write gold tables as Parquet to the published location read by the serving Lambda |
 | Inputs | Mart tables that passed the gate |
 | Outputs | Parquet files for `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window` |
-| Main functions and classes (proposed) | `publish_gold_parquet(tables, destination, logical_date)` |
+| Main functions and classes (as built) | `publish_marts` (as C9) and `upload_published(client, site_bucket, lake_bucket, published_dir, metrics_dir)`. One file per mart, each replaced whole by the next good run: `fct_satellite_window` measured 7.5 MB, so no split by trail |
 | ADRs | 0006 |
 
 #### C11 Serving API (F-1A.6)
@@ -759,7 +759,7 @@ Step by step, with failure handling:
 5. C3, C4 and C6 run on the trail points. The cadence of these reference-data steps is decided in ADR 0028 (OQ-25). Either way, each of them overwrites its own partitions, so running again is safe.
 6. C5 propagates once per satellite and evaluates all trail points in parallel. If the row count or runtime exceeds its limit the job stops before publishing and opens an incident (the limit values come from OQ-1).
 7. C7 runs dbt on DuckDB into staging. A failed dbt test fails the run.
-8. C9 runs the Great Expectations checks. On failure, publishing stops; the previously published Parquet stays (QR-4).
+8. C9 runs the publish gate checks. On failure, publishing stops; the previously published Parquet stays (QR-4).
 9. C10 publishes gold Parquet; each run is stamped with its valid until time.
 10. The metrics table gets freshness and row counts; `status.json` is regenerated; a missed freshness target or failed run sends an email.
 11. Iceberg maintenance (compact, expire snapshots, remove orphan files) is the last task, so it never competes with the pipelines.
@@ -1076,7 +1076,7 @@ Tests use small sample files in CI like ordinary unit tests; there are no staged
 ### 13.2 Data tests
 
 - dbt tests: unique and not_null on keys in staging and marts; relationships between facts and dimensions.
-- Great Expectations: freshness, empty results and value ranges on sample files; publishing stops on failure (AC-1A.5).
+- Publish gate: freshness, empty results and value ranges on sample files; publishing stops on failure (AC-1A.5).
 - Contract diff: each source's sample file against its contract.
 - Idempotence: running the same pull twice leaves the row count unchanged; replaying a day of orbit updates writes the same rows (AC-1B.2).
 - One metric gives the same value from Snowflake and from DuckDB (AC-1B.3).
@@ -1300,7 +1300,6 @@ A platform question that Project 1 depends on: whether the whole stack fits in 3
 | Gold | The last layer of tables, ready for the page to read |
 | GP data | General perturbations orbital elements, the format CelesTrak serves |
 | Grafana | The tool that shows platform health charts during work sessions; it reads X-Ray traces |
-| Great Expectations | Tool that checks data before it is published |
 | H3 | A grid of hexagon cells covering the Earth; resolution 9 cells are about 0.1 km2 (the FCC cell size) and resolution 8 is used for Ookla tiles |
 | Horizon profile | The highest terrain angle in each of 36 compass sectors around a point |
 | Iceberg | Table format on S3 |

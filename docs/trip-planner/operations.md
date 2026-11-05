@@ -140,7 +140,7 @@ Each runbook names the symptom, how it is detected, what the visitor sees, the f
 
 ### RB-6: The publish gate fails (C9)
 
-- **Detected by:** a Great Expectations check fails (freshness, empty results or value ranges). Publishing stops, and the previously published Parquet stays live.
+- **Detected by:** a publish gate check fails (freshness, empty results or value ranges). Publishing stops, and the previously published Parquet stays live.
 - **Visitor sees:** the previous data, with the late notice once it is late.
 - **First action:** read the failed expectation.
 - **Fix:** if the source is at fault, hold the publish until the source is fixed. If the expectation is wrong, change it through a recorded decision.
