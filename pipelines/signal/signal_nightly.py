@@ -24,7 +24,7 @@ import hashlib
 import urllib.request
 from collections.abc import Callable, Iterator
 from dataclasses import fields
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from dtc_selector import disagreement_rows, satellite_rows, select_dtc_satellites
@@ -50,6 +50,8 @@ from fcc_coverage import (
 )
 from lake_write import (
     contract_columns,
+    delete_partitions_before,
+    replace_rows_since,
     spark_schema,
     write_frame_partition,
     write_run_partition,
@@ -65,6 +67,15 @@ from orbit_ingest import (
     store_raw,
 )
 from raw_store import latest_manifest, read_raw
+from report_copy import (
+    cell_day_rows,
+    copy_marker,
+    mark_copied,
+    read_reports_to_copy,
+    report_rows,
+    set_aside_reasons,
+    set_aside_rows,
+)
 from sample_iceberg_job import CATALOG_NAME
 from satellite_windows import (
     MAX_WINDOW_ROWS,
@@ -91,6 +102,10 @@ from trail_loader import (
 
 # Tiles reach 1 km past the horizon range, so no ray from a point near a tile edge runs off them.
 TILE_MARGIN_M = 1_000
+# Lake copies of reports are deleted 30 days after their copy (ADR 0034).
+REPORT_COPY_RETENTION = timedelta(days=30)
+# A day's reports can be copied on later nights; 20 days of recount covers many missed nights.
+CELL_DAY_RECOUNT_DAYS = 20
 
 
 def pull_orbits(
@@ -547,3 +562,99 @@ def _horizons(spark, table: str, run_date: date) -> dict[str, HorizonProfile]:  
         )
         for row in spark.sql(query).collect()
     }
+
+
+def copy_reports(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    dynamodb,  # noqa: ANN001, a boto3 DynamoDB client
+    reports_table: str,
+    run_date: date,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+    run_time: datetime,
+) -> dict:
+    """Copy the hiker reports to the lake, set aside the flagged ones, and recount the days (C23).
+
+    Order matters (ADR 0012): the lake writes come first, and only then is each report marked
+    copied with its 30-day expiry, so a failed night loses nothing. Lake partitions older than
+    30 days are then deleted (ADR 0034), and the last 20 days of ``report_cell_day`` are counted
+    again, because a day's reports can arrive over the next nights.
+    """
+    contracts = Path(contracts_dir)
+    run_time = require_utc(run_time, "run_time")
+    marker = copy_marker(run_time)
+    reports = read_reports_to_copy(dynamodb, reports_table, marker)
+
+    points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
+    newest = _newest_run_date(spark, points_table)
+    if newest is None:
+        raise ValueError("trail_point has no rows; load_trails runs first")
+    points = [(point.lat, point.lon) for point in _trail_points(spark, points_table, newest)]
+    reasons = set_aside_reasons(reports, points)
+    kept = [report for report in reports if report.report_id not in reasons]
+
+    for table, rows in (
+        ("signal_report", report_rows(kept, run_time)),
+        ("signal_report_set_aside", set_aside_rows(reports, reasons)),
+    ):
+        write_run_partition(
+            spark,
+            table,
+            rows,
+            run_date,
+            columns=contract_columns(contracts / f"{table}.yaml", table),
+            namespace=namespace,
+            allow_empty=True,
+        )
+    expires = int((run_time + REPORT_COPY_RETENTION).timestamp())
+    marked = mark_copied(dynamodb, reports_table, [r.report_id for r in reports], marker, expires)
+
+    for table in ("signal_report", "signal_report_set_aside"):
+        delete_partitions_before(
+            spark, table, run_date - REPORT_COPY_RETENTION, namespace=namespace
+        )
+    first_day = run_date - timedelta(days=CELL_DAY_RECOUNT_DAYS)
+    counts = cell_day_rows(
+        _kept_reports_since(spark, f"{CATALOG_NAME}.{namespace}.signal_report", first_day),
+        run_time,
+        first_day,
+    )
+    replace_rows_since(
+        spark,
+        "report_cell_day",
+        counts,
+        run_date,
+        columns=contract_columns(contracts / "report_cell_day.yaml", "report_cell_day"),
+        namespace=namespace,
+        date_column="report_date_utc",
+        first_date=first_day,
+    )
+    return {
+        "copied": len(reports),
+        "set_aside": len(reasons),
+        "marked": marked,
+        "cell_days": len(counts),
+    }
+
+
+def _kept_reports_since(spark, table: str, first_day: date) -> list[dict]:  # noqa: ANN001
+    """Return the copied reports from ``first_day`` on, with their hours as aware UTC times.
+
+    The hour is read as epoch seconds, which do not depend on the Spark session's time zone.
+    """
+    if not spark.catalog.tableExists(table):
+        return []
+    first = int(datetime(first_day.year, first_day.month, first_day.day, tzinfo=UTC).timestamp())
+    query = (
+        "SELECT h3_cell_res9, had_signal, unix_timestamp(report_hour_utc) AS hour_epoch "
+        f"FROM {table} WHERE report_hour_utc >= timestamp_seconds({first})"
+    )
+    return [
+        {
+            "h3_cell_res9": row["h3_cell_res9"],
+            "had_signal": row["had_signal"],
+            "report_hour_utc": datetime.fromtimestamp(row["hour_epoch"], tz=UTC),
+        }
+        for row in spark.sql(query).collect()
+    ]

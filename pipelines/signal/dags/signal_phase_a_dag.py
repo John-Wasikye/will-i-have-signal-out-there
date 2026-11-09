@@ -11,6 +11,9 @@ failed check leaves the files already live in place. A task that fails
 tries twice more, then records an incident and
 sends an email, the same as the skeleton.
 
+The report copy (C23) follows the trails, because its mapped-area rule needs the trail points;
+nothing published waits for it.
+
 The DAG only wires tasks together. The logic lives in pipelines/signal/signal_nightly.py.
 """
 
@@ -265,6 +268,23 @@ def signal_phase_a_nightly():
         )
         return summary
 
+    @task
+    def copy_reports(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Copy the hiker reports to the lake, mark them to expire, and count them (C23)."""
+        spark = build_spark_session("signal_copy_reports", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            return signal_nightly.copy_reports(
+                spark,
+                aws_client("dynamodb"),
+                f"portfolio-{os.environ['PLATFORM_ENV']}-signal-reports",
+                _run_date(dag_run, data_interval_end),
+                contracts_dir=_contracts_dir(),
+                namespace=ICEBERG_NAMESPACE,
+                run_time=sample_flow.run_end(data_interval_end, dag_run.run_after),
+            )
+        finally:
+            spark.stop()
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
@@ -274,7 +294,7 @@ def signal_phase_a_nightly():
     horizons = compute_horizons()
     trails = load_trails()
     coverage = load_coverage()
-    trails >> [horizons, coverage]
+    trails >> [horizons, coverage, copy_reports()]
     windows = compute_windows()
     [selected, horizons] >> windows
     [windows, coverage] >> build_marts() >> publish_marts()
