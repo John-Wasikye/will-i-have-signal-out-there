@@ -30,6 +30,11 @@ describe('Trails page', () => {
     expect(text).toContain('Walk')
   })
 
+  it('lets a hiker report signal from the trail page (FR-49)', () => {
+    expect(text).toContain('I had signal here')
+    expect(text).toContain('I had no signal here')
+  })
+
   it('shows the cold start notice', () => {
     expect(text).toContain('may take up to 10 seconds')
   })
