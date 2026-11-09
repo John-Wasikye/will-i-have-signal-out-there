@@ -126,9 +126,13 @@ resource "aws_apigatewayv2_integration" "lambda" {
   payload_format_version = "2.0"
 }
 
+# Every read goes to the read-only function, and only reads. A catch-all ($default) route also
+# took the browser's OPTIONS preflight for POST /reports and answered 404, so browsers blocked
+# every report. With no route for OPTIONS, API Gateway answers the preflight from the CORS
+# settings above. Other methods to other paths get API Gateway's own 404.
 resource "aws_apigatewayv2_route" "default" {
   api_id    = aws_apigatewayv2_api.http.id
-  route_key = "$default"
+  route_key = "GET /{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

@@ -201,6 +201,30 @@ run "only_the_listed_origins_may_call_the_api_from_a_browser" {
   }
 }
 
+# A browser asks first (an OPTIONS preflight) before it sends a report with the X-Visitor-Id
+# header. API Gateway answers that itself only when no route matches OPTIONS. A catch-all route
+# sent it to the read-only function, which answered 404, and the browser blocked every report.
+run "the_read_only_route_takes_only_get_so_api_gateway_answers_the_preflight" {
+  command = plan
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  assert {
+    condition     = aws_apigatewayv2_route.default.route_key == "GET /{proxy+}"
+    error_message = "The read-only function must get GET requests only."
+  }
+
+  assert {
+    condition     = !startswith(aws_apigatewayv2_route.reports.route_key, "OPTIONS") && !startswith(aws_apigatewayv2_route.reports.route_key, "ANY")
+    error_message = "No route may take the OPTIONS preflight, or API Gateway stops answering it."
+  }
+}
+
 # --- Report API (C22) ------------------------------------------------------------------------
 
 run "reports_go_to_their_own_small_function" {
