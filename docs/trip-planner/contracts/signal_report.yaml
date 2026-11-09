@@ -1,0 +1,76 @@
+# Data contract (ODCS). Proposed (Nov 9, 2026), waiting for John's approval. Internal Iceberg table, written by the nightly report copy (C23).
+# The lake copy of the hiker reports in DynamoDB (hiker_signal_reports). The copy takes its column types from here.
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-signal-report
+name: signal_report
+version: 0.1.0
+status: proposed
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: One row per accepted hiker report that was not set aside, copied from DynamoDB by the nightly run. Source of report_cell_day and, later, of model labels.
+  limitations: Holds no visitor ID and no exact position, only the H3 resolution 9 cell, carrier, signal yes or no and the hour (ADR 0009, ADR 0011). Reports set aside by a rule go to signal_report_set_aside instead, so each copied report is in exactly one of the two tables. Rows are deleted 30 days after their copy (ADR 0012, ADR 0034).
+  usage: report_cell_day (C23); labels for the confidence model once N is set (C17, OQ-12).
+team:
+  - username: John
+    role: owner
+servers:
+  - server: iceberg-signal-report
+    type: s3
+    description: Iceberg table in the lake, written by Spark through the Glue catalog. Separate for dev and live.
+    location: "Lake table portfolio.portfolio_{env}.signal_report in s3://portfolio-{env}-lake-{account}/, partitioned by run_date (the night of the copy)."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Written in each nightly run. A rerun of the same night rewrites that night's partition with the same reports.
+  - property: retention
+    value: 30
+    unit: d
+    description: A partition is deleted when its run_date is more than 30 days before the night's run date (ADR 0034).
+customProperties:
+  - property: openQuestions
+    value: OQ-12
+  - property: adr
+    value: adrs/0009, adrs/0011, adrs/0012, adrs/0034
+schema:
+  - name: signal_report
+    physicalName: signal_report
+    physicalType: table
+    description: One row per copied report that no rule set aside.
+    properties:
+      - name: report_id
+        logicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: The key the report API gave the report. Not derived from the visitor ID.
+      - name: h3_cell_res9
+        logicalType: string
+        required: true
+      - name: carrier
+        logicalType: string
+        required: true
+      - name: had_signal
+        logicalType: boolean
+        required: true
+      - name: report_hour_utc
+        logicalType: timestamp
+        required: true
+        description: Time of the report rounded to the hour, UTC.
+      - name: copied_at_utc
+        logicalType: timestamp
+        required: true
+        description: The run time of the nightly copy that wrote it.
+    quality:
+      - type: library
+        metric: nullValues
+        mustBe: 0
+        description: Applies to required fields.
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - report_id

@@ -1,11 +1,11 @@
-# Data contract (ODCS). Approved by John (Oct 28, 2026), Phase B. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 proposed (Nov 9, 2026), waiting for John's approval: names and fields as built in C22 and C23.
 # Table and attribute names are proposals (OQ-21).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-hiker-signal-reports
 name: hiker_signal_reports
-version: 0.1.0
-status: active
+version: 0.2.0
+status: proposed
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
@@ -18,8 +18,8 @@ team:
 servers:
   - server: dynamodb-signal-reports
     type: custom
-    description: DynamoDB, point-in-time recovery off for the reports table (ADR 0022), provisioned within the free tier. Table names and capacity are set in Terraform (proposed names).
-    location: "DynamoDB tables {env}-signal-reports (signal_reports) and {env}-signal-report-limits (report_limit_counters); names proposed (OQ-21). Lake copy: {env}_signal.signal_report."
+    description: DynamoDB, point-in-time recovery off for both tables (ADR 0022, ADR 0025), provisioned within the free tier. Names and capacity are set in platform/terraform/modules/serving/reports.tf.
+    location: "DynamoDB tables portfolio-{env}-signal-reports (signal_reports) and portfolio-{env}-signal-report-limits (report_limit_counters). Lake copy: portfolio.portfolio_{env}.signal_report (contract signal_report)."
 slaProperties:
   - property: frequency
     value: 1
@@ -63,9 +63,9 @@ schema:
         required: true
         description: Time of the report rounded to the hour, UTC.
       - name: copied_at_utc
-        logicalType: timestamp
+        logicalType: string
         required: false
-        description: Set by the nightly copy.
+        description: Set by the nightly copy (C23) to its run time, written like 2026-11-10T10:00:00Z. A rerun of the same night finds its own reports by this value.
       - name: expires_at_epoch
         logicalType: integer
         required: false
@@ -80,21 +80,32 @@ schema:
   - name: report_limit_counters
     physicalName: report_limit_counters
     physicalType: table
-    description: Limit counters kept apart from reports. They hold the random visitor ID and expire 72 hours after their UTC day (ADR 0026). No report attribute is stored here besides what is needed for the one-per-cell-per-24-hours rule. One system-wide daily counter with no visitor ID enforces the 50 a day cap. Whether point-in-time recovery is off for this table is OQ-41.
+    description: Limit counters kept apart from reports. They hold only keyed hashes (HMAC) of the visitor ID, never the ID itself, and expire 72 hours after their UTC day (ADR 0026). No report attribute is stored here besides what is needed for the one-per-cell-per-24-hours rule. One system-wide daily counter with no visitor ID enforces the 50 a day cap. Point-in-time recovery is off for this table (OQ-41, ADR 0025).
     properties:
       - name: counter_key
         logicalType: string
         required: true
         primaryKey: true
         primaryKeyPosition: 1
-        description: Visitor ID plus day (and cell), or the system-wide day key. Days are counted by the report's own hour, not arrival time (ADR 0011). Exact composition and day boundary are proposals (OQ-21, OQ-26, OQ-38).
+        description: Either visitor#<HMAC of the visitor ID>#<UTC day>, system#<UTC day>, or cell#<HMAC of the visitor ID and cell>. Days are the report's own UTC day (ADR 0011, ADR 0026). The raw visitor ID and the cell are never stored here (ADR 0025).
       - name: count
         logicalType: integer
-        required: true
+        required: false
+        description: Reports counted on a visitor-day or system-day item. Not on a cell item.
+      - name: report_hours
+        logicalType: array
+        items:
+          logicalType: integer
+        required: false
+        description: On a cell item only, the epoch seconds of the report hours this visitor sent for the cell that can still clash with a new report (the last 72 hours).
+      - name: version
+        logicalType: integer
+        required: false
+        description: On a cell item only. Raised on each write, so a parallel request for the same cell fails and reads again.
       - name: expires_at_epoch
         logicalType: integer
         required: true
-        description: Expiry time, 72 hours after the end of the UTC day (ADR 0026).
+        description: Expiry time, 72 hours after the end of the UTC day (ADR 0026). For a cell item, the day of its latest report hour.
     quality:
       - type: text
         description: Limits enforced (Decided by John, Oct 9, 2026) - 10 reports a day per visitor ID, one per cell per visitor every 24 hours, and at most 50 reports a day for the whole system; caps are raised as traffic grows.

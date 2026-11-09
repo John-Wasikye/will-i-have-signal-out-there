@@ -13,6 +13,8 @@ from lake_write import (
     Column,
     conform_rows,
     contract_columns,
+    delete_partitions_before,
+    replace_rows_since,
     spark_schema,
     write_frame_partition,
     write_run_partition,
@@ -159,6 +161,9 @@ class FakeSpark:
             def overwritePartitions(self):  # noqa: N802, Spark method name
                 spark.calls.append("overwritePartitions")
 
+            def append(self):
+                spark.calls.append("append")
+
         class Frame:
             def writeTo(self, name):  # noqa: N802, Spark method name
                 spark.calls.append(f"writeTo:{name}")
@@ -256,3 +261,108 @@ def test_a_frame_rerun_overwrites_only_its_partition():
     spark.calls.clear()
     write_frame_partition(spark, "satellite_window", frame, namespace="p")
     assert spark.calls == ["writeTo:portfolio.p.satellite_window", "overwritePartitions"]
+
+
+# --- Rows that change after their night, and partitions that expire ---------------------------
+
+DAY_COLUMNS = (
+    Column("cell", "string", required=True),
+    Column("report_date_utc", "date", required=True),
+    Column("report_count", "integer", required=True),
+)
+
+
+def _day_row(day: date, count: int = 1) -> dict:
+    return {"cell": "c", "report_date_utc": day, "report_count": count}
+
+
+def test_replacing_rows_since_a_day_deletes_those_days_then_appends_the_new_rows():
+    spark = FakeSpark(table_exists=True)
+
+    written = replace_rows_since(
+        spark,
+        "report_cell_day",
+        [_day_row(date(2026, 10, 27))],
+        RUN_DATE,
+        columns=DAY_COLUMNS,
+        namespace="p",
+        date_column="report_date_utc",
+        first_date=date(2026, 10, 8),
+    )
+
+    assert written == 1
+    assert spark.calls == [
+        "sql:DELETE FROM portfolio.p.report_cell_day WHERE report_date_utc >= DATE '2026-10-08'",
+        "writeTo:portfolio.p.report_cell_day",
+        "append",
+    ]
+    assert spark.schema == spark_schema(DAY_COLUMNS)
+
+
+def test_replacing_rows_on_the_first_night_creates_the_table():
+    spark = FakeSpark(table_exists=False)
+
+    replace_rows_since(
+        spark,
+        "t",
+        [_day_row(date(2026, 10, 27))],
+        RUN_DATE,
+        columns=DAY_COLUMNS,
+        namespace="p",
+        date_column="report_date_utc",
+        first_date=date(2026, 10, 8),
+    )
+
+    assert spark.calls == ["writeTo:portfolio.p.t", "partitionedBy:run_date", "create"]
+
+
+def test_replacing_with_no_rows_still_clears_the_recounted_days():
+    spark = FakeSpark(table_exists=True)
+
+    written = replace_rows_since(
+        spark,
+        "t",
+        [],
+        RUN_DATE,
+        columns=DAY_COLUMNS,
+        namespace="p",
+        date_column="report_date_utc",
+        first_date=date(2026, 10, 8),
+    )
+
+    assert written == 0
+    assert spark.calls == [
+        "sql:DELETE FROM portfolio.p.t WHERE report_date_utc >= DATE '2026-10-08'"
+    ]
+
+
+def test_replacing_refuses_a_date_column_the_table_does_not_have():
+    with pytest.raises(ValueError, match="no column"):
+        replace_rows_since(
+            FakeSpark(table_exists=True),
+            "t",
+            [],
+            RUN_DATE,
+            columns=DAY_COLUMNS,
+            namespace="p",
+            date_column="report_date_utc; DROP TABLE x",
+            first_date=date(2026, 10, 8),
+        )
+
+
+def test_old_partitions_are_deleted_by_run_date():
+    spark = FakeSpark(table_exists=True)
+
+    delete_partitions_before(spark, "signal_report", date(2026, 10, 11), namespace="p")
+
+    assert spark.calls == [
+        "sql:DELETE FROM portfolio.p.signal_report WHERE run_date < DATE '2026-10-11'"
+    ]
+
+
+def test_deleting_old_partitions_of_a_missing_table_does_nothing():
+    spark = FakeSpark(table_exists=False)
+
+    delete_partitions_before(spark, "signal_report", date(2026, 10, 11), namespace="p")
+
+    assert spark.calls == []

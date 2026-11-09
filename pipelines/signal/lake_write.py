@@ -165,3 +165,51 @@ def write_frame_partition(
         frame.writeTo(full_name).overwritePartitions()
     else:
         frame.writeTo(full_name).partitionedBy("run_date").create()
+
+
+def replace_rows_since(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    table_name: str,
+    rows: list[dict],
+    run_date: date,
+    *,
+    columns: Sequence[Column],
+    namespace: str,
+    date_column: str,
+    first_date: date,
+) -> int:
+    """Replace every row whose ``date_column`` is ``first_date`` or later, and return the count.
+
+    For counts that keep changing after their night, such as reports per cell and day: reports
+    for one day arrive over the next nights, so the recent days are counted again each night,
+    while older days stay as they were. The new rows go in tonight's ``run_date`` partition.
+    """
+    if date_column not in {column.name for column in columns}:
+        raise ValueError(f"{table_name}: no column named {date_column!r}")
+    full_name = f"{CATALOG_NAME}.{namespace}.{table_name}"
+    exists = spark.catalog.tableExists(full_name)
+    if exists:
+        spark.sql(f"DELETE FROM {full_name} WHERE {date_column} >= DATE '{first_date.isoformat()}'")
+    if not rows:
+        return 0
+    frame = spark.createDataFrame(
+        conform_rows(rows, columns, run_date), schema=spark_schema(columns)
+    )
+    if exists:
+        frame.writeTo(full_name).append()
+    else:
+        frame.writeTo(full_name).partitionedBy("run_date").create()
+    return len(rows)
+
+
+def delete_partitions_before(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    table_name: str,
+    first_kept: date,
+    *,
+    namespace: str,
+) -> None:
+    """Delete the table's partitions with a ``run_date`` before ``first_kept``, if it exists."""
+    full_name = f"{CATALOG_NAME}.{namespace}.{table_name}"
+    if spark.catalog.tableExists(full_name):
+        spark.sql(f"DELETE FROM {full_name} WHERE run_date < DATE '{first_kept.isoformat()}'")

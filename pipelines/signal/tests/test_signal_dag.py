@@ -51,6 +51,7 @@ def test_every_step_is_a_task(signal_dag):
         "load_coverage",
         "build_marts",
         "publish_marts",
+        "copy_reports",
     }
 
 
@@ -91,6 +92,12 @@ def test_the_marts_wait_for_the_windows_and_the_coverage(signal_dag):
 
 def test_publishing_waits_for_the_marts(signal_dag):
     assert signal_dag.get_task("publish_marts").upstream_task_ids == {"build_marts"}
+
+
+def test_the_report_copy_waits_only_for_the_trails(signal_dag):
+    """It needs the trail points for the mapped-area rule, and nothing published waits for it."""
+    assert signal_dag.get_task("copy_reports").upstream_task_ids == {"load_trails"}
+    assert signal_dag.get_task("copy_reports").downstream_task_ids == set()
 
 
 def test_a_task_tries_again_after_a_brief_failure(signal_dag):

@@ -654,6 +654,8 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Main functions and classes (proposed) | `copy_reports_to_lake(spark, logical_date)`; `set_expiry_after_copy(report_keys)` (sets the DynamoDB expiry attribute to 30 days after the copy); `find_impossible_reports(reports_df, mapped_area_df)`; `find_contradicting_bursts(reports_df)`; `build_label_candidates(reports_df, n_per_cell_day)` (a cell qualifies at N reports in one day; N: OQ-12); `build_report_counts_area(reports_df)` |
 | Outputs | Iceberg `signal_report`, `signal_report_set_aside`; published `fct_report_counts_area` |
 | Open | OQ-12, OQ-13. Area and minimum count answered in ADR 0030 (OQ-35) |
+| Set-aside rules (FR-56, decided by John, Nov 9, 2026) | Outside the mapped area: the report's cell centre is more than 10 km from every Phase A trail point. Contradicting burst: one cell and one hour with 3 or more reports that hold both answers; all of them are set aside. The burst rule sees one night's copy only |
+| As built, part 1 (Nov 2026) | `pipelines/signal/report_copy.py` and `signal_nightly.copy_reports`, DAG task `copy_reports` after `load_trails`. Reads reports with no `copied_at_utc` (or this run's), writes `signal_report` (contract proposed) and `signal_report_set_aside` as tonight's partitions, then marks each report with `copied_at_utc` and `expires_at_epoch` 30 days on. Lake partitions older than 30 days are deleted. `report_cell_day` counts the last 20 days again each night and keeps older days. The box role can Scan and UpdateItem the reports table only. Not built: Snowflake (OQ-4), labels (OQ-12), `fct_report_counts_area` and the page counts (part 2) |
 | ADRs | 0012, 0008 |
 
 #### C24 Operations hardening (F-1B.9)
