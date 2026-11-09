@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 9, 2026: nightly report copy (C23, part 1)
+
+- John decided the FR-56 set-aside rules: more than 10 km from every Phase A trail point is outside the mapped area; a cell and hour with 3 or more reports holding both answers is a contradicting burst. Recorded in the C23 design.
+- The C23 design has an "As built, part 1" row. New contract `signal_report` 0.1.0 and `hiker_signal_reports` 0.2.0 (table names, the cell counter fields, recovery off for the counters) are proposed and wait for John's approval.
+
 ### Nov 9, 2026: report buttons (C21, part 1)
 
 - The C21 design now has an "As built, part 1" row: the two report buttons on the trail page, a carrier picker, the H3 cell computed on the phone with h3-js, and a queue on the phone that sends when the page is open. Sending in the background on Android (a service worker) is part 2.
