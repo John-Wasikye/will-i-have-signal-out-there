@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 9, 2026: report buttons (C21, part 1)
+
+- The C21 design now has an "As built, part 1" row: the two report buttons on the trail page, a carrier picker, the H3 cell computed on the phone with h3-js, and a queue on the phone that sends when the page is open. Sending in the background on Android (a service worker) is part 2.
+
 ### Nov 9, 2026: report API (C22)
 
 - The C22 design now has an "As built" row: its own function on `POST /reports`, two DynamoDB tables with provisioned capacity in the free tier, one transaction per report, and the visitor ID and place kept only as keyed hashes in the counters. ADR 0029's reserved concurrency of 10 is not set, because the account's whole Lambda limit is 10.
