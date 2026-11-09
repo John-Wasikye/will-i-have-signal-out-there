@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 9, 2026: report API (C22)
+
+- The C22 design now has an "As built" row: its own function on `POST /reports`, two DynamoDB tables with provisioned capacity in the free tier, one transaction per report, and the visitor ID and place kept only as keyed hashes in the counters. ADR 0029's reserved concurrency of 10 is not set, because the account's whole Lambda limit is 10.
+
 ### Nov 5, 2026: site redesign
 
 - John approved a new look for the site. The trail tool is now the home page, and the old home text is at `/about`. The strip map became a trail map on real terrain, with a key, so FR-17, F-1A.6 and the C12 design now say trail map.
