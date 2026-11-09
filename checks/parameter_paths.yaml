@@ -10,6 +10,11 @@ parameters:
     description: >-
       Password of Airflow's PostgreSQL database on the session box. At least 16 letters and
       digits, because it goes into a connection address.
+  - path: /portfolio/<env>/signal/report-visitor-key
+    used_by: platform/terraform/modules/serving/reports.tf
+    description: >-
+      SecureString HMAC key of the report function (ADR 0025). The counters table stores only
+      HMAC-SHA256 of each visitor ID with this key. At least 32 random bytes, written as text.
 
 # Folders that Airflow reads its settings from. Airflow looks up <prefix>/<id> when it needs
 # one, so a folder can be empty, and its existence is not checked.

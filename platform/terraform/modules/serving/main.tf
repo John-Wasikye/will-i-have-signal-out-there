@@ -113,8 +113,8 @@ resource "aws_apigatewayv2_api" "http" {
 
   cors_configuration {
     allow_origins = var.allowed_origins
-    allow_methods = ["GET", "OPTIONS"]
-    allow_headers = ["content-type"]
+    allow_methods = ["GET", "OPTIONS", "POST"]
+    allow_headers = ["content-type", "x-visitor-id"]
     max_age       = 3600
   }
 }
@@ -140,6 +140,13 @@ resource "aws_apigatewayv2_stage" "default" {
   default_route_settings {
     throttling_rate_limit  = var.throttle_rate
     throttling_burst_limit = var.throttle_burst
+  }
+
+  # Write routes are throttled harder than reads (ADR 0029).
+  route_settings {
+    route_key              = aws_apigatewayv2_route.reports.route_key
+    throttling_rate_limit  = 10
+    throttling_burst_limit = 20
   }
 }
 
