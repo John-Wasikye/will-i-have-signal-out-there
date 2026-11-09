@@ -15,7 +15,6 @@ from datetime import UTC, datetime, timedelta
 import h3
 import pytest
 import reports
-from botocore.exceptions import ClientError
 from reports import (
     SYSTEM_DAILY_LIMIT,
     VISITOR_DAILY_LIMIT,
@@ -465,13 +464,23 @@ def _commit(cell_version: int | None = None) -> Commit:
     )
 
 
-def _cancelled(*codes: str) -> ClientError:
-    return ClientError(
+class FakeClientError(Exception):
+    """Shaped like botocore's ClientError: the parsed answer is on ``response``.
+
+    CI does not install botocore (the Lambda runtime provides it), so the tests do not import it.
+    """
+
+    def __init__(self, response: dict) -> None:
+        super().__init__(response["Error"]["Code"])
+        self.response = response
+
+
+def _cancelled(*codes: str) -> FakeClientError:
+    return FakeClientError(
         {
             "Error": {"Code": "TransactionCanceledException", "Message": "cancelled"},
             "CancellationReasons": [{"Code": code} for code in codes],
-        },
-        "TransactWriteItems",
+        }
     )
 
 
@@ -537,9 +546,8 @@ def test_the_dynamodb_store_names_why_a_transaction_was_cancelled(codes, expecte
 
 
 def test_any_other_dynamodb_error_is_store_unavailable():
-    error = ClientError(
-        {"Error": {"Code": "ProvisionedThroughputExceededException", "Message": "slow"}},
-        "TransactWriteItems",
+    error = FakeClientError(
+        {"Error": {"Code": "ProvisionedThroughputExceededException", "Message": "slow"}}
     )
     store = DynamoReportStore(RecordingClient(error=error), "reports-table", "counters-table")
 
