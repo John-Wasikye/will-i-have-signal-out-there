@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import contract from '../../../docs/platform/openapi-serving-template.yaml?raw'
 import tripPlannerContract from '../../../docs/trip-planner/openapi.yaml?raw'
-import { sampleUrl, trailSignalUrl, trailsUrl } from './api'
+import { reportsUrl, sampleUrl, trailSignalUrl, trailsUrl } from './api'
 
 // The API's routes, as the contract lists them under `paths:` (two spaces, then /name:).
 // platform/serving/tests/test_contract.py checks the API serves exactly these, so an address
@@ -53,6 +53,13 @@ describe('trailSignalUrl', () => {
 
   it('encodes the trail ID, so it cannot change the address', () => {
     expect(pathOf(trailSignalUrl('https://api.example.com', 'a/b'))).toBe('/trails/a%2Fb/signal')
+  })
+})
+
+describe('reportsUrl', () => {
+  it('posts to the report route in the trip planner contract', () => {
+    expect(pathOf(reportsUrl('https://api.example.com/'))).toBe('/reports')
+    expect(tripPlannerPaths).toContain('/reports')
   })
 })
 

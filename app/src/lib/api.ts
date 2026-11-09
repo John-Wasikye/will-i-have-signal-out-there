@@ -16,3 +16,8 @@ export function trailsUrl(baseUrl: string): string {
 export function trailSignalUrl(baseUrl: string, trailId: string): string {
   return `${trailsUrl(baseUrl)}/${encodeURIComponent(trailId)}/signal`
 }
+
+/** The address hiker reports are posted to (docs/trip-planner/openapi.yaml, Phase B). */
+export function reportsUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/$/, '')}/reports`
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ColdStartNotice } from '../components/ColdStartNotice'
 import { Credits } from '../components/Credits'
 import { DtcRequirementsNote } from '../components/DtcRequirementsNote'
+import { ReportButtons } from '../components/ReportButtons'
 import { TrailSignalView } from '../components/TrailSignalView'
 import { trailSignalUrl, trailsUrl } from '../lib/api'
 import { latestOnly } from '../lib/latestOnly'
@@ -89,6 +90,8 @@ export function Trails() {
         </p>
       )}
       {signal && <TrailSignalView key={signal.trail_id} signal={signal} now={now} />}
+
+      <ReportButtons />
 
       <p className="lede">
         I cover three main trails at Grand Canyon National Park: {PHASE_A_TRAILS.join(', ')}. Choose
