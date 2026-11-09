@@ -186,3 +186,21 @@ resource "aws_iam_role_policy" "alerts" {
     }
   }
 }
+
+# The nightly report copy (C23) reads the hiker reports not yet copied and marks each one copied
+# with its 30-day expiry (ADR 0012). It cannot add or delete reports, and it cannot reach the
+# limit counters, which hold the keyed hashes of visitor IDs.
+data "aws_iam_policy_document" "report_copy" {
+  statement {
+    sid       = "ReadAndMarkReports"
+    effect    = "Allow"
+    actions   = ["dynamodb:Scan", "dynamodb:UpdateItem"]
+    resources = ["arn:${local.partition}:dynamodb:${local.region}:${local.account_id}:table/portfolio-${var.env}-signal-reports"]
+  }
+}
+
+resource "aws_iam_role_policy" "report_copy" {
+  name   = "report-copy"
+  role   = aws_iam_role.box.id
+  policy = data.aws_iam_policy_document.report_copy.json
+}

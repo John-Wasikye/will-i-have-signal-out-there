@@ -392,3 +392,49 @@ run "refuses_a_live_alert_topic_in_a_dev_configuration" {
     aws_iam_role_policy.alerts,
   ]
 }
+# The nightly report copy (C23) reads the reports not yet copied and marks each one copied with
+# its expiry. It must not delete reports or reach any other table.
+run "box_can_read_and_mark_only_its_own_reports_table" {
+  command = plan
+
+  override_data {
+    target = data.aws_caller_identity.current
+    values = {
+      account_id = "123456789012"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      name = "us-east-1"
+    }
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.report_copy.policy, "arn:aws:dynamodb:us-east-1:123456789012:table/portfolio-dev-signal-reports\"")
+    error_message = "The box must reach this environment's reports table, and only that table."
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.report_copy.policy, "dynamodb:Scan") && strcontains(aws_iam_role_policy.report_copy.policy, "dynamodb:UpdateItem")
+    error_message = "The copy reads the reports and marks each one copied."
+  }
+
+  assert {
+    condition     = !strcontains(aws_iam_role_policy.report_copy.policy, "DeleteItem") && !strcontains(aws_iam_role_policy.report_copy.policy, "PutItem") && !strcontains(aws_iam_role_policy.report_copy.policy, "dynamodb:*")
+    error_message = "The box must not add or delete reports: DynamoDB's expiry deletes them."
+  }
+
+  assert {
+    condition     = !strcontains(aws_iam_role_policy.report_copy.policy, "signal-report-limits")
+    error_message = "The box has no use for the counters, which hold the visitor hashes."
+  }
+}

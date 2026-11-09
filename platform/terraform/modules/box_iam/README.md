@@ -9,6 +9,7 @@ I use this module to give the session box its permissions, and to let the schedu
 - read and write files in this environment's site bucket, but not delete them. This is where the box publishes the gold Parquet files and `status.json`.
 - pull the Airflow image from this environment's repository, but not push. A precondition refuses a repository from the wrong environment.
 - send run alerts through this environment's SNS topic and record good runs in CloudWatch, using the policy from the `alerts` module. A precondition refuses a topic from the wrong environment.
+- read the hiker reports table `portfolio-<env>-signal-reports` and mark each report copied (DynamoDB Scan and UpdateItem only), for the nightly report copy (C23). It cannot add or delete reports, and it cannot reach the limit counters, which hold the visitor hashes.
 - connect through Session Manager, so I can open a shell from the browser and no SSH port is open.
 
 A precondition refuses a site bucket from the wrong environment, so a dev box can never get a live bucket.
