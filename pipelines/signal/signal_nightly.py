@@ -457,6 +457,7 @@ def copy_tables_for_dbt(
     *,
     namespace: str,
     input_dir: Path,
+    run_time: datetime,
 ) -> dict:
     """Copy the partitions tonight's dbt models read to plain Parquet (C7, OQ-40).
 
@@ -464,6 +465,9 @@ def copy_tables_for_dbt(
     so their newest partitions count (ADR 0028); flags older than the points would belong to
     points that are gone, so they stop the step. The windows must be tonight's. Returns which
     partitions were copied and how many windows there are.
+
+    The reports of the 7 days up to ``run_time`` are copied for the area counts (C23, ADR 0030).
+    copy_reports runs first, so the report table exists even on a night with no reports.
     """
     points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
     coverage_table = f"{CATALOG_NAME}.{namespace}.trail_point_coverage"
@@ -484,6 +488,9 @@ def copy_tables_for_dbt(
     windows = spark.sql(query).collect()[0]["rows"]
     if windows == 0:
         raise ValueError(f"no satellite windows for {run_date}; compute_windows runs first")
+    reports_table = f"{CATALOG_NAME}.{namespace}.signal_report"
+    if not spark.catalog.tableExists(reports_table):
+        raise ValueError(f"{reports_table} does not exist; copy_reports runs first")
 
     # Spark's default time format has no time zone. This one stores the UTC instant itself.
     spark.conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
@@ -492,14 +499,37 @@ def copy_tables_for_dbt(
         "trail_point_coverage": (coverage_table, f"run_date = DATE '{coverage_date.isoformat()}'"),
         "satellite_window": (windows_table, tonight),
     }
-    for name, (table, partition) in copies.items():
-        frame = spark.sql(f"SELECT * FROM {table} WHERE {partition}").coalesce(1)
+    queries = {
+        name: f"SELECT * FROM {table} WHERE {partition}"
+        for name, (table, partition) in copies.items()
+    }
+    queries["signal_report"] = _reports_query(reports_table, run_time)
+    for name, query in queries.items():
+        frame = spark.sql(query).coalesce(1)
         frame.write.mode("overwrite").parquet((Path(input_dir) / name).as_uri())
     return {
         "trail_point_date": points_date.isoformat(),
         "coverage_date": coverage_date.isoformat(),
         "windows": windows,
     }
+
+
+REPORT_COUNT_DAYS = 7  # ADR 0030
+
+
+def _reports_query(table: str, run_time: datetime) -> str:
+    """Select the reports whose hour falls in the 7 days up to ``run_time``.
+
+    Times are compared as epoch seconds, because the Spark sessions set no time zone.
+    """
+    end = require_utc(run_time, "run_time")
+    start = end - timedelta(days=REPORT_COUNT_DAYS)
+    hour = "unix_timestamp(report_hour_utc)"
+    return (
+        "SELECT report_id, h3_cell_res9, carrier, had_signal, report_hour_utc "
+        f"FROM {table} WHERE {hour} > {int(start.timestamp())} "
+        f"AND {hour} <= {int(end.timestamp())}"
+    )
 
 
 def _orbit_rows(s3, raw_bucket: str, manifest: dict, contract: Path) -> list[dict]:  # noqa: ANN001
