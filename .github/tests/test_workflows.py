@@ -327,3 +327,12 @@ def test_the_api_tests_run_on_the_exact_versions_the_package_ships():
     test = next(i for i, run in enumerate(runs) if run.strip() == "pytest")
     assert install < lock < test
     assert "--no-deps" in runs[lock] and "--require-hashes" in runs[lock]
+
+
+def test_the_dbt_environment_is_checked_against_each_package_s_stated_limits():
+    # dbt installs with --no-deps, which skips every version check. pip check reads each
+    # package's stated limits, so a version dbt does not support fails CI instead of passing.
+    runs = _runs(_load(WORKFLOWS / "ci.yml")["jobs"]["python"])
+    install = runs.index("-r platform/box/requirements-dbt.txt")
+    check = runs.index(".venv-dbt/bin/python -m pip check")
+    assert install < check

@@ -25,10 +25,13 @@ jobs:
       - name: Use the API package's locked versions
         run: python -m pip install --no-deps --require-hashes -r platform/serving/requirements-lock.txt
       # dbt has its own environment, as in the Airflow image. The dbt tests run it as a program.
+      # --no-deps skips every version check, so pip check then compares each package with the
+      # limits the others state, and a version dbt does not support fails here.
       - name: Install dbt in its own environment
         run: |
           python -m venv .venv-dbt
           .venv-dbt/bin/python -m pip install --no-deps --only-binary :all: -r platform/box/requirements-dbt.txt
+          .venv-dbt/bin/python -m pip check
       - name: Lint
         run: |
           ruff check .
