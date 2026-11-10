@@ -3,9 +3,11 @@ import { ColdStartNotice } from '../components/ColdStartNotice'
 import { Credits } from '../components/Credits'
 import { DtcRequirementsNote } from '../components/DtcRequirementsNote'
 import { ReportButtons } from '../components/ReportButtons'
+import { ReportCounts } from '../components/ReportCounts'
 import { TrailSignalView } from '../components/TrailSignalView'
-import { trailSignalUrl, trailsUrl } from '../lib/api'
+import { reportCountsUrl, trailSignalUrl, trailsUrl } from '../lib/api'
 import { latestOnly } from '../lib/latestOnly'
+import type { ReportCount } from '../lib/reportCounts'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
 import { PHASE_A_TRAILS } from '../lib/trails'
 
@@ -24,6 +26,8 @@ export function Trails() {
   const [signal, setSignal] = useState<TrailSignal | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [counts, setCounts] = useState<ReportCount[] | null>(null)
+  const [countsFailed, setCountsFailed] = useState(false)
   const [now, setNow] = useState(() => new Date())
   const beginRequest = useRef(latestOnly())
 
@@ -48,6 +52,16 @@ export function Trails() {
       })
       .finally(() => {
         if (isCurrent()) setLoading(false)
+      })
+    // The counts load on their own, so a failure here never hides the trail map.
+    setCounts(null)
+    setCountsFailed(false)
+    fetchJson<{ counts: ReportCount[] }>(reportCountsUrl(import.meta.env.VITE_API_BASE_URL, id))
+      .then((answer) => {
+        if (isCurrent()) setCounts(answer.counts)
+      })
+      .catch(() => {
+        if (isCurrent()) setCountsFailed(true)
       })
   }
 
@@ -90,6 +104,7 @@ export function Trails() {
         </p>
       )}
       {signal && <TrailSignalView key={signal.trail_id} signal={signal} now={now} />}
+      <ReportCounts counts={counts} failed={countsFailed} />
 
       <ReportButtons />
 
