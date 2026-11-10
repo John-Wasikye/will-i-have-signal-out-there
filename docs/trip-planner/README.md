@@ -6,10 +6,10 @@ This folder is the documentation for Project 1. It is written so that someone wh
 
 | Field | Value |
 |---|---|
-| Status | Approved by John (Oct 28, 2026). Phase A is built and deployed: C1 to C12 run nightly or serve the site. Phase B has started: the report API (C22), the report buttons part 1 (C21) and the nightly report copy part 1 (C23) are live. Not built yet: Android background sending (C21 part 2), area counts on the page (C23 part 2), C13 to C20 and C24 |
+| Status | Approved by John (Oct 28, 2026). Phase A is built and deployed: C1 to C12 run nightly or serve the site. Phase B has started: the report API (C22), the report buttons part 1 (C21), the nightly report copy (C23 part 1) and the report counts by area on the trail page (C23 part 2) are live. Not built yet: Android background sending (C21 part 2), C13 to C20 and C24 |
 | Owner | John |
 | Last updated | Nov 10, 2026 |
-| Live link | https://signal.johnwasikye.com (under development: Phase A trails with T-Mobile coverage and satellite times, and the report buttons) |
+| Live link | https://signal.johnwasikye.com (under development: Phase A trails with T-Mobile coverage and satellite times, the report buttons and the report counts) |
 
 ---
 
