@@ -28,6 +28,11 @@ describe('ReportButtons', () => {
     expect(text).toContain('waits on your phone')
   })
 
+  it('says Android sends it by itself and iPhone needs the page open (FR-52)', () => {
+    expect(text).toContain('Android sends it by itself when signal returns')
+    expect(text).toContain('On iPhone, open this page again')
+  })
+
   it('has a live region for what happened to a report', () => {
     expect(markup).toContain('aria-live="polite"')
   })
