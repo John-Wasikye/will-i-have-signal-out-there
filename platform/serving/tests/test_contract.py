@@ -14,8 +14,12 @@ import app as serving_app
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONTRACT = REPO_ROOT / "docs" / "platform" / "openapi-serving-template.yaml"
 TRIP_PLANNER_CONTRACT = REPO_ROOT / "docs" / "trip-planner" / "openapi.yaml"
-# Only the trail routes are built so far. The others in that contract are Phase B.
-TRAIL_ROUTES = {("/trails", "get"), ("/trails/{trail_id}/signal", "get")}
+# The trail routes and the report counts are built. The others in that contract come later.
+TRAIL_ROUTES = {
+    ("/trails", "get"),
+    ("/trails/{trail_id}/signal", "get"),
+    ("/report-counts", "get"),
+}
 METHODS = {"get", "put", "post", "delete", "patch", "head", "options"}
 
 

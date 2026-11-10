@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import contract from '../../../docs/platform/openapi-serving-template.yaml?raw'
 import tripPlannerContract from '../../../docs/trip-planner/openapi.yaml?raw'
-import { reportsUrl, sampleUrl, trailSignalUrl, trailsUrl } from './api'
+import { reportCountsUrl, reportsUrl, sampleUrl, trailSignalUrl, trailsUrl } from './api'
 
 // The API's routes, as the contract lists them under `paths:` (two spaces, then /name:).
 // platform/serving/tests/test_contract.py checks the API serves exactly these, so an address
@@ -60,6 +60,21 @@ describe('reportsUrl', () => {
   it('posts to the report route in the trip planner contract', () => {
     expect(pathOf(reportsUrl('https://api.example.com/'))).toBe('/reports')
     expect(tripPlannerPaths).toContain('/reports')
+  })
+})
+
+describe('reportCountsUrl', () => {
+  it('asks for the report count route in the trip planner contract', () => {
+    expect(pathOf(reportCountsUrl('https://api.example.com/', 'grca-bright-angel'))).toBe(
+      '/report-counts',
+    )
+    expect(tripPlannerPaths).toContain('/report-counts')
+  })
+
+  it('puts the trail ID in the query, encoded, so it cannot change the address', () => {
+    const url = new URL(reportCountsUrl('https://api.example.com', 'a/b&c=d'))
+    expect(url.searchParams.get('trail_id')).toBe('a/b&c=d')
+    expect(url.searchParams.size).toBe(1)
   })
 })
 

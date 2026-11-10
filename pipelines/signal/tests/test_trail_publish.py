@@ -36,6 +36,27 @@ SCHEMA = pa.schema(
 )
 
 
+COUNT_SCHEMA = pa.schema(
+    [
+        ("area_id", pa.string()),
+        ("carrier", pa.string()),
+        ("had_signal", pa.bool_()),
+        ("report_count", pa.int32()),
+        ("counted_through_utc", UTC_US),
+    ]
+)
+
+
+def _count(area: str = "862994c57ffffff", carrier: str = "T-Mobile", count: int = 5) -> dict:
+    return {
+        "area_id": area,
+        "carrier": carrier,
+        "had_signal": True,
+        "report_count": count,
+        "counted_through_utc": RUN_END,
+    }
+
+
 def _point(trail: str) -> str:
     return f"{trail}-00000"
 
@@ -52,7 +73,9 @@ def _window(trail: str = MAIN_TRAILS[0], **changes) -> dict:
     }
 
 
-def _tables(windows=None, points=MAIN_TRAILS, coverage=MAIN_TRAILS) -> dict[str, pa.Table]:
+def _tables(
+    windows=None, points=MAIN_TRAILS, coverage=MAIN_TRAILS, counts=()
+) -> dict[str, pa.Table]:
     rows = [_window(trail) for trail in MAIN_TRAILS] if windows is None else windows
     return {
         "dim_trail_point": pa.Table.from_pylist(
@@ -64,6 +87,7 @@ def _tables(windows=None, points=MAIN_TRAILS, coverage=MAIN_TRAILS) -> dict[str,
         ),
         "fct_satellite_window": pa.Table.from_pylist(rows, schema=SCHEMA),
         "fct_reachable_period": pa.Table.from_pylist([{"trail_point_id": _point(points[0])}]),
+        "fct_report_counts_area": pa.Table.from_pylist(list(counts), schema=COUNT_SCHEMA),
     }
 
 
@@ -156,12 +180,13 @@ def test_good_marts_are_published_with_their_times_unchanged(tmp_path):
         "fct_trail_point_coverage.parquet",
         "fct_satellite_window.parquet",
         "fct_reachable_period.parquet",
+        "fct_report_counts_area.parquet",
     }
     table = pq.read_table(tmp_path / "published" / "fct_satellite_window.parquet")
     assert table.schema.field("window_start_utc").type == UTC_US
     assert table.to_pylist()[0]["window_start_utc"] == RUN_END
     assert summary == {
-        "tables": 5,
+        "tables": 6,
         "windows": 3,
         "points": 3,
         "run_started_utc": RUN_STARTED.isoformat(),
@@ -214,3 +239,29 @@ def test_the_marts_go_to_the_folder_the_api_reads_and_the_metrics_to_the_lake(tm
         ("site", "published/fct_satellite_window.parquet"),
         ("lake", "platform/run_metrics/dag_id=d/run_id=r/m.parquet"),
     ]
+
+
+def test_a_week_with_no_report_counts_passes_the_gate():
+    # Most areas have fewer than 5 reports in 7 days, so an empty count table is normal.
+    assert gate_marts(_tables(counts=()), NOW).passed
+
+
+def test_published_counts_pass_the_gate():
+    counts = [_count(carrier="T-Mobile", count=3), _count(carrier="Verizon", count=2)]
+    assert gate_marts(_tables(counts=counts), NOW).passed
+
+
+def test_an_area_with_fewer_than_5_reports_fails_the_gate():
+    # dbt already leaves such areas out (ADR 0030). The gate checks again before publishing.
+    assert "862994c57ffffff: 4 reports, fewer than 5" in _failures(
+        _tables(counts=[_count(count=4)])
+    )
+
+
+def test_dbts_empty_placeholder_row_is_dropped_when_the_marts_are_read(tmp_path):
+    tables = _tables()
+    placeholder = {name: None for name in COUNT_SCHEMA.names}
+    tables["fct_report_counts_area"] = pa.Table.from_pylist([placeholder], schema=COUNT_SCHEMA)
+    read = read_marts(_write(tables, tmp_path))
+    assert read["fct_report_counts_area"].num_rows == 0
+    assert read["fct_report_counts_area"].schema.names == COUNT_SCHEMA.names

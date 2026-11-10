@@ -648,6 +648,28 @@ label {
   fill: var(--color-coverage);
 }
 
+.report-counts {
+  margin: 16px 0 24px;
+  padding: 16px 20px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.report-counts h3 {
+  margin: 0 0 8px;
+}
+
+.report-counts ul {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.report-counts-note {
+  margin: 0;
+  font-size: 0.9em;
+}
+
 .freshness {
   margin: 16px 0 32px;
   padding: 20px;

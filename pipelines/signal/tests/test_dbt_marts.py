@@ -8,6 +8,7 @@ not there. CI installs it from platform/box/requirements-dbt.txt.
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import h3
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -128,6 +129,20 @@ WINDOW_SCHEMA = pa.schema(
     ]
 )
 
+REPORT_SCHEMA = pa.schema(
+    [
+        ("report_id", pa.string()),
+        ("h3_cell_res9", pa.string()),
+        ("carrier", pa.string()),
+        ("had_signal", pa.bool_()),
+        ("report_hour_utc", UTC_US),
+    ]
+)
+# Two H3 resolution 6 areas near Bright Angel: AREA holds three resolution 9 cells.
+AREA = h3.cell_to_parent(h3.latlng_to_cell(36.06, -112.14, 9), 6)
+AREA_CELLS = sorted(h3.cell_to_children(AREA, 9))[:3]
+OTHER_AREA_CELL = h3.latlng_to_cell(36.40, -111.80, 9)
+
 
 def _write(input_dir: Path, table: str, rows: list[dict], schema: pa.Schema) -> None:
     folder = input_dir / table
@@ -135,11 +150,12 @@ def _write(input_dir: Path, table: str, rows: list[dict], schema: pa.Schema) -> 
     pq.write_table(pa.Table.from_pylist(rows, schema=schema), folder / "part-0.parquet")
 
 
-def _build(tmp_path: Path, windows: list[dict]) -> Path:
+def _build(tmp_path: Path, windows: list[dict], reports: list[dict] | None = None) -> Path:
     input_dir, output_dir = tmp_path / "input", tmp_path / "marts"
     _write(input_dir, "trail_point", POINTS, POINT_SCHEMA)
     _write(input_dir, "trail_point_coverage", COVERAGE, COVERAGE_SCHEMA)
     _write(input_dir, "satellite_window", windows, WINDOW_SCHEMA)
+    _write(input_dir, "signal_report", reports or [], REPORT_SCHEMA)
     run_dbt(
         dbt_bin=DBT,
         project_dir=PROJECT,
@@ -168,6 +184,7 @@ def _rows(marts: Path, name: str) -> list[dict]:
         "fct_trail_point_coverage",
         "fct_satellite_window",
         "fct_reachable_period",
+        "fct_report_counts_area",
     ],
 )
 def test_each_mart_has_exactly_its_contract_columns(marts, mart):
@@ -284,3 +301,61 @@ def test_dbt_sends_nothing_home():
     project = yaml.safe_load((PROJECT / "dbt_project.yml").read_text(encoding="utf-8"))
     assert project["flags"]["send_anonymous_usage_stats"] is False
     assert project["flags"]["version_check"] is False
+
+
+def _report(n: int, cell: str, carrier: str, had_signal: bool, hours_before: int) -> dict:
+    return {
+        "report_id": f"r{n}",
+        "h3_cell_res9": cell,
+        "carrier": carrier,
+        "had_signal": had_signal,
+        "report_hour_utc": SPAN_START - timedelta(hours=hours_before),
+    }
+
+
+AREA_REPORTS = [
+    _report(1, AREA_CELLS[0], "T-Mobile", True, 30),
+    _report(2, AREA_CELLS[1], "T-Mobile", True, 20),
+    _report(3, AREA_CELLS[2], "T-Mobile", True, 10),
+    _report(4, AREA_CELLS[0], "T-Mobile", False, 5),
+    _report(5, AREA_CELLS[1], "Verizon", True, 2),
+]
+# Four reports in the other area: under the minimum of 5 (ADR 0030).
+OTHER_REPORTS = [_report(10 + n, OTHER_AREA_CELL, "AT&T", True, n) for n in range(4)]
+
+
+def _counts(tmp_path: Path, reports: list[dict]) -> list[dict]:
+    return _rows(_build(tmp_path, [WINDOW], reports), "fct_report_counts_area")
+
+
+def test_an_area_is_the_resolution_6_parent_of_the_report_cell(tmp_path):
+    assert AREA != h3.cell_to_parent(OTHER_AREA_CELL, 6)
+    rows = _counts(tmp_path, AREA_REPORTS)
+    assert {row["area_id"] for row in rows} == {AREA}
+
+
+def test_an_area_counts_its_reports_by_carrier_and_answer(tmp_path):
+    rows = _counts(tmp_path, AREA_REPORTS)
+    assert sorted((r["carrier"], r["had_signal"], r["report_count"]) for r in rows) == [
+        ("T-Mobile", False, 1),
+        ("T-Mobile", True, 3),
+        ("Verizon", True, 1),
+    ]
+
+
+def test_an_area_with_fewer_than_5_reports_is_left_out(tmp_path):
+    rows = _counts(tmp_path, AREA_REPORTS + OTHER_REPORTS)
+    assert {row["area_id"] for row in rows} == {AREA}
+
+
+def test_each_row_of_an_area_carries_the_areas_latest_report_hour(tmp_path):
+    rows = _counts(tmp_path, AREA_REPORTS)
+    latest = SPAN_START - timedelta(hours=2)
+    assert {row["counted_through_utc"] for row in rows} == {latest}
+
+
+def test_no_reports_give_no_counts_only_dbts_empty_placeholder_row(marts):
+    # dbt-duckdb writes an empty model as one row of nulls, so the file keeps its columns.
+    # The publisher drops that row (trail_publish.read_marts).
+    rows = _rows(marts, "fct_report_counts_area")
+    assert all(value is None for row in rows for value in row.values())

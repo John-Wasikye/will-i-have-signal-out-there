@@ -10,3 +10,4 @@ sources:
       - name: trail_point
       - name: trail_point_coverage
       - name: satellite_window
+      - name: signal_report

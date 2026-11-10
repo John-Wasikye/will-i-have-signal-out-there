@@ -21,3 +21,11 @@ export function trailSignalUrl(baseUrl: string, trailId: string): string {
 export function reportsUrl(baseUrl: string): string {
   return `${baseUrl.replace(/\/$/, '')}/reports`
 }
+
+/**
+ * The address of the hiker report counts for one trail (docs/trip-planner/openapi.yaml, Phase B).
+ * The trail ID is encoded, so it cannot change the address.
+ */
+export function reportCountsUrl(baseUrl: string, trailId: string): string {
+  return `${baseUrl.replace(/\/$/, '')}/report-counts?trail_id=${encodeURIComponent(trailId)}`
+}

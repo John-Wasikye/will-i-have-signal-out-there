@@ -239,6 +239,7 @@ def signal_phase_a_nightly():
                     _run_date(dag_run, data_interval_end),
                     namespace=ICEBERG_NAMESPACE,
                     input_dir=work_dir / "input",
+                    run_time=sample_flow.run_end(data_interval_end, dag_run.run_after),
                 )
             finally:
                 spark.stop()
@@ -294,10 +295,11 @@ def signal_phase_a_nightly():
     horizons = compute_horizons()
     trails = load_trails()
     coverage = load_coverage()
-    trails >> [horizons, coverage, copy_reports()]
+    reports = copy_reports()
+    trails >> [horizons, coverage, reports]
     windows = compute_windows()
     [selected, horizons] >> windows
-    [windows, coverage] >> build_marts() >> publish_marts()
+    [windows, coverage, reports] >> build_marts() >> publish_marts()
 
 
 signal_phase_a_nightly()

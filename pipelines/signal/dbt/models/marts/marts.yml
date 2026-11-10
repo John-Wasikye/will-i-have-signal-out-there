@@ -100,3 +100,26 @@ models:
         data_tests: [not_null]
       - name: run_started_utc
         data_tests: [not_null]
+
+  - name: fct_report_counts_area
+    data_tests:
+      - unique_columns:
+          arguments:
+            columns: [area_id, carrier, had_signal]
+      # ADR 0030: no area with fewer than 5 reports in 7 days is published.
+      - at_least_per_group:
+          arguments:
+            group_column: area_id
+            count_column: report_count
+            minimum: 5
+    columns:
+      - name: area_id
+        data_tests: [not_null]
+      - name: carrier
+        data_tests: [not_null]
+      - name: had_signal
+        data_tests: [not_null]
+      - name: report_count
+        data_tests: [not_null]
+      - name: counted_through_utc
+        data_tests: [not_null]
