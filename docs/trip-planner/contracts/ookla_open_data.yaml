@@ -1,10 +1,10 @@
-# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 proposed (Nov 10, 2026), waiting for John's approval: source and fields from the OQ-10 first-run check. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 10, 2026): source and fields from the OQ-10 first-run check. ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-ookla-open-data
 name: ookla_open_data
 version: 0.2.0
-status: proposed
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

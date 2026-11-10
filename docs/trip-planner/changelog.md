@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 10, 2026: Ookla contract approved
+
+- John approved contract `ookla_open_data` 0.2.0. It is now active.
+
 ### Nov 10, 2026: Ookla first-run check (OQ-10)
 
 - The Ookla 2026 quarter 3 mobile file was read on the laptop (kept outside the repository): 189,644,612 bytes, MD5 f22f98824d61cd039c2cd57d3dea69b8, matching the bucket's ETag. OQ-10 is answered; OQ-2, OQ-7 and OQ-20 are partly answered.
