@@ -75,6 +75,23 @@ def test_the_box_pyarrow_stays_on_the_version_airflow_pins_but_takes_security_fi
     }
 
 
+def test_the_box_numpy_stays_on_the_version_airflow_pins_but_takes_security_fixes():
+    # Airflow's constraint file pins numpy in the image, so any other version fails the build.
+    assert _ignored(_update("pip", "/platform/box"), "numpy") == {
+        "version-update:semver-patch",
+        "version-update:semver-minor",
+        MAJOR,
+    }
+
+
+def test_the_box_networkx_stays_on_a_line_that_runs_on_python_3_11():
+    # networkx 3.7 needs Python 3.12 or newer, and the box and CI run Python 3.11.
+    assert _ignored(_update("pip", "/platform/box"), "networkx") == {
+        "version-update:semver-minor",
+        MAJOR,
+    }
+
+
 def test_the_root_python_ranges_are_raised_by_hand():
     # The root file holds ranges, and Dependabot raises a range's ceiling across a major
     # version even with majors ignored. CI already installs the newest version in each range.
