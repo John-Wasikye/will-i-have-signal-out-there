@@ -27,7 +27,11 @@ MART_NAMES = (
     "fct_trail_point_coverage",
     "fct_satellite_window",
     "fct_reachable_period",
+    "fct_report_counts_area",
 )
+# Most areas have too few reports to show, so this mart may be empty on any night (ADR 0030).
+MAY_BE_EMPTY = frozenset({"fct_report_counts_area"})
+MIN_AREA_REPORTS = 5  # ADR 0030
 # The decided main trails (ADR 0020). The trail page must answer for each one (AC-1A.6).
 MAIN_TRAILS = ("grca-bright-angel", "grca-north-kaibab", "grca-south-kaibab")
 FRESHNESS_TARGET_HOURS = 26
@@ -37,8 +41,25 @@ PROJECT = "signal"
 
 
 def read_marts(marts_dir: Path) -> dict[str, pa.Table]:
-    """Read every mart dbt wrote. A missing file raises ``FileNotFoundError``."""
-    return {name: pq.read_table(Path(marts_dir) / f"{name}.parquet") for name in MART_NAMES}
+    """Read every mart dbt wrote. A missing file raises ``FileNotFoundError``.
+
+    dbt-duckdb writes an empty model as one row of nulls, so the file keeps its columns. That
+    row is dropped here, so it is never published as data.
+    """
+    return {
+        name: _without_placeholder(pq.read_table(Path(marts_dir) / f"{name}.parquet"))
+        for name in MART_NAMES
+    }
+
+
+def _without_placeholder(table: pa.Table) -> pa.Table:
+    """Drop rows in which every value is null."""
+    if table.num_columns == 0 or table.num_rows == 0:
+        return table
+    any_value = pc.is_valid(table.column(0))
+    for column in table.columns[1:]:
+        any_value = pc.or_(any_value, pc.is_valid(column))
+    return table.filter(any_value)
 
 
 def _distinct(table: pa.Table, column: str) -> set:
@@ -81,16 +102,35 @@ def _window_checks(windows: pa.Table, now_utc: datetime) -> list[str | None]:
     return checks
 
 
+def _area_checks(counts: pa.Table) -> list[str | None]:
+    """Check that no published area has fewer reports than the minimum (ADR 0030)."""
+    totals: dict[str, int] = {}
+    for area, count in zip(
+        counts["area_id"].to_pylist(), counts["report_count"].to_pylist(), strict=True
+    ):
+        totals[area] = totals.get(area, 0) + count
+    return [
+        f"{area}: {total} reports, fewer than {MIN_AREA_REPORTS}"
+        for area, total in sorted(totals.items())
+        if total < MIN_AREA_REPORTS
+    ]
+
+
 def gate_marts(tables: dict[str, pa.Table], now_utc: datetime) -> GateResult:
     """Run every check on the marts and combine the results."""
     now_utc = require_utc(now_utc, "now_utc")
     windows = tables["fct_satellite_window"]
     return evaluate(
         [
-            *(check_not_empty(name, table.num_rows) for name, table in tables.items()),
+            *(
+                check_not_empty(name, table.num_rows)
+                for name, table in tables.items()
+                if name not in MAY_BE_EMPTY
+            ),
             check_row_limit("fct_satellite_window", windows.num_rows, MAX_WINDOW_ROWS),
             *_trail_checks(tables),
             *_window_checks(windows, now_utc),
+            *_area_checks(tables["fct_report_counts_area"]),
         ]
     )
 
