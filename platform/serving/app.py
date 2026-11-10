@@ -16,6 +16,7 @@ from typing import Annotated
 from duckdb_query import query_rows
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
+from report_counts import router as report_counts_router
 from trails import router as trails_router
 
 PUBLISHED_DIR = Path(os.environ.get("PUBLISHED_DIR", "published"))
@@ -32,6 +33,7 @@ app = FastAPI(
 
 
 app.include_router(trails_router)
+app.include_router(report_counts_router)
 
 
 class Health(BaseModel):
