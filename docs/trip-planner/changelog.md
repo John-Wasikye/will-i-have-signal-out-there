@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 10, 2026: report contracts approved
+
+- John approved contracts `signal_report` 0.1.0 and `hiker_signal_reports` 0.2.0. Both are now active.
+
 ### Nov 9, 2026: nightly report copy (C23, part 1)
 
 - John decided the FR-56 set-aside rules: more than 10 km from every Phase A trail point is outside the mapped area; a cell and hour with 3 or more reports holding both answers is a contradicting burst. Recorded in the C23 design.

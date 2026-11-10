@@ -1,11 +1,11 @@
-# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 proposed (Nov 9, 2026), waiting for John's approval: names and fields as built in C22 and C23.
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 10, 2026): names and fields as built in C22 and C23.
 # Table and attribute names are proposals (OQ-21).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-hiker-signal-reports
 name: hiker_signal_reports
 version: 0.2.0
-status: proposed
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:

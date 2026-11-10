@@ -1,11 +1,11 @@
-# Data contract (ODCS). Proposed (Nov 9, 2026), waiting for John's approval. Internal Iceberg table, written by the nightly report copy (C23).
+# Data contract (ODCS). Approved by John (Nov 10, 2026). Internal Iceberg table, written by the nightly report copy (C23).
 # The lake copy of the hiker reports in DynamoDB (hiker_signal_reports). The copy takes its column types from here.
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-signal-report
 name: signal_report
 version: 0.1.0
-status: proposed
+status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
