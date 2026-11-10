@@ -10,3 +10,10 @@ select *
 from {{ model }}
 where {{ start_column }} > {{ end_column }}
 {% endtest %}
+
+{% test at_least_per_group(model, group_column, count_column, minimum) %}
+select {{ group_column }}
+from {{ model }}
+group by {{ group_column }}
+having sum({{ count_column }}) < {{ minimum }}
+{% endtest %}
