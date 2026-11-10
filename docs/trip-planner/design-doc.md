@@ -633,6 +633,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Main functions and classes (proposed) | React component `ReportButtons`; `captureCell()` (GPS to cell, then drops coordinates); `buildReport(cell, carrier, signal, now)` (time rounded to the hour, UTC); `enqueueReport(report)` (persistent local store); `flushQueue()`; background send on Android; `PendingReportsNote`; `getOrCreateVisitorId()` (random ID, stored on the phone only) |
 | Answered | Visitor ID format and transport: ADR 0025 (OQ-38). Report time zone: UTC per standard 15 |
 | As built, part 1 (Nov 2026) | `app/src/components/ReportButtons.tsx` on the trail page, with a carrier picker (AT&T, T-Mobile, Verizon, the list the report API accepts) that the phone remembers. `app/src/lib/reports.ts`: `getOrCreateVisitorId`, `buildReport`, `enqueueReport`, `flushQueue`, `sendReport`, `waitingNote`; the queue is in localStorage. `app/src/lib/cell.ts`: `captureCell` with h3-js 4.5.0, in its own chunk that starts loading when the page opens, so a tap later works without signal. Saved reports are sent when the page opens, when the connection returns and when the hiker comes back to the tab. A 400 or 429 drops the report and shows the server's message; a network failure or 5xx keeps it. Reports more than 48 hours old are dropped unsent. Part 2, not built: a service worker for sending in the background on Android (FR-52) |
+| As built, part 2 (Nov 2026) | The queue, visitor ID and carrier moved from localStorage to IndexedDB (`app/src/lib/reportStore.ts`), which a service worker can open; each waiting report is its own record, and part 1's data is moved once. `app/src/sw.ts`, built by `vite.sw.config.ts` into one classic script at `/sw.js`, answers the background sync `send-reports` and fails while reports still wait, so Chrome tries again later; it caches nothing. After saving, the page asks for a background sync (`app/src/lib/backgroundSend.ts`); without it (iPhone) the page sends as in part 1. The page and the worker share one Web Lock, so a report is never posted twice. The site's content security policy says `worker-src 'self'` explicitly |
 | ADRs | 0009, 0010, 0011 |
 
 #### C22 Report API and limiter (F-1B.8)
@@ -1001,7 +1002,7 @@ Platform-wide deployment is described in [../Platform/platform-requirements.md](
 | C15, C16 (B) | Session box and Snowflake; Marquez on the box (ARM image built once in GitHub Actions); dbt docs on the site | dev and live | After each pipeline run (refresh); Superset and Grafana during sessions only; snapshot charts published nightly |
 | C11 Serving API | Lambda (FastAPI, DuckDB) behind API Gateway | dev and live | Always available, box off |
 | C12 Trail page | S3 and CloudFront, preview link per pull request | dev preview and live | Always available |
-| C21 (B) | The hiker's phone (browser, local storage, background send on Android) | live | No schedule; runs when the hiker taps a button or signal returns |
+| C21 (B) | The hiker's phone (browser, IndexedDB, background send on Android) | live | No schedule; runs when the hiker taps a button or signal returns |
 | C22 Report API (B) | Lambda writing DynamoDB | dev and live | Always available |
 | C17 training (B) | Databricks Free Edition | single (free account) | After a model retrain; a monthly keep-alive job |
 | C18 to C20 (B) | Lambda (agents), X-Ray, S3 log, Grafana reads X-Ray during sessions | dev and live | Always available |
@@ -1078,7 +1079,7 @@ Tests use small sample files in CI like ordinary unit tests; there are no staged
 | C6 | `flag_points_covered` on a small hexagon set |
 | C8 | `diff_schema` with a renamed, removed and added field |
 | C12 | `isRunLate` and `windowsWithLateFlag` with a controlled clock (late notice shown, data never hidden); local time formatting from UTC |
-| C21 (B) | `buildReport` rounds time to the hour; no coordinates in the payload; queue persists across a reload |
+| C21 (B) | `buildReport` rounds time to the hour; no coordinates in the payload; queue persists across a reload; a sync fails while reports wait; page and worker take turns |
 | C22 (B) | The 11th report in a day from one visitor is refused; the system refuses reports beyond 50 a day; a second report for the same cell within 24 hours is refused; a batch of reports made earlier and sent together is judged by the report hours; counters expire |
 
 ### 13.2 Data tests
