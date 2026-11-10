@@ -17,11 +17,20 @@ Everything runs on AWS in two separate environments, dev and live, built with Te
 | Publish gate, write-audit-publish, status file, run metrics and incident records | `pipelines/platform/publish` | Live |
 | Phase A steps: orbits (C1), Direct-to-Cell selector (C2), trails (C3), terrain horizon (C4), satellite windows (C5), FCC coverage (C6), dbt marts (C7), contract diff (C8), publish gate (C9), publisher (C10) | `pipelines/signal` | Live, in the nightly DAG |
 | Trail API (C11) and trail page (C12) | `platform/serving/trails.py`, `app/src/pages/Trails.tsx` | Live. They read published files, so they work with the session box off |
+| Phase B report API (C22): takes a hiker's "I had signal here" or "I had no signal here", with limits per visitor, per place and per day, and stores it in DynamoDB | `platform/serving/reports.py`, `platform/terraform/modules/serving/reports.tf` | Live |
+| Phase B report buttons, part 1 (C21): the phone turns its location into a cell about 350 m across, so exact coordinates never leave it, and keeps a report until it can send it | `app/src/components/ReportButtons.tsx`, `app/src/lib/reports.ts`, `app/src/lib/cell.ts` | Live. A report waiting on the phone is sent when the page is open again |
+| Phase B nightly report copy, part 1 (C23): copies new reports into the lake, sets aside reports outside the mapped area or in a contradicting burst, and lets the copied ones expire after 30 days | `pipelines/signal/report_copy.py`, task `copy_reports` | Live, in the nightly DAG |
 | Terraform: storage, Glue catalog, IAM, budget, alerts, audit trail, Parameter Store, registry, serving, session box, site, visitor data | `platform/terraform` | Applied to dev and live |
 | Continuous integration, CodeQL and Dependabot | `.github/workflows` | Running on every pull request |
 | Deploys | `.github/workflows/deploy.yml`, `terraform-apply.yml` | Each merge builds and scans the Airflow image, then deploys to dev and live after I approve each one |
 
-Phase B comes next: every carrier, measured speed tests and hiker signal reports.
+Phase B has started. Not built yet:
+
+- Sending a waiting report in the background on Android, without the page open (C21 part 2).
+- Report counts by area, and showing them on the trail page (C23 part 2).
+- Every carrier, Ookla speed tests and OpenCelliD (C13). The carrier list is AT&T, T-Mobile and Verizon until then.
+- The Snowflake warehouse (C15), and the labels and confidence model built from reports (C17).
+- The orbit update stream, lineage, the trip assistant and operations hardening (C14, C16, C18 to C20, C24).
 
 ## Run the checks yourself
 
@@ -37,7 +46,7 @@ ruff check .
 pytest
 ```
 
-You should see `All checks passed!` from ruff. Pytest should report about 700 tests passing and about 25 skipped. The skipped ones need Airflow, Spark, Helm or Docker, which do not run on Windows here; CI runs them. The dbt tests run only if dbt has its own environment, because Airflow's packages refuse it: `py -3.11 -m venv .venv-dbt`, then `.\.venv-dbt\Scripts\python -m pip install --no-deps --only-binary :all: dbt-core==1.11.16 dbt-duckdb==1.11.1 duckdb==1.5.6` with the other packages in `platform/box/requirements-dbt.txt`.
+You should see `All checks passed!` from ruff. Pytest should report about 800 tests passing and about 25 skipped. The skipped ones need Airflow, Spark, Helm or Docker, which do not run on Windows here; CI runs them. The dbt tests run only if dbt has its own environment, because Airflow's packages refuse it: `py -3.11 -m venv .venv-dbt`, then `.\.venv-dbt\Scripts\python -m pip install --no-deps --only-binary :all: dbt-core==1.11.16 dbt-duckdb==1.11.1 duckdb==1.5.6` with the other packages in `platform/box/requirements-dbt.txt`.
 
 ### 2. Site
 
@@ -52,7 +61,7 @@ npm run build
 npm run dev
 ```
 
-`npm run dev` starts a local preview. The status page reads `app/public/status.json`.
+`npm test` should report about 220 tests passing. `npm run dev` starts a local preview. The status page reads `app/public/status.json`.
 
 ### 3. Terraform
 
