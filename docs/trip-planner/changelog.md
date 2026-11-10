@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 10, 2026: report counts by area (C23, part 2)
+
+- The C23 design has an "As built, part 2" row: the 7-day report copy for dbt, the `fct_report_counts_area` mart (H3 resolution 6 areas, at least 5 reports, ADR 0030), the gate check, `GET /report-counts` and the counts on the trail page.
+- The mart reads `signal_report`, because `report_cell_day` has no carrier column.
+
 ### Nov 10, 2026: Ookla contract approved
 
 - John approved contract `ookla_open_data` 0.2.0. It is now active.
