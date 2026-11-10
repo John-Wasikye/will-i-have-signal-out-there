@@ -84,6 +84,16 @@ def test_the_box_numpy_stays_on_the_version_airflow_pins_but_takes_security_fixe
     }
 
 
+def test_the_box_dbt_packages_move_together_by_hand_but_take_security_fixes():
+    # dbt installs with --no-deps from a full list. A new dbt-core can need a package the
+    # list lacks (1.12 needs python-dotenv), and dbt-duckdb must match dbt-core.
+    assert _ignored(_update("pip", "/platform/box"), "dbt-*") == {
+        "version-update:semver-patch",
+        "version-update:semver-minor",
+        MAJOR,
+    }
+
+
 def test_the_box_networkx_stays_on_a_line_that_runs_on_python_3_11():
     # networkx 3.7 needs Python 3.12 or newer, and the box and CI run Python 3.11.
     assert _ignored(_update("pip", "/platform/box"), "networkx") == {
