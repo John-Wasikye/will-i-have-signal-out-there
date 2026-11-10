@@ -1,15 +1,15 @@
-# Data contract (ODCS). Approved by John (Oct 28, 2026), Phase B. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 proposed (Nov 10, 2026), waiting for John's approval: source and fields from the OQ-10 first-run check. ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-ookla-open-data
 name: ookla_open_data
-version: 0.1.0
-status: active
+version: 0.2.0
+status: proposed
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
-  purpose: Ookla open mobile speed-test data for Arizona (quarterly, about 600-meter tiles, GPS-accurate tests only), used as measured evidence for the coverage confidence model.
-  limitations: License CC BY-NC-SA 4.0 (non-commercial, credit, share-alike). Derived data published here carries the same license. Speed tests exist only where phones had signal, so dead zones are missing. It is a public archive, so a manifest of URL, size and hash is stored instead of a full copy (engineering standard 1, which keeps a manifest for public archives). File size unknown (OQ-7).
+  purpose: Ookla open mobile speed-test data for Arizona (quarterly, zoom 16 tiles about 610 m across at the equator and about 490 m at Grand Canyon), used as measured evidence for the coverage confidence model. Ookla filters the tests to GPS-quality locations before publishing, so the loader has no accuracy filter.
+  limitations: License CC BY-NC-SA 4.0 (non-commercial, credit, share-alike). Derived data published here carries the same license. Speed tests exist only where phones had signal, so dead zones are missing. A tile mixes the tests of every carrier. The file has no carrier field, so a tile is evidence that some phone had data there, not that a given carrier works. Data is thin on the trails (in 2026 quarter 3, 22 tiles and 96 tests near the three Grand Canyon trails). It is a public archive, so a manifest of URL, size and hash is stored instead of a full copy (engineering standard 1, which keeps a manifest for public archives).
   usage: Input to C13 and C17.
 team:
   - username: John
@@ -17,8 +17,8 @@ team:
 servers:
   - server: ookla-open-data-aws
     type: s3
-    description: Ookla open data on AWS. Location to be fixed in the first-run check (OQ-10, OQ-20).
-    location: "Ookla open data on AWS; quarterly file list fixed by OQ-10 and OQ-20. Manifest: s3://{env}-signal-raw/ookla/manifest/. Lake table: {env}_signal.ookla_tile."
+    description: Ookla's public bucket on AWS (us-west-2), read without signing in. One worldwide Parquet file per quarter (2026 quarter 3, published Oct 9, 2026, 189,644,612 bytes, 3,477,926 tiles), so the loader keeps only Arizona tiles by tile centre (OQ-10).
+    location: "s3://ookla-open-data/parquet/performance/type=mobile/year={year}/quarter={q}/{yyyy-mm-dd}_performance_mobile_tiles.parquet, the date being the quarter's first day. Manifest: s3://portfolio-{env}-raw-{account}/signal/ookla/manifest/ (proposed). Lake table: portfolio.portfolio_{env}.ookla_tile (proposed)."
 slaProperties:
   - property: frequency
     value: 1
@@ -30,14 +30,14 @@ customProperties:
   - property: license
     value: "Includes data derived from Speedtest by Ookla® open data, licensed under CC BY-NC-SA 4.0. Derived data published here is shared under the same license."
   - property: openQuestions
-    value: OQ-2, OQ-7, OQ-10, OQ-20
+    value: OQ-2, OQ-14
   - property: adr
     value: adrs/0007, adrs/0013
 schema:
   - name: ookla_tile
     physicalName: ookla_tile
     physicalType: table
-    description: One row per tile and quarter, with the H3 resolution 8 cell assigned at load (engineering standard 9, which picks the H3 resolution from the source). Field names from the Ookla file are confirmed in the first-run check (OQ-10).
+    description: One row per tile and quarter, with the H3 resolution 8 cell assigned at load (engineering standard 9, which picks the H3 resolution from the source). The source fields (OQ-10) are quadkey, tile (outline as WKT text), tile_x and tile_y (centre), avg_d_kbps, avg_u_kbps, avg_lat_ms, avg_lat_down_ms, avg_lat_up_ms, tests, devices.
     properties:
       - name: quarter
         logicalType: string
@@ -50,19 +50,31 @@ schema:
         required: true
         primaryKey: true
         primaryKeyPosition: 2
-        description: Tile identifier from the source (name to be confirmed, OQ-20).
+        description: The source's quadkey, a 16-character zoom 16 tile code.
       - name: h3_cell_res8
         logicalType: string
         required: true
-        description: H3 resolution 8 cell for the tile (assignment rule in the loader, ADR 0007).
+        description: H3 resolution 8 cell of the tile centre (tile_x, tile_y) (ADR 0007).
       - name: test_count
         logicalType: integer
         required: true
-        description: Number of tests in the tile; basis for "enough tests nearby" (threshold OQ-14).
-      - name: speed_metrics
-        logicalType: object
+        description: The source's tests, the number of tests in the tile; basis for "enough tests nearby" (threshold OQ-14).
+      - name: device_count
+        logicalType: integer
         required: true
-        description: Measured speed fields as provided by the source (names to be confirmed, OQ-20).
+        description: The source's devices, the number of distinct phones that ran the tests.
+      - name: avg_download_kbps
+        logicalType: integer
+        required: true
+        description: The source's avg_d_kbps, average download speed in kilobits per second.
+      - name: avg_upload_kbps
+        logicalType: integer
+        required: true
+        description: The source's avg_u_kbps, average upload speed in kilobits per second.
+      - name: avg_latency_ms
+        logicalType: integer
+        required: true
+        description: The source's avg_lat_ms, average latency in milliseconds.
       - name: source_url
         logicalType: string
         required: true

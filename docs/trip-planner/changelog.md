@@ -10,6 +10,12 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 10, 2026: Ookla first-run check (OQ-10)
+
+- The Ookla 2026 quarter 3 mobile file was read on the laptop (kept outside the repository): 189,644,612 bytes, MD5 f22f98824d61cd039c2cd57d3dea69b8, matching the bucket's ETag. OQ-10 is answered; OQ-2, OQ-7 and OQ-20 are partly answered.
+- Contract `ookla_open_data` 0.2.0 is proposed and waits for John's approval: the real file location, the field names, `tile_key` is the quadkey, explicit speed and device columns replace `speed_metrics`, and a note that a tile mixes every carrier.
+- C13 drops `filter_gps_accurate`, because Ookla publishes only tests with GPS-quality locations. C17 notes that Ookla evidence is not per carrier.
+
 ### Nov 10, 2026: report contracts approved
 
 - John approved contracts `signal_report` 0.1.0 and `hiker_signal_reports` 0.2.0. Both are now active.
