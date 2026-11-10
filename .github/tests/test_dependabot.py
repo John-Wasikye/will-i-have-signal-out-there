@@ -94,6 +94,17 @@ def test_the_box_dbt_packages_move_together_by_hand_but_take_security_fixes():
     }
 
 
+@pytest.mark.parametrize("name", ["agate", "mashumaro"])
+def test_the_packages_dbt_core_bounds_move_with_dbt(name):
+    # dbt-core 1.11 supports agate below 1.10 and mashumaro below 3.15. A newer one passes our
+    # tests but is a combination dbt was never released with.
+    assert _ignored(_update("pip", "/platform/box"), name) == {
+        "version-update:semver-patch",
+        "version-update:semver-minor",
+        MAJOR,
+    }
+
+
 def test_the_box_networkx_stays_on_a_line_that_runs_on_python_3_11():
     # networkx 3.7 needs Python 3.12 or newer, and the box and CI run Python 3.11.
     assert _ignored(_update("pip", "/platform/box"), "networkx") == {

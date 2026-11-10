@@ -63,6 +63,17 @@ updates:
           - version-update:semver-patch
           - version-update:semver-minor
           - version-update:semver-major
+      # dbt-core 1.11 supports agate below 1.10 and mashumaro below 3.15, so they move with it.
+      - dependency-name: agate
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
+          - version-update:semver-major
+      - dependency-name: mashumaro
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
+          - version-update:semver-major
       # networkx 3.7 needs Python 3.12 or newer; the box runs Python 3.11. Patches still come.
       - dependency-name: networkx
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
