@@ -1,15 +1,15 @@
-# Data contract (ODCS). Approved by John (Oct 28, 2026). Published gold table (Parquet). Column names are proposals (OQ-21).
+# Data contract (ODCS). Approved by John (Oct 28, 2026). 0.2.0 proposed (Nov 11, 2026) for C13 part 2, waiting for John's approval. Published gold table (Parquet). Column names are proposals (OQ-21).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-published-fct-trail-point-coverage
 name: fct_trail_point_coverage
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: Whether each trail point is covered for a carrier, according to the FCC modeled coverage (a claim, not a measurement).
-  limitations: Phase A has one carrier; Phase B adds every carrier for the park. The release identifier supports SCD Type 2 history in Snowflake (ADR 0015). The Phase A carrier is T-Mobile (ADR 0020); the Phase B carrier list is open (OQ-11).
+  limitations: Every carrier in the park's FCC files (ADR 0031). A point is covered for a carrier when any of that carrier's technologies lists its cell. The release identifier supports SCD Type 2 history in Snowflake (ADR 0015).
   usage: Read by the serving Lambda for the strip map.
 team:
   - username: John
@@ -70,4 +70,4 @@ schema:
             - trail_point_id
             - carrier
       - type: text
-        description: Every trail point has a coverage flag for the Phase A carrier (AC-1A.4).
+        description: Every trail point has a coverage flag for every loaded carrier (AC-1A.4, AC-1B.1).
