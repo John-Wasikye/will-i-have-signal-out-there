@@ -273,9 +273,10 @@ def load_coverage_if_changed(
     """Load the newest FCC file of each carrier and technology, and flag the trail points (C6, C13).
 
     Every carrier in the park's FCC files is loaded (ADR 0031). The FCC site refuses automated
-    requests, so the files are put in the raw bucket by hand and this step never downloads them. Coverage is reference data (ADR 0028): it runs when the kept
-    files are not exactly the loaded ones, or the trail points are newer than the flags. Every
-    file is loaded each time, so the newest partitions always hold every carrier. Returns
+    requests, so the files are put in the raw bucket by hand and this step never downloads them.
+    Coverage is reference data (ADR 0028): it runs when the kept files are not exactly the loaded
+    ones, or the trail points are newer than the flags. Every file is loaded each time, so the
+    newest partitions always hold every carrier. Returns
     ``{"changed": False}``, or how many files, cells and points were used and how many points
     each carrier and technology covers.
     """
