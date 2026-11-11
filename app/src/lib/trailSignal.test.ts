@@ -58,6 +58,10 @@ describe('pointState', () => {
     expect(pointState(point, 'AT&T', noon, false)).toBe('covered')
   })
 
+  it('never offers a satellite for a carrier other than T-Mobile, which the texts need', () => {
+    expect(pointState(mapPoint(0, 0, false, [open]), 'Verizon', noon, false)).toBe('none')
+  })
+
   it('never claims a satellite when the data is late', () => {
     expect(pointState(mapPoint(0, 0, false, [open]), 'T-Mobile', noon, true)).toBe('none')
   })

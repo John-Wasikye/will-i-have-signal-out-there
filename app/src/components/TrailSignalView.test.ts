@@ -187,3 +187,30 @@ describe('TrailSignalView with several carriers', () => {
     expect(coveredRuns(markup)).toBe(2)
   })
 })
+
+describe('TrailSignalView without T-Mobile on the map', () => {
+  const att = (seq: number, covered: boolean): PointSignal => ({
+    ...point(seq, covered, [current]),
+    coverage: [{ carrier: 'AT&T', covered }],
+  })
+  const markup = renderMarkup(
+    createElement(TrailSignalView, {
+      signal: { ...signal, carriers: ['AT&T'], points: [att(0, true), att(1, false), att(2, false)] },
+      now,
+    }),
+  )
+
+  it('leaves the satellite out of the key, because the texts need T-Mobile', () => {
+    expect(visibleText(markup)).not.toContain('satellite is reachable now')
+    expect(visibleText(markup)).toContain('No coverage claimed')
+  })
+
+  it('leaves the satellite count out of the map label', () => {
+    expect(markup).toContain('AT&amp;T coverage at 1 of 3 points.')
+    expect(markup).not.toContain('Satellite reachable now at')
+  })
+
+  it('draws no satellite stretch', () => {
+    expect(markup).not.toContain('trail-run-satellite')
+  })
+})
