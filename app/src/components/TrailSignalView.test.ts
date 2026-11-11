@@ -155,3 +155,35 @@ describe('TrailSignalView', () => {
     expect(render(late)).not.toContain('Satellite reachable now')
   })
 })
+
+describe('TrailSignalView with several carriers', () => {
+  const both = (seq: number, att: boolean, tmobile: boolean): PointSignal => ({
+    ...point(seq, tmobile, []),
+    coverage: [
+      { carrier: 'AT&T', covered: att },
+      { carrier: 'T-Mobile', covered: tmobile },
+    ],
+  })
+  const several: TrailSignal = {
+    ...signal,
+    carriers: ['AT&T', 'T-Mobile'],
+    points: [both(0, true, true), both(1, true, false), both(2, true, true)],
+  }
+  const markup = renderMarkup(createElement(TrailSignalView, { signal: several, now }))
+
+  it('starts on T-Mobile, not on the first carrier in the list', () => {
+    // The count is the map's label for screen readers, so it is in the markup, not the text.
+    expect(markup).toContain('T-Mobile coverage at 2 of 3 points')
+    expect(visibleText(markup)).toContain('T-Mobile claims coverage')
+  })
+
+  it('offers every carrier in a picker for the map', () => {
+    expect(markup).toContain('Carrier on the map')
+    expect(markup.match(/<option[^>]*>(AT&amp;T|T-Mobile)<\/option>/g)?.length).toBe(2)
+  })
+
+  it('colors the line by the chosen carrier only', () => {
+    // AT&T covers every point; T-Mobile has a gap in the middle, so two covered stretches.
+    expect(coveredRuns(markup)).toBe(2)
+  })
+})

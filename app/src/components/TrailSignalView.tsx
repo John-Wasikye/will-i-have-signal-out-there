@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { openReportStore } from '../lib/reportStore'
+import { loadCarrier } from '../lib/reports'
 import { formatUtc } from '../lib/status'
 import { photoFor, profileLine, terrainFor, toFeet, type TrailPhoto } from '../lib/trailMedia'
 import {
+  coveredPointCount,
   distanceKm,
   isReachableAt,
   isRunLate,
@@ -9,6 +12,7 @@ import {
   nextWalkStep,
   nextWindow,
   pointState,
+  startingCarrier,
   trailRuns,
   trailShape,
   windowsWithPassedFlag,
@@ -251,12 +255,22 @@ function PointDetail({ point, elevationM, now, late }: PointDetailProps) {
   )
 }
 
+/** The carrier the phone remembers for reports, or null if none or the store cannot open. */
+async function rememberedCarrier(): Promise<string | null> {
+  try {
+    return await loadCarrier(await openReportStore(typeof indexedDB === 'undefined' ? undefined : indexedDB))
+  } catch {
+    return null
+  }
+}
+
 interface TrailSignalViewProps {
   signal: TrailSignal
   now: Date
 }
 
 export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
+  const [carrier, setCarrier] = useState(() => startingCarrier(signal.carriers, null))
   const [selected, setSelected] = useState(0)
   const [walking, setWalking] = useState(false)
   const lastIndex = signal.points.length - 1
@@ -269,22 +283,30 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
   )
   // Checking every window of every point is too slow to repeat on each step of a walk.
   const states = useMemo(
-    () => signal.points.map((item) => pointState(item, now, late)),
-    [signal.points, now, late],
+    () => signal.points.map((item) => pointState(item, carrier, now, late)),
+    [signal.points, carrier, now, late],
   )
   const reachCount = useMemo(
     () => signal.points.filter((item) => isReachableAt(item.windows, now)).length,
     [signal.points, now],
   )
-  const carrier = signal.carriers[0]
   const terrain = terrainFor(signal.trail_id, signal.points.length)
   const photo = photoFor(signal.trail_id)
   const shownIndex = Math.min(selected, lastIndex)
-  const coveredCount = signal.points.filter((item) =>
-    item.coverage.some((flag) => flag.covered),
-  ).length
+  const coveredCount = coveredPointCount(signal.points, carrier)
   const coverageLabel = `${carrier} coverage at ${coveredCount} of ${signal.points.length} points.`
   const reachLabel = `Satellite reachable now at ${reachCount} of ${signal.points.length} points.`
+
+  // The phone remembers the hiker's carrier for reports; the map starts there if the data has it.
+  useEffect(() => {
+    let current = true
+    void rememberedCarrier().then((remembered) => {
+      if (current) setCarrier(startingCarrier(signal.carriers, remembered))
+    })
+    return () => {
+      current = false
+    }
+  }, [signal.carriers])
 
   useEffect(() => {
     if (!walking) return
@@ -327,6 +349,18 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
             <button type="button" className="walk-button" onClick={toggleWalk}>
               {walking ? 'Pause' : 'Walk the trail'}
             </button>
+            {signal.carriers.length > 1 && (
+              <label className="map-carrier">
+                Carrier on the map{' '}
+                <select value={carrier} onChange={(event) => setCarrier(event.target.value)}>
+                  {signal.carriers.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="walk-slider">
               <label htmlFor="trail-point">Move along the trail</label>
               <input
