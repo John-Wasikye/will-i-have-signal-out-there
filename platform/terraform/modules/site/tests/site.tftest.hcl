@@ -136,4 +136,9 @@ run "every_response_carries_the_security_headers" {
     ])
     error_message = "The content security policy must allow only this site's own files."
   }
+
+  assert {
+    condition     = strcontains(aws_cloudfront_response_headers_policy.security.security_headers_config[0].content_security_policy[0].content_security_policy, "worker-src 'self'")
+    error_message = "The report sender (a service worker) may load only from this site, and the policy says so explicitly."
+  }
 }

@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { captureCell as CaptureCell } from '../lib/cell'
-import { reportsUrl } from '../lib/api'
+import { askForBackgroundSend, registerReportWorker } from '../lib/backgroundSend'
+import { openReportStore } from '../lib/reportStore'
 import {
   CARRIERS,
   buildReport,
   enqueueReport,
-  flushQueue,
-  getOrCreateVisitorId,
   loadCarrier,
   loadQueue,
+  moveFromLocalStorage,
   saveCarrier,
-  sendReport,
+  sendWaitingReports,
   waitingNote,
   type Carrier,
   type FlushSummary,
-  type KeyValueStore,
+  type LegacyStore,
+  type ReportStore,
 } from '../lib/reports'
 
 const POSITION_OPTIONS: PositionOptions = { enableHighAccuracy: true, timeout: 30_000, maximumAge: 60_000 }
@@ -25,17 +26,29 @@ const CELL_TOOL_MISSING =
   'The page did not finish loading before signal was lost. Open it again when you have signal.'
 const NO_LOCATION = 'This browser cannot share a location, so it cannot send reports.'
 
-/** localStorage when the browser allows it; otherwise a store that lasts only while the page is open. */
-function phoneStore(): KeyValueStore {
+/** Part 1's localStorage, if the browser lets the page read it. */
+function oldLocalStorage(): LegacyStore | undefined {
   try {
-    const probe = 'signal.probe'
-    window.localStorage.setItem(probe, probe)
-    window.localStorage.removeItem(probe)
     return window.localStorage
   } catch {
-    const data = new Map<string, string>()
-    return { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => void data.set(key, value) }
+    return undefined
   }
+}
+
+/** The phone's report store, with part 1's data moved into it. */
+async function phoneStore(): Promise<ReportStore> {
+  const store = await openReportStore(typeof indexedDB === 'undefined' ? undefined : indexedDB)
+  const local = oldLocalStorage()
+  try {
+    if (local !== undefined) await moveFromLocalStorage(local, store)
+  } catch {
+    // Another tab moved it at the same moment; its copy is in the store.
+  }
+  return store
+}
+
+function workerContainer() {
+  return 'serviceWorker' in navigator ? navigator.serviceWorker : undefined
 }
 
 function outcome(summary: FlushSummary): string {
@@ -52,7 +65,7 @@ export function ReportButtons() {
   const [carrier, setCarrier] = useState<Carrier | ''>('')
   const [waiting, setWaiting] = useState(0)
   const [message, setMessage] = useState('')
-  const store = useRef<KeyValueStore | null>(null)
+  const store = useRef<ReportStore | null>(null)
   const sending = useRef(false)
   const cellModule = useRef<Promise<{ captureCell: typeof CaptureCell }> | null>(null)
 
@@ -61,14 +74,13 @@ export function ReportButtons() {
     if (phone === null || sending.current) return
     sending.current = true
     try {
-      const visitorId = getOrCreateVisitorId(phone, (length) =>
-        crypto.getRandomValues(new Uint8Array(length)),
-      )
-      const summary = await flushQueue(
-        phone,
-        (report) => sendReport(reportsUrl(import.meta.env.VITE_API_BASE_URL), visitorId, report, fetch),
-        new Date(),
-      )
+      const summary = await sendWaitingReports({
+        store: phone,
+        locks: 'locks' in navigator ? navigator.locks : undefined,
+        fetchImpl: fetch,
+        apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+        now: new Date(),
+      })
       setWaiting(summary.waiting)
       const said = outcome(summary)
       if (said) setMessage(said)
@@ -78,14 +90,18 @@ export function ReportButtons() {
   }, [])
 
   // Saved reports go out when the page opens, when the connection returns, and when the hiker
-  // comes back to the tab. Sending in the background on Android is part 2 (a service worker).
+  // comes back to the tab. On Android the service worker also sends them with the page closed.
   useEffect(() => {
     // Load h3-js now, while there is signal, so a tap works later without it.
     cellModule.current = import('../lib/cell')
-    store.current = phoneStore()
-    setCarrier(loadCarrier(store.current) ?? '')
-    setWaiting(loadQueue(store.current).length)
-    void flush()
+    // The worker is built only for the deployed site (npm run build).
+    if (import.meta.env.PROD) void registerReportWorker(workerContainer())
+    void phoneStore().then(async (phone) => {
+      store.current = phone
+      setCarrier((await loadCarrier(phone)) ?? '')
+      setWaiting((await loadQueue(phone)).length)
+      await flush()
+    })
     const whenVisible = () => {
       if (document.visibilityState === 'visible') void flush()
     }
@@ -102,7 +118,7 @@ export function ReportButtons() {
     const chosen = CARRIERS.find((option) => option === value)
     if (chosen === undefined || store.current === null) return
     setCarrier(chosen)
-    saveCarrier(store.current, chosen)
+    void saveCarrier(store.current, chosen)
   }
 
   function report(hadSignal: boolean) {
@@ -126,9 +142,11 @@ export function ReportButtons() {
           setMessage(CELL_TOOL_MISSING)
           return
         }
-        setWaiting(enqueueReport(phone, buildReport(cell, carrier, hadSignal, new Date()), crypto.randomUUID()))
+        const report = buildReport(cell, carrier, hadSignal, new Date())
+        setWaiting(await enqueueReport(phone, report, crypto.randomUUID()))
         setMessage('Saved on your phone. It will be sent when you have signal.')
-        void flush()
+        await askForBackgroundSend(workerContainer())
+        await flush()
       },
       (error) => setMessage(error.code === error.PERMISSION_DENIED ? LOCATION_DENIED : LOCATION_FAILED),
       POSITION_OPTIONS,
@@ -168,8 +186,8 @@ export function ReportButtons() {
         {[message, waitingNote(waiting)].filter(Boolean).join(' ')}
       </p>
       <p className="report-help">
-        With no signal, a report waits on your phone and goes out when signal returns, the next time
-        this page is open.
+        With no signal, a report waits on your phone. Android sends it by itself when signal returns,
+        even with this page closed. On iPhone, open this page again when you have signal.
       </p>
     </section>
   )

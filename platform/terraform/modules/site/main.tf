@@ -66,6 +66,9 @@ resource "aws_cloudfront_response_headers_policy" "security" {
         "default-src 'self'",
         "connect-src 'self' https://*.execute-api.${data.aws_region.current.name}.amazonaws.com",
         "img-src 'self' data:",
+        # default-src already covers workers; saying it here keeps the report sender (sw.js)
+        # working if default-src ever changes.
+        "worker-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
