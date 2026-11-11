@@ -554,6 +554,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Outputs | Iceberg `fcc_coverage_cell` (all carriers), Iceberg `ookla_tile` (H3 resolution 8, per engineering standard 9) |
 | Main functions and classes (proposed) | `load_ookla_arizona(spark, quarter)`; `tile_to_h3_res8(tile)`; `load_all_carriers(spark, park)`; `load_opencellid_towers(spark)` |
 | Contract | contracts/ookla_open_data.yaml, fcc_mobile_coverage.yaml |
+| As built, part 1 (Nov 2026) | `pipelines/signal/ookla_tiles.py` and task `load_ookla`, the last task of the signal DAG, after a good publish. Each night a header request finds the newest of the two quarters that ended before the run (Ookla publishes a quarter some weeks after it ends; only a 404 means not published). A quarter counts as loaded once its manifest (quarter, URL, fetch time, size, SHA-256) is under `signal/ookla/manifest/quarter=<YYYY-Qn>/` in the raw bucket, so most nights need no Spark. A new quarter's worldwide file (about 190 MB) is streamed to a temporary folder, read in batches, and the tiles whose centre (`tile_x`, `tile_y`) is inside Arizona's box (longitude -114.82 to -109.04, latitude 31.33 to 37.00) become `ookla_tile` rows with the H3 resolution 8 cell of the centre. The manifest is kept only after the lake write, so a failed night loads the quarter again; the file is then deleted. 2026 quarter 3: 11,180 tiles, 40,392 tests. Every carrier (part 2) and OpenCelliD (part 3) are not built |
 | ADRs | 0007, 0013 |
 
 #### C14 Orbit update stream (F-1B.2)
