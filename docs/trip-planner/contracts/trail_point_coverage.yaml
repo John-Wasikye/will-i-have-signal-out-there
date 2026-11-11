@@ -1,4 +1,4 @@
-# Data contract (ODCS). Approved by John (Nov 4, 2026). 0.2.0 proposed (Nov 11, 2026) for C13 part 2, waiting for John's approval. Internal Iceberg table, written by C6. Not a source or a published table;
+# Data contract (ODCS). Approved by John (Nov 4, 2026). 0.2.0 approved by John (Nov 11, 2026) for C13 part 2. Internal Iceberg table, written by C6. Not a source or a published table;
 # included because C7 reads it, and the loader takes its column types from here.
 apiVersion: v3.0.2
 kind: DataContract
