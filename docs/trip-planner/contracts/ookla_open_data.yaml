@@ -1,9 +1,9 @@
-# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 10, 2026): source and fields from the OQ-10 first-run check. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 10, 2026): source and fields from the OQ-10 first-run check. 0.2.1 approved by John (Nov 11, 2026): manifest and lake table locations final, as built in C13 part 1. ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-ookla-open-data
 name: ookla_open_data
-version: 0.2.0
+version: 0.2.1
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
@@ -18,7 +18,7 @@ servers:
   - server: ookla-open-data-aws
     type: s3
     description: Ookla's public bucket on AWS (us-west-2), read without signing in. One worldwide Parquet file per quarter (2026 quarter 3, published Oct 9, 2026, 189,644,612 bytes, 3,477,926 tiles), so the loader keeps only Arizona tiles by tile centre (OQ-10).
-    location: "s3://ookla-open-data/parquet/performance/type=mobile/year={year}/quarter={q}/{yyyy-mm-dd}_performance_mobile_tiles.parquet, the date being the quarter's first day. Manifest: s3://portfolio-{env}-raw-{account}/signal/ookla/manifest/ (proposed). Lake table: portfolio.portfolio_{env}.ookla_tile (proposed)."
+    location: "s3://ookla-open-data/parquet/performance/type=mobile/year={year}/quarter={q}/{yyyy-mm-dd}_performance_mobile_tiles.parquet, the date being the quarter's first day. Manifest: s3://portfolio-{env}-raw-{account}/signal/ookla/manifest/quarter={yyyy}-Q{q}/fetched_at={UTC time}/manifest.json. Lake table: portfolio.portfolio_{env}.ookla_tile."
 slaProperties:
   - property: frequency
     value: 1

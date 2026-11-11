@@ -19,16 +19,17 @@ Everything runs on AWS in two separate environments, dev and live, built with Te
 | Trail API (C11) and trail page (C12) | `platform/serving/trails.py`, `app/src/pages/Trails.tsx` | Live. They read published files, so they work with the session box off |
 | Phase B report API (C22): takes a hiker's "I had signal here" or "I had no signal here", with limits per visitor, per place and per day, and stores it in DynamoDB | `platform/serving/reports.py`, `platform/terraform/modules/serving/reports.tf` | Live |
 | Phase B report buttons, part 1 (C21): the phone turns its location into a cell about 350 m across, so exact coordinates never leave it, and keeps a report until it can send it | `app/src/components/ReportButtons.tsx`, `app/src/lib/reports.ts`, `app/src/lib/cell.ts` | Live. A report waiting on the phone is sent when the page is open again |
-| Phase B report buttons, part 2 (C21): on Android a small service worker sends a waiting report by itself when signal returns, even with the page closed. On iPhone the page sends it the next time it opens | `app/src/sw.ts`, `app/src/lib/backgroundSend.ts`, `app/src/lib/reportStore.ts` | Built, not deployed yet |
+| Phase B report buttons, part 2 (C21): on Android a small service worker sends a waiting report by itself when signal returns, even with the page closed. On iPhone the page sends it the next time it opens | `app/src/sw.ts`, `app/src/lib/backgroundSend.ts`, `app/src/lib/reportStore.ts` | Live. Tested on desktop Chrome and on an iPhone, not yet on an Android phone |
 | Phase B nightly report copy, part 1 (C23): copies new reports into the lake, sets aside reports outside the mapped area or in a contradicting burst, and lets the copied ones expire after 30 days | `pipelines/signal/report_copy.py`, task `copy_reports` | Live, in the nightly DAG |
 | Phase B report counts by area, part 2 (C23): counts each carrier's reports over the last 7 days per area (an H3 resolution 6 cell, about 36 km²) and shows them under the trail map. An area appears only once it has at least 5 reports, so a count cannot point at one hiker | `pipelines/signal/dbt/models/marts/fct_report_counts_area.sql`, `platform/serving/report_counts.py`, `app/src/components/ReportCounts.tsx` | Live. Until an area has 5 reports, the page says "Too few reports to show." |
+| Phase B Ookla speed tests, part 1 (C13): once a quarter, loads Ookla's open mobile speed-test tiles for Arizona (about 11,200 tiles) with an H3 resolution 8 cell each, for the confidence model. Only a manifest of the worldwide file is kept | `pipelines/signal/ookla_tiles.py`, task `load_ookla` | Built, not deployed yet |
 | Terraform: storage, Glue catalog, IAM, budget, alerts, audit trail, Parameter Store, registry, serving, session box, site, visitor data | `platform/terraform` | Applied to dev and live |
 | Continuous integration, CodeQL and Dependabot | `.github/workflows` | Running on every pull request |
 | Deploys | `.github/workflows/deploy.yml`, `terraform-apply.yml` | Each merge builds and scans the Airflow image, then deploys to dev and live after I approve each one |
 
 Phase B has started. Not built yet:
 
-- Every carrier, Ookla speed tests and OpenCelliD (C13). The carrier list is AT&T, T-Mobile and Verizon until then.
+- Every carrier and OpenCelliD (C13 parts 2 and 3). The carrier list is AT&T, T-Mobile and Verizon until then.
 - The Snowflake warehouse (C15), and the labels and confidence model built from reports (C17).
 - The orbit update stream, lineage, the trip assistant and operations hardening (C14, C16, C18 to C20, C24).
 
@@ -86,3 +87,5 @@ The module tests use a mock AWS provider and make no AWS calls. The IAM tests us
 ## License
 
 I released the code under the MIT license ([LICENSE](LICENSE)). Each data source keeps its own license, and the project notes list them.
+
+Includes data derived from Speedtest by Ookla® open data, licensed under CC BY-NC-SA 4.0. Derived data published here is shared under the same license.

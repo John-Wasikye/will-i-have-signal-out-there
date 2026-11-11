@@ -10,6 +10,13 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 11, 2026: Ookla speed tests (C13, part 1)
+
+- The C13 design has an "As built, part 1" row: the `load_ookla` task, the quarter check by header request, the manifest kept after the lake write, the Arizona box and the H3 resolution 8 cell of each tile centre.
+- The Ookla notice (ADR 0013) is in the page's credits and the README.
+- C21 part 2 is live.
+- John approved contract `ookla_open_data` 0.2.1: the manifest and lake table locations are final, as built.
+
 ### Nov 10, 2026: background send on Android (C21, part 2)
 
 - The C21 design has an "As built, part 2" row: IndexedDB in place of localStorage, the service worker at `/sw.js` with background sync, one Web Lock shared by the page and the worker, and `worker-src 'self'` in the site's security policy.

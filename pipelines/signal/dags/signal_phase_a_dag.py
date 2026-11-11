@@ -14,6 +14,10 @@ sends an email, the same as the skeleton.
 The report copy (C23) follows the trails, because its mapped-area rule needs the trail points;
 nothing published waits for it.
 
+The Ookla tiles (C13) load last, after a good publish, because only the confidence model (C17)
+reads them; after a failed night they load on the next one. Most nights the step finds its
+quarter already loaded and ends without starting Spark.
+
 The DAG only wires tasks together. The logic lives in pipelines/signal/signal_nightly.py.
 """
 
@@ -286,6 +290,33 @@ def signal_phase_a_nightly():
         finally:
             spark.stop()
 
+    @task
+    def load_ookla(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Load Ookla's newest quarter of Arizona speed-test tiles, once per quarter (C13)."""
+        s3 = aws_client("s3")
+        raw_bucket = os.environ["PLATFORM_RAW_BUCKET"]
+        run_date = _run_date(dag_run, data_interval_end)
+        quarter = signal_nightly.ookla_quarter_to_load(s3, raw_bucket, run_date)
+        if quarter is None:
+            return {"changed": False}
+        spark = build_spark_session("signal_load_ookla", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            # The worldwide file (about 190 MB) is needed only while the step runs.
+            with tempfile.TemporaryDirectory(prefix="ookla-") as work_dir:
+                return signal_nightly.load_ookla_quarter(
+                    spark,
+                    s3,
+                    raw_bucket,
+                    quarter,
+                    run_date,
+                    contracts_dir=_contracts_dir(),
+                    namespace=ICEBERG_NAMESPACE,
+                    now_utc=datetime.now(UTC),
+                    work_dir=Path(work_dir),
+                )
+        finally:
+            spark.stop()
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
@@ -299,7 +330,7 @@ def signal_phase_a_nightly():
     trails >> [horizons, coverage, reports]
     windows = compute_windows()
     [selected, horizons] >> windows
-    [windows, coverage, reports] >> build_marts() >> publish_marts()
+    [windows, coverage, reports] >> build_marts() >> publish_marts() >> load_ookla()
 
 
 signal_phase_a_nightly()
