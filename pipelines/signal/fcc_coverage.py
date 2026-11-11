@@ -25,6 +25,8 @@ from trail_loader import TrailPoint
 H3_RESOLUTION = 9
 RAW_PREFIX = "signal/fcc/coverage"
 PHASE_A_PROVIDER_ID = 130403  # T-Mobile (ADR 0020)
+# Every carrier in the park's FCC files (ADR 0031), named as the report API names them.
+CARRIER_BY_PROVIDER = {130077: "AT&T", 130403: "T-Mobile", 131425: "Verizon"}
 PHASE_A_STATE = "04"  # Arizona's FIPS code, as in the FCC file names
 GRAND_CANYON_LON_LAT = (-112.1, 36.1)
 PARQUET_BATCH_ROWS = 100_000
@@ -78,11 +80,23 @@ def coverage_prefix(provider_id: int = PHASE_A_PROVIDER_ID, state: str = PHASE_A
 
 
 def release_of(raw_key: str) -> str:
-    """Return the release in an FCC file name, such as ``D25_19oct2026`` (data date, file date)."""
-    match = re.search(r"_(D\d{2}_\d{2}[a-z]{3}\d{4})\.zip$", raw_key)
+    """Return the release in an FCC file name, such as ``J26_10nov2026`` (data date, file date)."""
+    # D is the December release and J the June one, each with the data year.
+    match = re.search(r"_([DJ]\d{2}_\d{2}[a-z]{3}\d{4})\.zip$", raw_key)
     if match is None:
         raise WrongFccFile(f"{raw_key}: the file name has no release")
     return match.group(1)
+
+
+def file_group(raw_key: str) -> tuple[int, str]:
+    """Return the provider ID and technology in an FCC file name, such as (130403, "4GLTE").
+
+    A newer release of the same provider and technology replaces the older one.
+    """
+    match = re.search(r"/bdc_\d{2}_(\d+)_(\w+?)_mobile_broadband_h3_", raw_key)
+    if match is None:
+        raise WrongFccFile(f"{raw_key}: the file name has no provider and technology")
+    return int(match.group(1)), match.group(2)
 
 
 def extract_gpkg(zip_body: bytes, work_dir: Path) -> Path:
@@ -124,9 +138,11 @@ def read_fcc_cells(
     ``must_contain`` is a (longitude, latitude) the file's extent has to reach. The FCC download
     page starts on Alabama, and a wrong state's file would otherwise mark every point uncovered.
     """
+    if provider_id not in CARRIER_BY_PROVIDER:
+        raise WrongFccFile(f"{path}: provider {provider_id} is not in the carrier list")
     connection = sqlite3.connect(f"file:{Path(path).as_posix()}?mode=ro", uri=True)
     table = _check_file(connection, path, provider_id, must_contain)
-    return _cells(connection, table)
+    return _cells(connection, table, CARRIER_BY_PROVIDER[provider_id])
 
 
 def _check_file(
@@ -154,12 +170,11 @@ def _check_file(
     return table
 
 
-def _cells(connection: sqlite3.Connection, table: str) -> Iterator[FccCell]:
+def _cells(connection: sqlite3.Connection, table: str, carrier: str) -> Iterator[FccCell]:
     rows = connection.execute(
-        f'select h3_res9_id, brandname, technology, environmnt, minsignal from "{table}" '
-        "order by fid"
+        f'select h3_res9_id, technology, environmnt, minsignal from "{table}" order by fid'
     )
-    for cell, carrier, technology, environment, min_signal in rows:
+    for cell, technology, environment, min_signal in rows:
         yield FccCell(cell, carrier, str(technology), environment, min_signal)
     connection.close()
 
