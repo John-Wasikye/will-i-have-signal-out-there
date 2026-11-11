@@ -11,6 +11,7 @@ import {
   nearestPoint,
   nextWalkStep,
   nextWindow,
+  offersSatellite,
   pointState,
   startingCarrier,
   trailRuns,
@@ -158,13 +159,14 @@ function Photo({ photo }: { photo: TrailPhoto }) {
 }
 
 function MapKey({ carrier, late }: { carrier: string; late: boolean }) {
+  const satellite = !late && offersSatellite(carrier)
   return (
     <ul className="map-key" aria-label="Map key">
       <li>
         <span className="key-line key-covered" />
         {carrier} claims coverage
       </li>
-      {!late && (
+      {satellite && (
         <li>
           <span className="key-line key-satellite" />
           No {carrier}, but a satellite is reachable now
@@ -172,7 +174,7 @@ function MapKey({ carrier, late }: { carrier: string; late: boolean }) {
       )}
       <li>
         <span className="key-line key-none" />
-        {late ? 'No coverage claimed' : 'Neither right now'}
+        {satellite ? 'Neither right now' : 'No coverage claimed'}
       </li>
       <li>
         <span className="key-you" />
@@ -377,7 +379,7 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
             shape={shape}
             states={states}
             selected={shownIndex}
-            label={late ? coverageLabel : `${coverageLabel} ${reachLabel}`}
+            label={!late && offersSatellite(carrier) ? `${coverageLabel} ${reachLabel}` : coverageLabel}
             terrainUrl={terrain?.imageUrl}
             onSelect={jumpTo}
           />

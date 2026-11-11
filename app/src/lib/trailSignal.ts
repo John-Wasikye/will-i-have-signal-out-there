@@ -92,6 +92,7 @@ export function pointState(
   late: boolean,
 ): PointState {
   if (coveredBy(point, carrier)) return 'covered'
+  if (!offersSatellite(carrier)) return 'none'
   return !late && isReachableAt(point.windows, now) ? 'satellite' : 'none'
 }
 
@@ -99,13 +100,18 @@ export function coveredPointCount(points: PointSignal[], carrier: string): numbe
   return points.filter((point) => coveredBy(point, carrier)).length
 }
 
-// The carrier Starlink Direct-to-Cell texting works with, so the map starts where the page began.
-const DEFAULT_CARRIER = 'T-Mobile'
+// The only carrier Starlink Direct-to-Cell texting works with here, so the map starts on it.
+const SATELLITE_CARRIER = 'T-Mobile'
+
+/** Satellite texts need T-Mobile service, so only its map shows where a satellite is reachable. */
+export function offersSatellite(carrier: string): boolean {
+  return carrier === SATELLITE_CARRIER
+}
 
 /** The remembered carrier if the data has it, else T-Mobile, else the first carrier. */
 export function startingCarrier(carriers: string[], remembered: string | null): string {
   if (remembered !== null && carriers.includes(remembered)) return remembered
-  return carriers.includes(DEFAULT_CARRIER) ? DEFAULT_CARRIER : carriers[0]
+  return carriers.includes(SATELLITE_CARRIER) ? SATELLITE_CARRIER : carriers[0]
 }
 
 /** Groups neighbouring points that share a state, so each stretch is drawn as one line. */

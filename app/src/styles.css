@@ -873,7 +873,13 @@ input[type='range'] {
   font-weight: 700;
 }
 
-.report-carrier select {
+/* The trail map's carrier picker (C13) looks like the report picker. */
+.map-carrier {
+  font-weight: 700;
+}
+
+.report-carrier select,
+.map-carrier select {
   min-height: 44px;
   margin-left: 8px;
   padding: 6px 8px;
