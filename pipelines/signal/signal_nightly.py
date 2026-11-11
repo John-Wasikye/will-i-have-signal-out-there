@@ -14,8 +14,8 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
 6. ``compute_horizons_if_needed`` (C4) gives new trail points their terrain horizons.
 7. ``compute_windows`` (C5) writes ``satellite_window``: when each selected satellite is
    reachable from each trail point over the next 26 hours.
-8. ``load_coverage_if_changed`` (C6) loads the kept FCC file and flags each trail point, only
-   when the file or the points changed (ADR 0028).
+8. ``load_coverage_if_changed`` (C6, C13) loads the newest kept FCC file of each carrier and
+   technology and flags each trail point, only when the files or the points changed (ADR 0028).
 9. ``ookla_quarter_to_load`` and ``load_ookla_quarter`` (C13) load Ookla's newest quarter of
    Arizona speed-test tiles into ``ookla_tile``, once per quarter.
 """
@@ -23,6 +23,7 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
 from __future__ import annotations
 
 import hashlib
+import json
 import urllib.request
 from collections.abc import Callable, Iterator
 from dataclasses import fields
@@ -38,18 +39,19 @@ from elevation_source import (
 )
 from fcc_coverage import (
     GRAND_CANYON_LON_LAT,
-    PHASE_A_PROVIDER_ID,
+    PHASE_A_STATE,
     CellSource,
     FccCell,
     WrongFccFile,
-    coverage_prefix,
     extract_gpkg,
+    file_group,
     flag_points_covered,
     point_to_cell,
     read_fcc_cells,
     release_of,
     write_cells_parquet,
 )
+from fcc_coverage import RAW_PREFIX as FCC_RAW_PREFIX
 from lake_write import (
     contract_columns,
     delete_partitions_before,
@@ -268,29 +270,116 @@ def load_coverage_if_changed(
     now_utc: datetime,
     work_dir: Path,
 ) -> dict:
-    """Load the newest kept FCC file and flag the newest trail points, if either changed (C6).
+    """Load the newest FCC file of each carrier and technology, and flag the trail points (C6, C13).
 
-    The FCC site refuses automated requests, so the file is put in the raw bucket by hand and this
-    step never downloads it. Coverage is reference data (ADR 0028): it runs when the kept file's
-    hash is not the loaded one, or the trail points are newer than the flags. Returns
-    ``{"changed": False}``, or how many cells and points were used and how many are covered.
+    Every carrier in the park's FCC files is loaded (ADR 0031). The FCC site refuses automated
+    requests, so the files are put in the raw bucket by hand and this step never downloads them.
+    Coverage is reference data (ADR 0028): it runs when the kept files are not exactly the loaded
+    ones, or the trail points are newer than the flags. Every file is loaded each time, so the
+    newest partitions always hold every carrier. Returns
+    ``{"changed": False}``, or how many files, cells and points were used and how many points
+    each carrier and technology covers.
     """
     points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
     points_date = _newest_run_date(spark, points_table)
     if points_date is None:
         raise ValueError("no trail points are loaded yet, so there is nothing to flag")
-    manifest = latest_manifest(s3, raw_bucket, coverage_prefix())
-    if manifest is None:
-        raise ValueError(f"no FCC file is kept under {coverage_prefix()}")
+    manifests = _newest_coverage_files(s3, raw_bucket)
+    if not manifests:
+        raise ValueError(f"no FCC file is kept under {FCC_RAW_PREFIX}/")
     flags_date = _newest_run_date(spark, f"{CATALOG_NAME}.{namespace}.trail_point_coverage")
     loaded = _loaded_hashes(spark, f"{CATALOG_NAME}.{namespace}.fcc_coverage_cell")
-    if manifest["content_sha256"] in loaded and flags_date and flags_date >= points_date:
+    kept = {manifest["content_sha256"] for manifest in manifests}
+    if kept == loaded and flags_date and flags_date >= points_date:
         return {"changed": False}
 
+    points = _trail_points(spark, points_table, points_date)
+    cells_dir = Path(work_dir) / "cells"
+    cells_dir.mkdir()
+    flags: list[dict] = []
+    covered: dict[str, int] = {}
+    cell_count = 0
+    for number, manifest in enumerate(manifests):
+        file_flags, summary = _read_coverage_file(
+            s3,
+            raw_bucket,
+            manifest,
+            run_date,
+            points,
+            Path(work_dir),
+            cells_dir / f"{number}.parquet",
+        )
+        flags.extend(file_flags)
+        covered[f"{summary['carrier']} {summary['technology']}"] = sum(
+            flag["covered"] for flag in file_flags
+        )
+        cell_count += summary["cells"]
+
+    contract = Path(contracts_dir) / "fcc_mobile_coverage.yaml"
+    schema = spark_schema(contract_columns(contract, "fcc_coverage_cell"))
+    frame = spark.read.schema(schema).parquet(cells_dir.as_uri())
+    write_frame_partition(spark, "fcc_coverage_cell", frame, namespace=namespace)
+    write_run_partition(
+        spark,
+        "trail_point_coverage",
+        flags,
+        run_date,
+        columns=contract_columns(
+            Path(contracts_dir) / "trail_point_coverage.yaml", "trail_point_coverage"
+        ),
+        namespace=namespace,
+    )
+    return {
+        "changed": True,
+        "files": len(manifests),
+        "cells": cell_count,
+        "points": len(points),
+        "covered": covered,
+    }
+
+
+def _newest_coverage_files(s3, raw_bucket: str) -> list[dict]:  # noqa: ANN001
+    """Return the manifest of the newest kept file of each provider and technology.
+
+    A newer release of the same provider and technology replaces the older one. Only the Phase A
+    state's files count.
+    """
+    newest: dict[tuple[int, str], dict] = {}
+    pages = s3.get_paginator("list_objects_v2").paginate(
+        Bucket=raw_bucket, Prefix=f"{FCC_RAW_PREFIX}/"
+    )
+    for page in pages:
+        for item in page.get("Contents", []):
+            key = item["Key"]
+            if not key.endswith("manifest.json") or f"/state={PHASE_A_STATE}/" not in key:
+                continue
+            manifest = json.loads(read_raw(s3, raw_bucket, key))
+            group = file_group(manifest["raw_key"])
+            if group not in newest or manifest["fetched_at_utc"] > newest[group]["fetched_at_utc"]:
+                newest[group] = manifest
+    return [newest[group] for group in sorted(newest)]
+
+
+def _read_coverage_file(
+    s3,  # noqa: ANN001, a boto3 S3 client
+    raw_bucket: str,
+    manifest: dict,
+    run_date: date,
+    points: list[TrailPoint],
+    work_dir: Path,
+    parquet: Path,
+) -> tuple[list[dict], dict]:
+    """Write one kept file's cells to ``parquet`` and flag the points; return flags and summary.
+
+    The unzipped file is deleted once its cells are read, so only one is on the box at a time.
+    """
     body = read_raw(s3, raw_bucket, manifest["raw_key"])
     if hashlib.sha256(body).hexdigest() != manifest["content_sha256"]:
         raise WrongFccFile(f"{manifest['raw_key']}: the hash differs from its manifest")
-    gpkg = extract_gpkg(body, work_dir)
+    provider_id, _ = file_group(manifest["raw_key"])
+    folder = work_dir / parquet.stem
+    gpkg = extract_gpkg(body, folder)
+    del body
     source = CellSource(
         release=release_of(manifest["raw_key"]),
         source_url=manifest["source_url"],
@@ -300,42 +389,19 @@ def load_coverage_if_changed(
     )
 
     def cells() -> Iterator[FccCell]:
-        return read_fcc_cells(
-            gpkg, provider_id=PHASE_A_PROVIDER_ID, must_contain=GRAND_CANYON_LON_LAT
-        )
+        return read_fcc_cells(gpkg, provider_id=provider_id, must_contain=GRAND_CANYON_LON_LAT)
 
-    parquet = Path(work_dir) / "fcc_coverage_cell.parquet"
     summary = write_cells_parquet(cells(), parquet, source)
-    contract = Path(contracts_dir) / "fcc_mobile_coverage.yaml"
-    schema = spark_schema(contract_columns(contract, "fcc_coverage_cell"))
-    frame = spark.read.schema(schema).parquet(parquet.as_uri())
-    write_frame_partition(spark, "fcc_coverage_cell", frame, namespace=namespace)
-
-    points = _trail_points(spark, points_table, points_date)
     wanted = {point_to_cell(point.lat, point.lon) for point in points}
     listed = {cell.h3_cell_res9 for cell in cells() if cell.h3_cell_res9 in wanted}
-    flags = flag_points_covered(points, listed, summary["carrier"], point_to_cell)
+    gpkg.unlink()
     origin = {
         "technology": summary["technology"],
         "release": source.release,
         "content_sha256": source.content_sha256,
     }
-    write_run_partition(
-        spark,
-        "trail_point_coverage",
-        [flag | origin for flag in flags],
-        run_date,
-        columns=contract_columns(
-            Path(contracts_dir) / "trail_point_coverage.yaml", "trail_point_coverage"
-        ),
-        namespace=namespace,
-    )
-    return {
-        "changed": True,
-        "cells": summary["cells"],
-        "points": len(points),
-        "covered": sum(flag["covered"] for flag in flags),
-    }
+    flags = flag_points_covered(points, listed, summary["carrier"], point_to_cell)
+    return [flag | origin for flag in flags], summary
 
 
 def compute_horizons_if_needed(

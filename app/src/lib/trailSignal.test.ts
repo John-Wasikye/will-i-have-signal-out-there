@@ -7,7 +7,9 @@ import {
   nearestPoint,
   nextWalkStep,
   nextWindow,
+  coveredPointCount,
   pointState,
+  startingCarrier,
   trailRuns,
   trailShape,
   windowsWithPassedFlag,
@@ -33,19 +35,31 @@ const noon = new Date('2026-11-05T12:00:00Z')
 
 describe('pointState', () => {
   it('says covered wherever the carrier claims coverage, whatever the satellite does', () => {
-    expect(pointState(mapPoint(0, 0, true, [open]), noon, false)).toBe('covered')
+    expect(pointState(mapPoint(0, 0, true, [open]), 'T-Mobile', noon, false)).toBe('covered')
   })
 
   it('says satellite where there is no coverage but a satellite is reachable now', () => {
-    expect(pointState(mapPoint(0, 0, false, [open]), noon, false)).toBe('satellite')
+    expect(pointState(mapPoint(0, 0, false, [open]), 'T-Mobile', noon, false)).toBe('satellite')
   })
 
   it('says none where neither works now', () => {
-    expect(pointState(mapPoint(0, 0, false, [later]), noon, false)).toBe('none')
+    expect(pointState(mapPoint(0, 0, false, [later]), 'T-Mobile', noon, false)).toBe('none')
+  })
+
+  it('counts only the chosen carrier, not any carrier', () => {
+    const point = {
+      ...mapPoint(0, 0, false, [later]),
+      coverage: [
+        { carrier: 'AT&T', covered: true },
+        { carrier: 'T-Mobile', covered: false },
+      ],
+    }
+    expect(pointState(point, 'T-Mobile', noon, false)).toBe('none')
+    expect(pointState(point, 'AT&T', noon, false)).toBe('covered')
   })
 
   it('never claims a satellite when the data is late', () => {
-    expect(pointState(mapPoint(0, 0, false, [open]), noon, true)).toBe('none')
+    expect(pointState(mapPoint(0, 0, false, [open]), 'T-Mobile', noon, true)).toBe('none')
   })
 })
 
@@ -191,5 +205,39 @@ describe('distanceKm', () => {
     expect(distanceKm(0)).toBe(0)
     expect(distanceKm(20)).toBe(1)
     expect(distanceKm(255)).toBeCloseTo(12.75)
+  })
+})
+
+describe('startingCarrier', () => {
+  const all = ['AT&T', 'T-Mobile', 'Verizon']
+
+  it('starts on the carrier the phone remembers for reports', () => {
+    expect(startingCarrier(all, 'Verizon')).toBe('Verizon')
+  })
+
+  it('starts on T-Mobile, the satellite texting carrier, when the phone remembers none', () => {
+    expect(startingCarrier(all, null)).toBe('T-Mobile')
+  })
+
+  it('ignores a remembered carrier the data does not have', () => {
+    expect(startingCarrier(['AT&T', 'T-Mobile'], 'Verizon')).toBe('T-Mobile')
+  })
+
+  it('falls back to the first carrier when T-Mobile is missing', () => {
+    expect(startingCarrier(['AT&T', 'Verizon'], null)).toBe('AT&T')
+  })
+})
+
+describe('coveredPointCount', () => {
+  it('counts the points where the chosen carrier claims coverage', () => {
+    const points = [true, false, true].map((covered, n) => ({
+      ...mapPoint(n, 0, covered, []),
+      coverage: [
+        { carrier: 'AT&T', covered: true },
+        { carrier: 'T-Mobile', covered },
+      ],
+    }))
+    expect(coveredPointCount(points, 'T-Mobile')).toBe(2)
+    expect(coveredPointCount(points, 'AT&T')).toBe(3)
   })
 })

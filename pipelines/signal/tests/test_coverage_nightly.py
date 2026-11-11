@@ -1,7 +1,8 @@
 """Tests for the nightly coverage step (C6): load the kept FCC file and flag the trail points.
 
 The FCC site refuses automated requests, so the raw file is put in the raw bucket by hand and the
-step reads the newest one. It runs only when that file or the trail points changed (ADR 0028).
+step reads the newest file of each carrier and technology (ADR 0031). It runs only when those
+files or the trail points changed (ADR 0028).
 No test calls AWS. The file is a tiny real GeoPackage in a real zip.
 """
 
@@ -48,6 +49,7 @@ POINT_ROWS = [
     for n in range(2)
 ]
 LISTED_CELL = point_to_cell(36.06, -112.14)
+VERIZON_ID = 131425
 
 
 class FakeSpark:
@@ -111,29 +113,38 @@ class FakeSpark:
         return type("Frame", (), {"writeTo": lambda _self, name: Writer(name)})()
 
 
-def _kept_file(s3, tmp_path, *, stated_hash=None):
+def _kept_file(
+    s3,
+    tmp_path,
+    *,
+    stated_hash=None,
+    provider_id=PHASE_A_PROVIDER_ID,
+    technology=("4GLTE", 400),
+    release="D25_19oct2026",
+    fetched_at="2026-10-28T03:09:24Z",
+    cells=(LISTED_CELL, "89269b4004bffff"),
+):
     """Keep a zipped GeoPackage and its manifest in the fake raw bucket; return the file's hash."""
+    label, code = technology
     gpkg = _gpkg(
-        tmp_path / "source.gpkg",
-        [
-            (PHASE_A_PROVIDER_ID, "T-Mobile", 400, -110, 0, LISTED_CELL),
-            (PHASE_A_PROVIDER_ID, "T-Mobile", 400, -80, 1, "89269b4004bffff"),
-        ],
+        tmp_path / f"{provider_id}-{label}-{release}.gpkg",
+        [(provider_id, "Brand", code, -110 + n, n, cell) for n, cell in enumerate(cells)],
     )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.write(gpkg, "cells.gpkg")
     body = buffer.getvalue()
     sha256 = hashlib.sha256(body).hexdigest()
-    folder = f"{coverage_prefix()}fetched_at=2026-10-28T03:09:24Z"
-    s3.objects[f"{folder}/{ZIP_NAME}"] = body
+    name = f"bdc_04_{provider_id}_{label}_mobile_broadband_h3_{release}.zip"
+    folder = f"{coverage_prefix(provider_id)}fetched_at={fetched_at}"
+    s3.objects[f"{folder}/{name}"] = body
     s3.objects[f"{folder}/manifest.json"] = json.dumps(
         {
             "source_url": "https://broadbandmap.fcc.gov/data-download/nationwide-data",
-            "fetched_at_utc": "2026-10-28T03:09:24Z",
+            "fetched_at_utc": fetched_at,
             "content_sha256": stated_hash or sha256,
             "size_bytes": len(body),
-            "raw_key": f"{folder}/{ZIP_NAME}",
+            "raw_key": f"{folder}/{name}",
         }
     ).encode()
     return sha256
@@ -160,7 +171,13 @@ def test_the_first_run_loads_every_cell_and_flags_every_point(tmp_path):
 
     result = run(spark, s3, tmp_path)
 
-    assert result == {"changed": True, "cells": 2, "points": 2, "covered": 1}
+    assert result == {
+        "changed": True,
+        "files": 1,
+        "cells": 2,
+        "points": 2,
+        "covered": {"T-Mobile 400": 1},
+    }
     assert [row["trail_point_id"] for row in spark.written["trail_point_coverage"]] == [
         "tp-0",
         "tp-1",
@@ -210,6 +227,88 @@ def test_nothing_runs_when_the_file_and_the_points_are_unchanged(tmp_path):
     assert spark.written == {}
 
 
+def test_nothing_runs_when_every_kept_file_is_loaded(tmp_path):
+    s3 = FakeS3()
+    hashes = [
+        _kept_file(s3, tmp_path),
+        _kept_file(s3, tmp_path, provider_id=VERIZON_ID, release="J26_10nov2026"),
+    ]
+    spark = FakeSpark(coverage_date=date(2026, 11, 4), loaded_hashes=hashes)
+
+    assert run(spark, s3, tmp_path) == {"changed": False}
+
+
+def test_a_new_carriers_file_loads_again(tmp_path):
+    """A file added beside a loaded one changes the set of kept files, so everything reloads."""
+    s3 = FakeS3()
+    loaded = _kept_file(s3, tmp_path)
+    _kept_file(s3, tmp_path, provider_id=VERIZON_ID, release="J26_10nov2026")
+    spark = FakeSpark(coverage_date=date(2026, 11, 4), loaded_hashes=[loaded])
+
+    assert run(spark, s3, tmp_path)["changed"] is True
+
+
+def test_every_carrier_and_technology_is_loaded_and_flagged(tmp_path):
+    spark, s3 = FakeSpark(), FakeS3()
+    _kept_file(s3, tmp_path)
+    _kept_file(
+        s3,
+        tmp_path,
+        technology=("5GNR_7_1", 500),
+        fetched_at="2026-11-12T15:01:00Z",
+        cells=("89269b4004bffff",),
+    )
+    _kept_file(s3, tmp_path, provider_id=VERIZON_ID, cells=(LISTED_CELL,))
+
+    result = run(spark, s3, tmp_path)
+
+    flags = {
+        (row["trail_point_id"], row["carrier"], row["technology"]): row["covered"]
+        for row in spark.written["trail_point_coverage"]
+    }
+    assert flags == {
+        ("tp-0", "T-Mobile", "400"): True,
+        ("tp-1", "T-Mobile", "400"): False,
+        ("tp-0", "T-Mobile", "500"): False,
+        ("tp-1", "T-Mobile", "500"): False,
+        ("tp-0", "Verizon", "400"): True,
+        ("tp-1", "Verizon", "400"): False,
+    }
+    cells = {(row["carrier"], row["technology"]) for row in spark.written["fcc_coverage_cell"]}
+    assert cells == {("T-Mobile", "400"), ("T-Mobile", "500"), ("Verizon", "400")}
+    assert result["files"] == 3
+    assert result["covered"] == {"T-Mobile 400": 1, "T-Mobile 500": 0, "Verizon 400": 1}
+
+
+def test_a_newer_release_replaces_the_older_file_of_the_same_carrier_and_technology(tmp_path):
+    spark, s3 = FakeSpark(), FakeS3()
+    _kept_file(s3, tmp_path)
+    newer = _kept_file(
+        s3,
+        tmp_path,
+        release="J26_10nov2026",
+        fetched_at="2026-11-12T15:00:00Z",
+        cells=("89269b4004bffff",),
+    )
+
+    result = run(spark, s3, tmp_path)
+
+    assert result["files"] == 1
+    assert {row["content_sha256"] for row in spark.written["fcc_coverage_cell"]} == {newer}
+    assert {row["release"] for row in spark.written["trail_point_coverage"]} == {"J26_10nov2026"}
+
+
+def test_the_unzipped_files_do_not_stay_on_the_box(tmp_path):
+    """Each unzipped state file is about 300 MB, so it goes once its cells are read."""
+    s3 = FakeS3()
+    _kept_file(s3, tmp_path)
+    _kept_file(s3, tmp_path, provider_id=VERIZON_ID)
+
+    run(FakeSpark(), s3, tmp_path)
+
+    assert list((tmp_path / "work").rglob("*.gpkg")) == []
+
+
 def test_a_new_fcc_file_loads_again(tmp_path):
     s3 = FakeS3()
     _kept_file(s3, tmp_path)
@@ -254,3 +353,9 @@ def test_release_comes_from_the_file_name():
 def test_a_file_name_with_no_release_is_refused():
     with pytest.raises(WrongFccFile, match="release"):
         release_of("signal/fcc/x/coverage.zip")
+
+
+def test_a_june_release_is_read_from_the_file_name():
+    """The FCC publishes a December (D) and a June (J) release each year."""
+    name = "bdc_04_131425_4GLTE_mobile_broadband_h3_J26_10nov2026.zip"
+    assert release_of(f"signal/fcc/x/{name}") == "J26_10nov2026"

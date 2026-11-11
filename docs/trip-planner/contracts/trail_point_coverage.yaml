@@ -1,16 +1,16 @@
-# Data contract (ODCS). Approved by John (Nov 4, 2026). Internal Iceberg table, written by C6. Not a source or a published table;
+# Data contract (ODCS). Approved by John (Nov 4, 2026). 0.2.0 approved by John (Nov 11, 2026) for C13 part 2. Internal Iceberg table, written by C6. Not a source or a published table;
 # included because C7 reads it, and the loader takes its column types from here.
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-trail-point-coverage
 name: trail_point_coverage
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: One row per trail point and carrier, saying whether the point's H3 resolution 9 cell is listed in the carrier's FCC file.
-  limitations: Coverage is the carrier's modeled claim, not a measurement. Every listed cell counts as covered (OQ-44). Phase A covers T-Mobile 4G LTE only (ADR 0020).
+  limitations: Coverage is the carrier's modeled claim, not a measurement. Every listed cell counts as covered (OQ-44). Every carrier and technology loaded from the FCC files (ADR 0031), one row per file.
   usage: Input to int_trail_point_coverage in dbt (C7).
 team:
   - username: John

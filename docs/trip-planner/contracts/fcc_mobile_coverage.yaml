@@ -1,16 +1,16 @@
-# Data contract (ODCS). Approved by John (Oct 28, 2026). ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). Approved by John (Oct 28, 2026). 0.3.0 approved by John (Nov 11, 2026) for C13 part 2: every carrier, carrier names from the provider ID. ODCS version is a working placeholder (design-doc OQ-32).
 # FCC file layout beyond what the Documentation Plan confirms is open (OQ-20, OQ-7).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-fcc-mobile-coverage
 name: fcc_mobile_coverage
-version: 0.2.0
+version: 0.3.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: Mobile coverage published by the FCC (U.S. Federal Communications Commission), downloaded per provider, state and technology as a Shapefile or GeoPackage; most datasets include H3 resolution 9 hexagons alongside the raw modeled coverage. Used to flag each trail point covered or not for a carrier.
-  limitations: Coverage is a modeled claim, not a measurement; the confidence model (Phase B) judges how far to trust it. Phase A loads one carrier in Arizona; Phase B loads every carrier for the park. The release cadence and terms are not recorded (OQ-20, OQ-22).
+  limitations: Coverage is a modeled claim, not a measurement; the confidence model (Phase B) judges how far to trust it. Every carrier in the park's FCC files is loaded for Arizona (ADR 0031), which is AT&T, T-Mobile and Verizon, 4G LTE and 5G-NR 7/1 Mbps. The 5G-NR 35/3 Mbps files are not loaded, because their cells are also in the 7/1 files. The newest file of each provider and technology replaces the older one. The release cadence and terms are not recorded (OQ-20, OQ-22).
   usage: Input to C6 (coverage flag) and C13 (all carriers); source of SCD Type 2 carrier coverage history in Snowflake (Phase B).
 team:
   - username: John
@@ -48,7 +48,7 @@ schema:
         required: true
         primaryKey: true
         primaryKeyPosition: 2
-        description: Provider as named in the FCC file. The Phase A carrier is T-Mobile (ADR 0020); the provider name as written in the file is OQ-20.
+        description: Carrier name from the file's provider ID (130077 AT&T, 130403 T-Mobile, 131425 Verizon), the same names the report API accepts; the brand text in the file is not used.
       - name: technology
         logicalType: string
         required: true

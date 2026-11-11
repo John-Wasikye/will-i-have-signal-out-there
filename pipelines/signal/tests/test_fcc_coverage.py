@@ -5,12 +5,16 @@ Every listed cell counts as covered, whatever its environment or signal value (O
 calls the FCC or AWS. A GeoPackage is a SQLite file, so each test builds a tiny real one.
 """
 
+import re
 import sqlite3
+from pathlib import Path
 
 import pytest
 from fcc_coverage import (
+    CARRIER_BY_PROVIDER,
     FccCell,
     WrongFccFile,
+    file_group,
     flag_points_covered,
     point_to_cell,
     read_fcc_cells,
@@ -136,3 +140,44 @@ def test_cell_lookup_gets_latitude_first():
 
 def test_point_to_cell_gives_the_resolution_9_cell_the_fcc_file_uses():
     assert point_to_cell(36.1, -112.1) == "892994ced6bffff"
+
+
+AT_AND_T_ID = 130077
+
+
+def test_the_carrier_name_comes_from_the_provider_id_not_the_brand(tmp_path):
+    """The names must match the report API's list, whatever brand text a file carries."""
+    path = _gpkg(
+        tmp_path / "a.gpkg", [(AT_AND_T_ID, "AT&T Mobility", 400, -100, 0, "89269b4001bffff")]
+    )
+    (cell,) = read_fcc_cells(path, provider_id=AT_AND_T_ID, must_contain=GRAND_CANYON)
+    assert cell.carrier == "AT&T"
+
+
+def test_a_provider_outside_the_carrier_list_is_refused(tmp_path):
+    path = _gpkg(tmp_path / "a.gpkg", [(999, "Other", 400, -100, 0, "89269b4001bffff")])
+    with pytest.raises(WrongFccFile, match="carrier list"):
+        list(read_fcc_cells(path, provider_id=999, must_contain=GRAND_CANYON))
+
+
+def test_the_carrier_list_matches_the_report_api():
+    """The report buttons and the coverage map must name carriers the same way."""
+    reports = Path(__file__).parents[3] / "platform" / "serving" / "reports.py"
+    listed = re.search(r"CARRIERS = frozenset\(\{(.*?)\}\)", reports.read_text()).group(1)
+    assert set(CARRIER_BY_PROVIDER.values()) == set(re.findall(r'"([^"]+)"', listed))
+
+
+@pytest.mark.parametrize(
+    ("name", "group"),
+    [
+        ("bdc_04_130403_4GLTE_mobile_broadband_h3_D25_19oct2026.zip", (130403, "4GLTE")),
+        ("bdc_04_130077_5GNR_7_1_mobile_broadband_h3_J26_10nov2026.zip", (130077, "5GNR_7_1")),
+    ],
+)
+def test_a_kept_file_belongs_to_its_provider_and_technology(name, group):
+    assert file_group(f"signal/fcc/coverage/providerid=1/state=04/fetched_at=x/{name}") == group
+
+
+def test_a_file_name_without_provider_and_technology_is_refused():
+    with pytest.raises(WrongFccFile, match="provider and technology"):
+        file_group("signal/fcc/coverage/x/coverage.zip")
