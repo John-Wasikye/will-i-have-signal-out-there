@@ -16,6 +16,8 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
    reachable from each trail point over the next 26 hours.
 8. ``load_coverage_if_changed`` (C6) loads the kept FCC file and flags each trail point, only
    when the file or the points changed (ADR 0028).
+9. ``ookla_quarter_to_load`` and ``load_ookla_quarter`` (C13) load Ookla's newest quarter of
+   Arizona speed-test tiles into ``ookla_tile``, once per quarter.
 """
 
 from __future__ import annotations
@@ -55,6 +57,14 @@ from lake_write import (
     spark_schema,
     write_frame_partition,
     write_run_partition,
+)
+from ookla_tiles import (
+    Quarter,
+    arizona_tile_rows,
+    download_quarter,
+    newest_published_quarter,
+    quarter_prefix,
+    store_quarter_manifest,
 )
 from orbit_ingest import (
     CELESTRAK_STARLINK_URL,
@@ -665,6 +675,65 @@ def copy_reports(
         "set_aside": len(reasons),
         "marked": marked,
         "cell_days": len(counts),
+    }
+
+
+def ookla_quarter_to_load(
+    s3,  # noqa: ANN001, a boto3 S3 client
+    raw_bucket: str,
+    run_date: date,
+    *,
+    opener: Callable = urllib.request.urlopen,
+) -> Quarter | None:
+    """Return Ookla's newest published quarter if it is not loaded yet, else None (C13).
+
+    A quarter counts as loaded once its manifest is kept, so most nights this is one header
+    request and one listing, with no Spark.
+    """
+    quarter = newest_published_quarter(run_date, opener=opener)
+    if latest_manifest(s3, raw_bucket, quarter_prefix(quarter)) is not None:
+        return None
+    return quarter
+
+
+def load_ookla_quarter(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    s3,  # noqa: ANN001, a boto3 S3 client
+    raw_bucket: str,
+    quarter: Quarter,
+    run_date: date,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+    now_utc: datetime,
+    work_dir: Path,
+    opener: Callable = urllib.request.urlopen,
+) -> dict:
+    """Load one quarter's Arizona tiles into ``ookla_tile``, then keep its manifest (C13).
+
+    The manifest is what marks the quarter loaded, so it is kept only after the lake write: a
+    night that fails part way loads the quarter again. The worldwide file is deleted afterwards.
+    Returns the quarter and how many tiles and tests were loaded.
+    """
+    path, manifest = download_quarter(quarter, work_dir, now_utc=now_utc, opener=opener)
+    try:
+        rows = arizona_tile_rows(path, manifest)
+    finally:
+        path.unlink()
+    write_run_partition(
+        spark,
+        "ookla_tile",
+        rows,
+        run_date,
+        columns=contract_columns(Path(contracts_dir) / "ookla_open_data.yaml", "ookla_tile"),
+        namespace=namespace,
+    )
+    store_quarter_manifest(s3, raw_bucket, manifest)
+    return {
+        "changed": True,
+        "quarter": quarter.label,
+        "tiles": len(rows),
+        "tests": sum(row["test_count"] for row in rows),
     }
 
 

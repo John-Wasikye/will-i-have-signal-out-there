@@ -52,6 +52,7 @@ def test_every_step_is_a_task(signal_dag):
         "build_marts",
         "publish_marts",
         "copy_reports",
+        "load_ookla",
     }
 
 
@@ -100,6 +101,18 @@ def test_the_report_copy_waits_only_for_the_trails(signal_dag):
     """It needs the trail points for the mapped-area rule; the marts wait for it."""
     assert signal_dag.get_task("copy_reports").upstream_task_ids == {"load_trails"}
     assert signal_dag.get_task("copy_reports").downstream_task_ids == {"build_marts"}
+
+
+def test_the_ookla_load_runs_last_after_a_good_publish(signal_dag):
+    """The tiles feed only the confidence model (C17), so they never delay the page.
+
+    It waits for a successful publish (the default rule), so a failed publish still fails the
+    run: Airflow judges a run by its last tasks, and "all done" would hide that failure.
+    """
+    task = signal_dag.get_task("load_ookla")
+    assert task.upstream_task_ids == {"publish_marts"}
+    assert task.trigger_rule == "all_success"
+    assert task.downstream_task_ids == set()
 
 
 def test_a_task_tries_again_after_a_brief_failure(signal_dag):
