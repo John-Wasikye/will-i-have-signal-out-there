@@ -10,6 +10,12 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 11, 2026: every carrier (C13, part 2)
+
+- The C13 design has an "As built, part 2" row: the coverage step loads the newest kept FCC file of each provider and technology, carrier names come from the provider ID, June releases (`J26`) are read, and the trail map has a carrier picker.
+- Contracts `fcc_mobile_coverage` 0.3.0, `trail_point_coverage` 0.2.0 and `fct_trail_point_coverage` 0.2.0 are proposed and wait for John's approval: every carrier, names from the provider ID, and the 5G-NR 35/3 Mbps files left out.
+- C13 part 1 is live.
+
 ### Nov 11, 2026: Ookla speed tests (C13, part 1)
 
 - The C13 design has an "As built, part 1" row: the `load_ookla` task, the quarter check by header request, the manifest kept after the lake write, the Arizona box and the H3 resolution 8 cell of each tile centre.
