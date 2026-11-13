@@ -19,7 +19,9 @@ variables {
   scheduler_role_arn = "arn:aws:iam::123456789012:role/portfolio-dev-scheduler"
 }
 
-run "runs_on_a_persistent_spot_request_that_stops_on_interruption" {
+# Spot was dropped on 2026-11-13 (platform ADR-0033): AWS reclaimed the box or had no capacity on most
+# nights from 2026-11-10, and a short nightly run costs little more on demand.
+run "runs_on_demand_so_aws_cannot_take_it_back" {
   command = plan
 
   variables {
@@ -30,18 +32,8 @@ run "runs_on_a_persistent_spot_request_that_stops_on_interruption" {
   }
 
   assert {
-    condition     = aws_instance.box.instance_market_options[0].market_type == "spot"
-    error_message = "The session box must run on spot capacity."
-  }
-
-  assert {
-    condition     = aws_instance.box.instance_market_options[0].spot_options[0].spot_instance_type == "persistent"
-    error_message = "The box must use a persistent spot request, so it can be started again each night."
-  }
-
-  assert {
-    condition     = aws_instance.box.instance_market_options[0].spot_options[0].instance_interruption_behavior == "stop"
-    error_message = "A spot interruption must stop the box, not end it, because every job is safe to rerun."
+    condition     = length(aws_instance.box.instance_market_options) == 0
+    error_message = "The session box must run on demand, not on spot capacity."
   }
 }
 
@@ -100,7 +92,7 @@ run "the_box_can_read_its_work_session_tag" {
   }
 }
 
-run "start_gives_up_after_two_hours_without_spot_capacity" {
+run "start_gives_up_after_two_hours_without_capacity" {
   command = plan
 
   variables {
