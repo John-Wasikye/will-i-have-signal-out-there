@@ -1,6 +1,6 @@
 output "instance_id" {
   description = "ID of the session box. Use it to start the box by hand or to read its state."
-  value       = aws_instance.box.id
+  value       = aws_instance.box_on_demand.id
 }
 
 output "idle_alarm_name" {

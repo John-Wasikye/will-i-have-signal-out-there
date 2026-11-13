@@ -22,7 +22,7 @@ The run is short. A nightly run took about 8 to 12 minutes in November 2026, and
 
 ## Decision
 
-1. The session box (dev and live) runs on demand. Terraform no longer sets spot market options on it.
+1. The session box (dev and live) runs on demand. Terraform no longer sets spot market options on it, and a postcondition fails the plan if the box is ever a spot instance.
 2. Size, schedule, 2-hour nightly maximum, 4-hour session limit, idle stop and the $40 budget are unchanged.
 3. The watchdog keeps its spot notice check. On an on-demand box AWS sends no notice, so the check never fires; it needs no Deploy to keep.
 
@@ -36,6 +36,6 @@ The run is short. A nightly run took about 8 to 12 minutes in November 2026, and
 
 - No more spot stops or capacity failures at the start. A start can still fail if AWS has no on-demand capacity, which is rare; the start schedule still retries for 2 hours.
 - Cost: `t4g.2xlarge` is $0.2688 an hour on demand against about $0.10 on spot (us-east-1, Nov 13, 2026). At the measured 13 hours a month that is about $3.50 instead of about $1.40. At the planned 70 hours of work sessions, 30 hours of heavy batch and 22 nightly hours, the AWS total is about $40 (operations, section 3), the size of the $40 backup budget, and the all-in month about $48 to $51 against the $50 plan. The measured hours are far below that plan, so the cost to watch is the monthly box hours.
-- Changing the market type replaces the instance. The new box gets a new instance ID and a fresh root disk, so it needs the install script once. The persistent spot request of the old box must be cancelled, or AWS could launch a new spot box from it.
+- AWS cannot turn a spot instance into an on-demand one, and leaving the spot block out does not replace an existing box (the first plans said "No changes"). So the Terraform resource is renamed from `box` to `box_on_demand`: the apply removes the old spot box and creates an on-demand one. The new box gets a new instance ID and a fresh root disk, so it needs the install script once. The persistent spot request of the old box must be cancelled, or AWS could launch a new spot box from it.
 - Runbook PRB-3 (spot stop) no longer applies to the session box. PRB-1 now points at on-demand capacity.
 - Links: [ADR-0012](0012-nightly-run-spot-with-two-hour-maximum.md); [ADR-0013](0013-cost-guards-and-spend-limits.md); [operations](../operations.md).

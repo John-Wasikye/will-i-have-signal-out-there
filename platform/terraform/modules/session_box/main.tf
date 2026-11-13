@@ -32,7 +32,7 @@ resource "aws_security_group" "box" {
   }
 }
 
-resource "aws_instance" "box" {
+resource "aws_instance" "box_on_demand" {
   ami                         = var.ami_id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
@@ -42,6 +42,9 @@ resource "aws_instance" "box" {
 
   # On demand, not spot (ADR-0033): from 2026-11-10 AWS reclaimed the spot box or had no spot
   # capacity on most nights, and a nightly run of about 15 minutes costs little more on demand.
+  # AWS cannot turn a spot instance into an on-demand one, and leaving the spot block out does
+  # not replace an existing box, so the resource was renamed from "box": Terraform removes the
+  # old spot box and creates this one. The postcondition below refuses a spot box.
 
   dynamic "credit_specification" {
     for_each = local.is_burstable ? [1] : []
@@ -84,6 +87,11 @@ resource "aws_instance" "box" {
       tags["WorkSessionUntil"],
       tags_all["WorkSessionUntil"],
     ]
+
+    postcondition {
+      condition     = self.instance_lifecycle != "spot"
+      error_message = "The session box is a spot instance, but it must run on demand (ADR-0033)."
+    }
   }
 }
 
@@ -102,7 +110,7 @@ resource "aws_scheduler_schedule" "start" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:ec2:startInstances"
     role_arn = var.scheduler_role_arn
-    input    = jsonencode({ InstanceIds = [aws_instance.box.id] })
+    input    = jsonencode({ InstanceIds = [aws_instance.box_on_demand.id] })
 
     # With no capacity the start fails (rare on demand, common on spot before ADR-0033). The
     # default policy retries for 24 hours, which once started the box at 15:41 UTC, after the
@@ -131,7 +139,7 @@ resource "aws_scheduler_schedule" "hard_stop" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
     role_arn = var.scheduler_role_arn
-    input    = jsonencode({ InstanceIds = [aws_instance.box.id] })
+    input    = jsonencode({ InstanceIds = [aws_instance.box_on_demand.id] })
   }
 }
 
@@ -155,6 +163,6 @@ resource "aws_cloudwatch_metric_alarm" "idle" {
   alarm_actions       = ["arn:aws:automate:${data.aws_region.current.name}:ec2:stop"]
 
   dimensions = {
-    InstanceId = aws_instance.box.id
+    InstanceId = aws_instance.box_on_demand.id
   }
 }

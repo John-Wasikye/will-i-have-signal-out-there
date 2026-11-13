@@ -4,7 +4,7 @@ I use this module to create the session box: the one computer that runs the nigh
 
 What the module creates:
 
-- **The box:** an on-demand instance, so AWS cannot take it back mid-run. A `t4g` box runs in standard credit mode, so surplus CPU never bills. An `m7g` box is not burstable, so it has no credit setting. The box requires version 2 of the instance metadata service and can read its own tags there, so the watchdog can read the `WorkSessionUntil` tag I set when I start a work session. Terraform ignores that tag, so a plan never removes it. It also ignores the public address setting after the box is made: a stopped box gives up its address, and without this every plan made while the box is off would replace it. The subnet gives the box a new address each time it starts.
+- **The box:** an on-demand instance (resource `box_on_demand`), so AWS cannot take it back mid-run. A postcondition fails the plan if it is ever a spot instance. A `t4g` box runs in standard credit mode, so surplus CPU never bills. An `m7g` box is not burstable, so it has no credit setting. The box requires version 2 of the instance metadata service and can read its own tags there, so the watchdog can read the `WorkSessionUntil` tag I set when I start a work session. Terraform ignores that tag, so a plan never removes it. It also ignores the public address setting after the box is made: a stopped box gives up its address, and without this every plan made while the box is off would replace it. The subnet gives the box a new address each time it starts.
 - **A start at 10:00 UTC:** an EventBridge Scheduler schedule starts the box every night. That is 3 a.m. in Arizona and 6 a.m. in US Eastern. When AWS has no capacity, the schedule retries for up to 2 hours and then gives up, so a 2-hour run still ends before the hard stop and a late start never happens.
 - **A hard stop at 14:00 UTC:** a second schedule stops the box four hours after the start, whatever the pipelines are doing. This is my session limit.
 - **Its own security group:** no inbound traffic and any outbound. Without it, AWS would give the box the VPC's default group, which lets in traffic from everything else in that group, including other projects in the account. I reach the box through Session Manager, which needs no open port.
@@ -14,7 +14,7 @@ What the module does not do: it does not install k3s, Airflow or Spark; `platfor
 
 ## Decisions I made
 
-- **On demand, not spot.** From Nov 10, 2026 AWS reclaimed the spot box or had no spot capacity on most nights, and its capacity score for `t4g.2xlarge` was 1 out of 10 in every us-east-1 zone. The nightly run is short, so on demand costs little more (platform ADR-0033).
+- **On demand, not spot.** From Nov 10, 2026 AWS reclaimed the spot box or had no spot capacity on most nights, and its capacity score for `t4g.2xlarge` was 1 out of 10 in every us-east-1 zone. The nightly run is short, so on demand costs little more (platform ADR-0033). AWS cannot turn a spot instance into an on-demand one, so I renamed the resource from `box`, which makes Terraform replace the old spot box.
 - **The idle threshold is a placeholder.** The default is 5 percent average CPU for 6 five-minute periods. I will replace it after measuring the real box (open question OQ-P02).
 - **Public address, no NAT gateway.** The box pulls its images from the internet, and a NAT gateway would cost more than the box does.
 - **IMDSv2 required.** A container on the box cannot read the instance's credentials through the old metadata endpoint.
