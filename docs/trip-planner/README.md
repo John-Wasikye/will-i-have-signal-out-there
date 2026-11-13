@@ -6,10 +6,10 @@ This folder is the documentation for Project 1. It is written so that someone wh
 
 | Field | Value |
 |---|---|
-| Status | Approved by John (Oct 28, 2026). Phase A is built and deployed: C1 to C12 run nightly or serve the site. Phase B has started: the report API (C22), the report buttons part 1 (C21), the nightly report copy (C23 part 1) and the report counts by area on the trail page (C23 part 2) and Android background sending (C21 part 2) are live. The Ookla speed-test loader (C13 part 1) is live. Every carrier (C13 part 2) is built, not deployed yet. Not built yet: OpenCelliD (C13 part 3), C14 to C20 and C24 |
+| Status | Approved by John (Oct 28, 2026). Phase A is built and deployed: C1 to C12 run nightly or serve the site. Phase B has started: the report API (C22), the report buttons part 1 (C21), the nightly report copy (C23 part 1) and the report counts by area on the trail page (C23 part 2) and Android background sending (C21 part 2) are live. The Ookla speed-test loader (C13 part 1) and every carrier (C13 part 2: AT&T, T-Mobile and Verizon on the trail map) are live. Not built yet: OpenCelliD (C13 part 3), C14 to C20 and C24 |
 | Owner | John |
-| Last updated | Nov 11, 2026 |
-| Live link | https://signal.johnwasikye.com (under development: Phase A trails with T-Mobile coverage and satellite times, the report buttons and the report counts) |
+| Last updated | Nov 13, 2026 |
+| Live link | https://signal.johnwasikye.com (under development: Phase A trails with AT&T, T-Mobile and Verizon coverage and satellite times, the report buttons and the report counts) |
 
 ---
 

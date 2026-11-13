@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 13, 2026: session box on demand, every carrier live
+
+- The session box runs on demand instead of spot (platform ADR-0033). AWS reclaimed the spot box or had no spot capacity on Nov 10, 11, 12 and 13. The design doc, requirement QR-15, runbooks RB-8 and RB-9 and the cost table say so; the on-demand nightly cost cell now reads $5.91 (22 hours at $0.2688), so the on-demand all-in month is about $48 to $51.
+- C13 part 2 (every carrier) is live: all six FCC files (AT&T, T-Mobile, Verizon, 4G LTE and 5G 7/1, release J26) are loaded, and the trail map has the carrier picker.
+
 ### Nov 11, 2026: every carrier (C13, part 2)
 
 - The trail map shows satellite reach only for T-Mobile, the carrier satellite texts need, and the map's carrier picker uses the page's style.
