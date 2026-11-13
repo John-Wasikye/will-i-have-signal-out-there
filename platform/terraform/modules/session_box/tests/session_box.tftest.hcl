@@ -19,7 +19,9 @@ variables {
   scheduler_role_arn = "arn:aws:iam::123456789012:role/portfolio-dev-scheduler"
 }
 
-run "runs_on_a_persistent_spot_request_that_stops_on_interruption" {
+# Spot was dropped on 2026-11-13 (platform ADR-0033): AWS reclaimed the box or had no capacity on most
+# nights from 2026-11-10, and a short nightly run costs little more on demand.
+run "runs_on_demand_so_aws_cannot_take_it_back" {
   command = plan
 
   variables {
@@ -30,19 +32,32 @@ run "runs_on_a_persistent_spot_request_that_stops_on_interruption" {
   }
 
   assert {
-    condition     = aws_instance.box.instance_market_options[0].market_type == "spot"
-    error_message = "The session box must run on spot capacity."
+    condition     = length(aws_instance.box_on_demand.instance_market_options) == 0
+    error_message = "The session box must run on demand, not on spot capacity."
+  }
+}
+
+# On 2026-11-13 removing the spot block left both existing spot boxes in place (the plans said
+# "No changes"), so the box must refuse to be spot rather than only leave the block out.
+run "refuses_to_be_a_spot_box" {
+  command = plan
+
+  variables {
+    env                   = "dev"
+    ami_id                = "ami-0123456789abcdef0"
+    subnet_id             = "subnet-0123456789abcdef0"
+    instance_profile_name = "portfolio-dev-session-box"
   }
 
-  assert {
-    condition     = aws_instance.box.instance_market_options[0].spot_options[0].spot_instance_type == "persistent"
-    error_message = "The box must use a persistent spot request, so it can be started again each night."
+  override_resource {
+    target          = aws_instance.box_on_demand
+    override_during = plan
+    values = {
+      instance_lifecycle = "spot"
+    }
   }
 
-  assert {
-    condition     = aws_instance.box.instance_market_options[0].spot_options[0].instance_interruption_behavior == "stop"
-    error_message = "A spot interruption must stop the box, not end it, because every job is safe to rerun."
-  }
+  expect_failures = [aws_instance.box_on_demand]
 }
 
 run "starts_each_night_at_1000_utc" {
@@ -83,24 +98,24 @@ run "the_box_can_read_its_work_session_tag" {
   }
 
   assert {
-    condition     = aws_instance.box.metadata_options[0].instance_metadata_tags == "enabled"
+    condition     = aws_instance.box_on_demand.metadata_options[0].instance_metadata_tags == "enabled"
     error_message = "The watchdog reads the WorkSessionUntil tag from the instance metadata, so tags must be readable there."
   }
 
   assert {
-    condition     = aws_instance.box.metadata_options[0].http_tokens == "required"
+    condition     = aws_instance.box_on_demand.metadata_options[0].http_tokens == "required"
     error_message = "The box must keep requiring version 2 of the metadata service."
   }
   # The pipelines run in k3s pods, one network hop further from the metadata service, and
   # reach AWS with the box's role through it. Amazon Linux 2023 sets 2, but another image
   # might set 1, so the module sets it.
   assert {
-    condition     = aws_instance.box.metadata_options[0].http_put_response_hop_limit == 2
+    condition     = aws_instance.box_on_demand.metadata_options[0].http_put_response_hop_limit == 2
     error_message = "Pods on the box need a metadata hop limit of 2 to reach the box's role."
   }
 }
 
-run "start_gives_up_after_two_hours_without_spot_capacity" {
+run "start_gives_up_after_two_hours_without_capacity" {
   command = plan
 
   variables {
@@ -155,7 +170,7 @@ run "burstable_box_uses_standard_credit_mode" {
   }
 
   assert {
-    condition     = aws_instance.box.credit_specification[0].cpu_credits == "standard"
+    condition     = aws_instance.box_on_demand.credit_specification[0].cpu_credits == "standard"
     error_message = "A t4g box must use standard credit mode, so it never bills for surplus credits."
   }
 }
@@ -172,7 +187,7 @@ run "heavy_batch_box_has_no_credit_setting" {
   }
 
   assert {
-    condition     = length(aws_instance.box.credit_specification) == 0
+    condition     = length(aws_instance.box_on_demand.credit_specification) == 0
     error_message = "An m7g box is not burstable, so it must not set a credit mode."
   }
 }
@@ -216,7 +231,7 @@ run "tags_come_from_the_environment_except_the_name" {
   }
 
   assert {
-    condition     = keys(aws_instance.box.tags) == tolist(["Name"])
+    condition     = keys(aws_instance.box_on_demand.tags) == tolist(["Name"])
     error_message = "The provider's default tags set Project, Environment and ManagedBy, so the box must not set its own."
   }
 }

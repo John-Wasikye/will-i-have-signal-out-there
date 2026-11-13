@@ -72,7 +72,7 @@ Outside the boundary, owned by the platform (the shared system that all five pro
 
 | Item | Limit | Source |
 |---|---|---|
-| Whole platform | Under $50 a month, working from a browser only; a normal month costs about $23 to $46 on spot pricing (cheaper interruptible servers); skeleton and Phase A months usually cost under $20 | Decisions "Budget"; operating model |
+| Whole platform | Under $50 a month, working from a browser only; a normal month costs about $23 to $46 on spot pricing (cheaper interruptible servers), about $48 to $51 with the box on demand as it is since Nov 13, 2026 (platform ADR-0033); skeleton and Phase A months usually cost under $20 | Decisions "Budget"; operating model |
 | Session box | 4-hour session limit; idle shutdown; nightly run hard maximum 2 hours | Decisions "Cost guards", "Nightly shutdown" |
 | Backup guard | $40 AWS budget with an action | Decisions "Cost guards" |
 | Spark jobs (Spark is the batch data-processing engine) | Each job has a maximum number of rows read and written and a maximum runtime. A job over either limit stops before publishing and opens an incident. The values are open (OQ-15) | Build plan "Hard limits" |
@@ -737,7 +737,7 @@ At 10 degrees a window lasts 3 minutes at the median and 6 at most. Per trail, t
 
 ### 8.1 Nightly run, Phase A
 
-The platform starts the session box at 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern) on spot only, runs every pipeline, publishes, and shuts the box down when the pipelines finish, with a hard maximum of 2 hours (about 45 minutes expected). The Project 1 tasks are shown below (C1 to C10 are the components of section 7; "box" means the session box):
+The platform starts the session box at 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern) on demand (platform ADR-0033; spot only until Nov 13, 2026), runs every pipeline, publishes, and shuts the box down when the pipelines finish, with a hard maximum of 2 hours (about 45 minutes expected). The Project 1 tasks are shown below (C1 to C10 are the components of section 7; "box" means the session box):
 
 ```mermaid
 flowchart TD
@@ -773,7 +773,7 @@ Step by step, with failure handling:
 9. C10 publishes gold Parquet; each run is stamped with its valid until time.
 10. The metrics table gets freshness and row counts; `status.json` is regenerated; a missed freshness target or failed run sends an email.
 11. Iceberg maintenance (compact, expire snapshots, remove orphan files) is the last task, so it never competes with the pipelines.
-12. Airflow's database is saved to S3 and the box shuts down. If the 2-hour maximum is hit, it is recorded as an incident and the next run catches up. If spot is unavailable, the night is skipped and the next run catches up.
+12. Airflow's database is saved to S3 and the box shuts down. If the 2-hour maximum is hit, it is recorded as an incident and the next run catches up. If AWS has no capacity for the box, the night is skipped and the next run catches up.
 
 No daily gap: the run predicts 26 hours (24 plus the 2-hour nightly maximum), so the previous predictions are still valid when the next run publishes (ADR 0019). The 24 hours is the promise to the visitor; the extra 2 hours are a safety margin.
 
@@ -999,7 +999,7 @@ Platform-wide deployment is described in [../Platform/platform-requirements.md](
 
 | Component | Runs on | Environments | Schedule |
 |---|---|---|---|
-| C1 to C10 (pipelines, dbt, gate, publish) | Session box on k3s (Airflow, Spark) | dev and live, same code and containers, separate buckets, Glue databases and roles | Nightly at 10:00 UTC, spot only, hard maximum 2 hours |
+| C1 to C10 (pipelines, dbt, gate, publish) | Session box on k3s (Airflow, Spark) | dev and live, same code and containers, separate buckets, Glue databases and roles | Nightly at 10:00 UTC, on demand (platform ADR-0033), hard maximum 2 hours |
 | C14 stream (B) | Session box (Kafka one broker, Structured Streaming with availableNow) | dev and live | Inside the nightly run |
 | C15, C16 (B) | Session box and Snowflake; Marquez on the box (ARM image built once in GitHub Actions); dbt docs on the site | dev and live | After each pipeline run (refresh); Superset and Grafana during sessions only; snapshot charts published nightly |
 | C11 Serving API | Lambda (FastAPI, DuckDB) behind API Gateway | dev and live | Always available, box off |
@@ -1059,7 +1059,7 @@ See section 3.3. The satellite window job's row limit comes from the measured si
 - Every task is idempotent (safe to run again with the same result) and atomic (all or nothing); it overwrites a partition and uses the run's data interval instead of the current time (engineering standard 3).
 - Write, audit, publish (standard 4): bad data never reaches the site.
 - The page degrades safely: late data stays visible with a late notice and the time of the last good run (ADR 0006, amended).
-- Spot interruption: every job is safe to rerun; a skipped night is caught up by the next run.
+- Box stopped mid-run (a spot interruption before platform ADR-0033, or a crash): every job is safe to rerun; a skipped night is caught up by the next run.
 - Raw files are immutable and, for live, locked for 30 days (Decisions "Raw-file lock").
 - Always-on parts (Lambda) write only to DynamoDB, S3, CloudWatch and X-Ray (standard 16).
 - Business history is kept in rows (SCD Type 2, one partition per pull), not in Iceberg snapshots (standard 8).
@@ -1203,7 +1203,7 @@ These were separate ADRs and are recorded here in full because each is a setting
 | iPhone cannot send in the background | Delayed reports | Sent at next page open with a "1 report waiting to send" note (ADR 0010) |
 | Satellite window job explodes in rows or runtime | Cost or overrun | Interval storage; row and runtime limits; incident (ADR 0005; OQ-1, OQ-15) |
 | Upstream format change | Run fails | Contracts, schema diff, weekly smoke test (ADR 0018) |
-| Spot unavailable or reclaimed | Skipped night | Rerun-safe jobs; next run catches up; the page shows the old data with the late notice |
+| Box cannot start or is stopped mid-run | Skipped night | Rerun-safe jobs; next run catches up; the page shows the old data with the late notice |
 | Databricks Free Edition limits or lapses | Training blocked | Site never depends on it; repo copy; monthly keep-alive (ADR 0014; OQ-3, OQ-19) |
 | Snowflake cannot read Glue or refresh | Warehouse stale | Refresh step; first-run check (ADR 0015; OQ-4) |
 | Marquez ARM build fails | No lineage graph | Platform first-run check; lineage choice revisited (OQ-5) |

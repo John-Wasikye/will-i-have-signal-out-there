@@ -19,7 +19,7 @@ Names of tables, buckets, functions and files in this document are proposed here
 
 ## 2 Summary
 
-The platform is the shared base for the five projects. It is a public repository with CI, Terraform-built AWS infrastructure, a nightly computer (the session box) that is started each night on spot pricing, runs Airflow and Spark on k3s, publishes Parquet to S3, and shuts down. Public pages and small APIs run on CloudFront, S3 and Lambda, so they stay up with the session box off. Every key is in Parameter Store. Dev and live are separate copies built from the same code. Freshness, row counts, a status page, and one incident record per real failure show whether the data is good [BP Platform skeleton; BP How the plan works].
+The platform is the shared base for the five projects. It is a public repository with CI, Terraform-built AWS infrastructure, a nightly computer (the session box) that is started each night on demand (ADR-0033), runs Airflow and Spark on k3s, publishes Parquet to S3, and shuts down. Public pages and small APIs run on CloudFront, S3 and Lambda, so they stay up with the session box off. Every key is in Parameter Store. Dev and live are separate copies built from the same code. Freshness, row counts, a status page, and one incident record per real failure show whether the data is good [BP Platform skeleton; BP How the plan works].
 
 The platform's rules, not its code, are what the projects rely on: cost guards, storage clean-up and locks, UTC timestamps, least privilege, and the sixteen engineering standards [requirements.md](requirements.md) section 2.
 
@@ -29,8 +29,8 @@ The platform's rules, not its code, are what the projects rely on: cost guards, 
 
 | Fact | Source |
 |---|---|
-| Budget under $50 a month, browser only. Normal month about $23 to $46 on spot pricing; prices as of Oct 8, 2026 | BD Budget; BP Operating model |
-| Nightly run at 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern), about 45 minutes expected, 2 hours maximum, spot only | BD Data freshness; BD Nightly run time; BP How the box is run |
+| Budget under $50 a month, browser only. Normal month about $23 to $46 on spot pricing, about $48 to $51 on demand (the box runs on demand since Nov 13, 2026, ADR-0033); prices as of Oct 8, 2026 | BD Budget; BP Operating model |
+| Nightly run at 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern), about 45 minutes expected, 2 hours maximum; spot only until Nov 13, 2026, then on demand (ADR-0033) | BD Data freshness; BD Nightly run time; BP How the box is run |
 | A $40 AWS budget denies new launches and stops the box; budget alerts lag by hours, so the idle alarm and session limit are the real guards | BP 0.3 guardrails; BD Cost guards |
 | Live raw files locked 30 days (governance mode); dev files not locked | BP Engineering table; BD Raw-file lock |
 | Dev and live fully separate; dev cannot write live | BD Dev and live; BP 0.2 |
@@ -125,7 +125,7 @@ flowchart TB
 GitHub Actions, OIDC`"]:::cont
     tf["`Terraform
 state in its own S3 bucket`"]:::cont
-    box["`Session box (spot)
+    box["`Session box (on demand)
 k3s, Airflow, Spark, Iceberg
 10:00 UTC, 2-hour maximum`"]:::cont
     ps[("`Parameter Store
@@ -213,23 +213,23 @@ Function, class, file and table names here are proposals. They become binding wh
 ### 7.2 Terraform modules: Platform/terraform/
 
 - Job: create every AWS resource as code and destroy them cheaply [Eng 10].
-- Modules (proposed): `state` (the state bucket with versioning, KMS, public-access block, S3 locking; created once by hand and then referenced), `storage` (raw, lake and site buckets with the clean-up rules and Object Lock on live raw), `catalog` (Glue databases, one per environment), `site` (CloudFront and the site bucket), `budget` ($40 budget and action), `iam` (one least-privilege role per pipeline and the OIDC trust), `parameters` (Parameter Store paths), `session_box` (spot instance module, schedule, session limit, idle alarm, spot handler), `serving` (Lambda, API Gateway HTTP API, and REST API where keys are needed), `visitor_data` (DynamoDB tables, point-in-time recovery).
+- Modules (proposed): `state` (the state bucket with versioning, KMS, public-access block, S3 locking; created once by hand and then referenced), `storage` (raw, lake and site buckets with the clean-up rules and Object Lock on live raw), `catalog` (Glue databases, one per environment), `site` (CloudFront and the site bucket), `budget` ($40 budget and action), `iam` (one least-privilege role per pipeline and the OIDC trust), `parameters` (Parameter Store paths), `session_box` (on-demand instance module, ADR-0033; schedule, session limit, idle alarm, spot handler), `serving` (Lambda, API Gateway HTTP API, and REST API where keys are needed), `visitor_data` (DynamoDB tables, point-in-time recovery).
 - Inputs: environment name (dev or live), tags.
 - Outputs: resource names and ARNs read by the pipelines.
 - Rule: a module that creates a live resource cannot be applied from a dev role (ADR-0020).
 
 ### 7.3 Session box: Platform/box/
 
-- Job: start a spot instance with k3s, install Airflow and Spark with their official Helm charts, run the nightly DAG, and shut down [BP 0.3].
+- Job: start the box (on demand, ADR-0033) with k3s, install Airflow and Spark with their official Helm charts, run the nightly DAG, and shut down [BP 0.3].
 - Inputs: the schedule (10:00 UTC), the Airflow database backup in S3, Parameter Store paths.
 - Outputs: pipeline results in S3, metrics, the shutdown.
 - Main items:
   - `start_box(env) -> InstanceId` (Terraform-driven; the box starts from the schedule or by hand).
   - `restore_airflow_db(s3_uri)` and `save_airflow_db(s3_uri)`: the database is saved after every run and at shutdown, and restored at startup (ADR-0008).
-  - `on_spot_interruption(event)`: reacts to the two-minute warning; the running tasks are safe to rerun [BP How the box is run].
+  - `on_spot_interruption(event)`: reacts to the two-minute warning; the running tasks are safe to rerun [BP How the box is run]. On demand (ADR-0033) AWS sends no warning, so it never fires.
   - `enforce_session_limit(max_hours=4)`, `idle_alarm(idle_minutes)`: the 4-hour session limit and idle shutdown [BD Cost guards].
   - `shutdown_when_done()`: stops the box when the DAG run ends, or at the 2-hour nightly maximum, and records a reached maximum as an incident [BD Nightly shutdown].
-- Notes: the nightly run uses spot only. If spot is unavailable, the night is skipped and the next run catches up (ADR-0012). Sizes: t4g.2xlarge for everyday work, m7g.2xlarge for heavy batch [BP Where each job runs].
+- Notes: the nightly run used spot only until Nov 13, 2026, and runs on demand since (ADR-0033). If AWS has no capacity, the night is skipped and the next run catches up (ADR-0012). Sizes: t4g.2xlarge for everyday work, m7g.2xlarge for heavy batch [BP Where each job runs].
 
 ### 7.4 Airflow DAG conventions: pipelines/Platform/dags/
 
@@ -290,7 +290,7 @@ Function, class, file and table names here are proposals. They become binding wh
 ```mermaid
 sequenceDiagram
   participant S as Schedule
-  participant B as Session box (spot)
+  participant B as Session box (on demand)
   participant A as Airflow
   participant L as Lake and published S3
   participant M as Metrics and status
@@ -305,14 +305,14 @@ sequenceDiagram
 
 Steps and failure handling:
 
-1. The box starts on spot at 10:00 UTC. If no spot instance is available, the start retries for up to 2 hours (until 12:00 UTC), then the night is skipped and the next run catches up [BP How the box is run; ADR-0012].
+1. The box starts on demand at 10:00 UTC (ADR-0033). If AWS has no capacity, the start retries for up to 2 hours (until 12:00 UTC), then the night is skipped and the next run catches up [BP How the box is run; ADR-0012].
 2. The box restores the Airflow database from S3 and reads keys from Parameter Store [PR-10].
 3. Each project's pipelines run. A failing task retries as the project's DAG defines, then fails. A failure opens one incident and one GitHub issue, and sends an email [PR-14, PR-24].
 4. Publishing happens only after the checks pass. A failed check stops the publish and opens an incident [Eng 4].
 5. Run metrics are written and status.json is published, so the status page shows the last good run [PR-13].
 6. Iceberg maintenance runs last [Eng 7].
 7. The box saves the Airflow database and shuts down when the pipelines finish. Reaching the 2-hour maximum is recorded as an incident [BD Nightly shutdown].
-8. If AWS takes back the spot instance, the interruption handler reacts to the two-minute warning. Every task is safe to rerun [BP How the box is run].
+8. On spot, the interruption handler reacted to AWS's two-minute warning. On demand (ADR-0033) AWS does not take the box back. Every task is safe to rerun [BP How the box is run].
 
 ### 8.2 Public request with the box off
 
@@ -360,7 +360,7 @@ API type: the HTTP type of API Gateway for public pages; the REST type only wher
 
 | What | Runs where | Notes |
 |---|---|---|
-| Pipelines, Spark, Airflow, checks | Session box on k3s (t4g.2xlarge everyday; m7g.2xlarge for heavy batch), spot only | Started 10:00 UTC; shut down when done; 4-hour session limit; 2-hour nightly maximum [BP 0.3] |
+| Pipelines, Spark, Airflow, checks | Session box on k3s (t4g.2xlarge everyday; m7g.2xlarge for heavy batch), on demand (ADR-0033) | Started 10:00 UTC; shut down when done; 4-hour session limit; 2-hour nightly maximum [BP 0.3] |
 | Ingest tasks | Fargate scheduled tasks, daily | Always-on storage only [Eng 16] |
 | Serving | Lambda (FastAPI, DuckDB) behind API Gateway; site on CloudFront and S3 | Works with the box off [BP 0.4] |
 | Published data, lake | S3 with Iceberg and the Glue catalog | Dev and live fully separate buckets, databases and roles [BP 0.2] |
@@ -419,10 +419,12 @@ Monthly estimate (prices as of Oct 8, 2026; estimates from public price pages) [
 
 | Item | Spot | On-demand |
 |---|---|---|
-| AWS total | $18 to $25 | About $37 |
+| AWS total | $18 to $25 | About $40 |
 | Snowflake after the trial (3-credit monitor) | Up to $6 | Up to $6 |
 | Model API (cheapest model, $10 cap, Project 1 ADR 0038) | $5 to $10 | $5 |
-| All in, normal month | About $23 to $46 | About $45 to $48 |
+| All in, normal month | About $23 to $46 | About $48 to $51 |
+
+Since Nov 13, 2026 the session box runs on demand (ADR-0033), so the On-demand column applies to the box. The on-demand nightly cell said $2 to $3.35 until then; 22 hours at $0.2688 is $5.91. Measured use from Oct 14 to Nov 13, 2026 was about 13 box hours, and the whole AWS bill for those 30 days was $4.74.
 
 ### 12.6 Reliability
 
@@ -458,7 +460,7 @@ Evals, an LLM judge and red-team sets do not apply to the platform, except for t
 | Local cluster | k3s (chosen) vs Docker Compose | [ADR-0002](adrs/0002-k3s-on-the-session-box.md) |
 | Keys | Parameter Store only (chosen) vs keys in GitHub | [ADR-0007](adrs/0007-keys-in-parameter-store.md) |
 | Environments | Fully separate dev and live (chosen) | [ADR-0020](adrs/0020-dev-and-live-separate-merges-gated.md) |
-| Nightly compute | Spot box started per night (chosen) vs always-on server | [ADR-0012](adrs/0012-nightly-run-spot-with-two-hour-maximum.md) |
+| Nightly compute | Box started per night (chosen) vs always-on server; on demand (chosen Nov 13, 2026) vs spot | [ADR-0012](adrs/0012-nightly-run-spot-with-two-hour-maximum.md), [ADR-0033](adrs/0033-session-box-on-demand.md) |
 | Airflow database | On the box, saved to S3 (chosen) vs PostgreSQL always on | [ADR-0008](adrs/0008-airflow-database-saved-to-s3.md) |
 | Always-on parts | Lambda and Fargate on always-on storage only (chosen) | [ADR-0011](adrs/0011-always-on-writes-only-to-always-on-storage.md) |
 | Visitor data | DynamoDB (chosen) vs PostgreSQL on the box | [ADR-0006](adrs/0006-dynamodb-for-visitor-data.md) |
@@ -493,7 +495,7 @@ These were separate ADRs and are recorded here in full because each is a setting
 |---|---|
 | Spend rises above $50 a month | Hard limits per item; session limit; idle alarm; $40 budget (as backup); monthly estimate reviewed |
 | The session box runs past 2 hours | Hard maximum; the box shuts down; the hit is an incident [BD Nightly shutdown] |
-| Spot capacity is unavailable | The night is skipped and the next run catches up; the page shows the late notice (project decision) |
+| AWS has no capacity for the box (common on spot before ADR-0033, rare on demand) | The night is skipped and the next run catches up; the page shows the late notice (project decision) |
 | A key leaks | Parameter Store only; gitleaks in CI; reads logged |
 | A dev change damages live data | Separate buckets, catalogs and roles; dev roles refused on live writes |
 | A failed run goes unnoticed | Email on failure and on missed freshness; status page; GitHub issue |
@@ -528,7 +530,7 @@ Spikes that gate the skeleton: OQ-P02 (measured idle time), OQ-P04. Spikes that 
 | Term | Meaning |
 |---|---|
 | Walking skeleton | A tiny version of the whole system with every main part connected end to end, grown while it keeps running [BD Build method] |
-| Session box | The temporary AWS computer (a spot instance) that runs k3s, Airflow and Spark each night |
+| Session box | The temporary AWS computer (an on-demand instance since ADR-0033) that runs k3s, Airflow and Spark each night |
 | Spot instance | A cheaper AWS computer that AWS can take back with a two-minute warning |
 | k3s | A lightweight Kubernetes |
 | Airflow | The scheduler that runs pipelines in order and retries them |

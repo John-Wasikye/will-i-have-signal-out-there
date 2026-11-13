@@ -55,16 +55,16 @@ The session box is the rented AWS server that runs Airflow, Spark and the other 
 
 | Item | Requirement |
 |---|---|
-| Instance | Spot. `t4g.2xlarge` (8 vCPU, 32 GB) for everyday work in CPU credit mode `standard`, or `m7g.2xlarge` (not burstable) for heavy batch. Both have 32 GB, which is the memory limit to check (open question below) |
+| Instance | On demand since Nov 13, 2026 (ADR-0033); spot before. `t4g.2xlarge` (8 vCPU, 32 GB) for everyday work in CPU credit mode `standard`, or `m7g.2xlarge` (not burstable) for heavy batch. Both have 32 GB, which is the memory limit to check (open question below) |
 | Images | arm64. Each image's manifest is checked before first use |
 | Orchestration | k3s (a lightweight Kubernetes). Each pipeline has its own memory and CPU limits, and failed services restart automatically |
 | Installed with official Helm charts | Airflow in its single-machine mode; Spark with its operator; Kafka (one broker, Phase B); PostgreSQL for Airflow's own bookkeeping only; Superset and Grafana (Phase B, during sessions only) |
 | Session limit | The box stops 4 hours after it starts |
 | Idle shutdown | A CloudWatch alarm stops the box when it is idle |
-| Spot interruption | A handler reacts to the two-minute spot warning. Every job is safe to rerun |
+| Spot interruption | A handler reacts to the two-minute spot warning. Every job is safe to rerun. On demand (ADR-0033) no warning comes, so the handler never fires |
 | Nightly start | 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern) |
 | Nightly stop | When every pipeline finishes. Hard maximum 2 hours. Hitting the maximum is recorded as an incident |
-| Spot only for the nightly run | If spot capacity is unavailable, that night is skipped and the next run catches up |
+| Spot only for the nightly run (replaced on Nov 13, 2026 by ADR-0033: on demand) | If AWS has no capacity, that night is skipped and the next run catches up |
 | Backfills | Long historical backfills run only during work sessions, never in the nightly run |
 | Airflow's database | Saved to S3 after every run and at shutdown, and restored at startup. If the latest copy is lost, the pipelines are safe to rerun |
 | Airflow's keys | Read from Parameter Store through Airflow's built-in secrets backend, so the saved database never contains a key |

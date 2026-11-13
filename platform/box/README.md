@@ -32,13 +32,13 @@ The watchdog checks every 30 seconds and stops the box for the first of these re
 
 1. **AWS is taking the box back.** AWS puts a notice in the instance metadata two minutes ahead. This applies to every boot.
 2. **The nightly run finished,** whether it succeeded or failed.
-3. **The box has been up for 2 hours.** It records an incident for this and emails me through the run alerts topic, because a run stopped this way never reports anything itself. A spot warning sends the email only: AWS taking the box back is a note, not an incident (runbook PRB-3).
+3. **The box has been up for 2 hours.** It records an incident for this and emails me through the run alerts topic, because a run stopped this way never reports anything itself. A spot warning sends the email only (on demand, since platform ADR-0033, AWS sends no such warning): AWS taking the box back is a note, not an incident (runbook PRB-3).
 
 To stop, it saves the database to S3 first, because that is the step with a deadline. It then records the incident and sends the email if there is one, and powers the box off last. Powering off always runs, even if a save fails, so a broken step cannot leave a server billing.
 
-Only a boot between 10:00 and 12:00 UTC counts as the nightly run, because the start schedule retries for up to 2 hours when AWS has no spot capacity. If the watchdog cannot reach Airflow, it keeps going and still stops the box at 2 hours.
+Only a boot between 10:00 and 12:00 UTC counts as the nightly run, because the start schedule retries for up to 2 hours when AWS has no capacity. If the watchdog cannot reach Airflow, it keeps going and still stops the box at 2 hours.
 
-Any other boot is either a work session I planned or a start nobody planned. After AWS takes a spot box back, it starts the box again by itself once capacity returns, at any hour; on 2026-10-26 it did so at 15:52 UTC. So a work session has to be marked: before I start the box, I tag it with `WorkSessionUntil`, the time the session ends. The watchdog reads that tag from the instance metadata on every check.
+Any other boot is either a work session I planned or a start nobody planned. While the box ran on spot, AWS started it again by itself after taking it back, at any hour; on 2026-10-26 it did so at 15:52 UTC. The box runs on demand since 2026-11-13 (platform ADR-0033), but a start nobody planned can still happen, so a work session has to be marked: before I start the box, I tag it with `WorkSessionUntil`, the time the session ends. The watchdog reads that tag from the instance metadata on every check.
 
 - **A boot with no tag, or with a tag from an earlier session,** is a start nobody planned. The watchdog saves the database, emails me, and powers off at once.
 - **A work session** stops at its tagged end time, at the 4-hour session limit counted from its boot, or for a spot warning, whichever comes first. The idle alarm also stops it after 30 idle minutes. I can change the tag during the session to end it sooner. If the tag cannot be read, the session gets the 4-hour limit, so a failed read never cuts a session short.

@@ -90,7 +90,7 @@ The skeleton is a walking skeleton: every main part is in place and connected en
 | PR-05 | Terraform creates the S3 buckets (raw, lake, site), the Glue catalog, a CloudFront site, the $40 budget with its action, tags, and one least-privilege IAM role per pipeline. Every key lives in Parameter Store. | 0.2 | BP 0.2 |
 | PR-06 | Dev and live have separate buckets, separate Glue databases and separate roles. A dev role is refused when it writes to live data. Only merges to main reach live, after the changed pipelines pass on sample data in CI. | 0.2 | BP 0.2; BD Dev and live |
 | PR-07 | Terraform state lives in its own S3 bucket, versioned, encrypted with a platform KMS key, public access blocked, readable only by the Terraform role, with S3 native locking. State never lives in the repository. | 0.2 | BP 0.2; BD Terraform state; ADR-0023 |
-| PR-08 | A Terraform module starts a spot box (t4g in standard credit mode, or m7g) with k3s, and installs Airflow and Spark with their official Helm charts (Airflow in single-machine mode). | 0.3 | BP 0.3; ADR-0002, ADR-0012 |
+| PR-08 | A Terraform module starts the session box (spot in the build plan, on demand since ADR-0033; t4g in standard credit mode, or m7g) with k3s, and installs Airflow and Spark with their official Helm charts (Airflow in single-machine mode). | 0.3 | BP 0.3; ADR-0002, ADR-0012, ADR-0033 |
 | PR-09 | The session box has a 4-hour session limit, an idle alarm, a spot interruption handler, and a nightly schedule that starts it at 10:00 UTC and shuts it down when the pipelines finish, with a 2-hour maximum. | 0.3 | BP 0.3; ADR-0012 |
 | PR-10 | Airflow's database is saved to S3 after every run and at shutdown, and restored at startup. Airflow reads connection keys from Parameter Store through its secrets backend, so the backup holds no key. | 0.3 | BP 0.3; ADR-0008 |
 | PR-11 | A publish step writes gold tables as Parquet. A Lambda function runs DuckDB over them behind API Gateway with FastAPI. The sample endpoint answers with the session box off. | 0.4 | BP 0.4; ADR-0026 |
@@ -115,7 +115,7 @@ Moved here from the skeleton so the first page goes live sooner [BD Extras moved
 
 | ID | Requirement | Source |
 |---|---|---|
-| PR-30 | The nightly run starts at 10:00 UTC on spot only, waits for the pipelines to finish, and has a 2-hour maximum. If no spot instance is available, the night is skipped and the next run catches up. | BD Nightly run time; BD Nightly shutdown; BP How the box is run |
+| PR-30 | The nightly run starts at 10:00 UTC (spot only in the build plan; on demand since Nov 13, 2026, ADR-0033), waits for the pipelines to finish, and has a 2-hour maximum. If AWS has no capacity, the night is skipped and the next run catches up. | BD Nightly run time; BD Nightly shutdown; BP How the box is run |
 | PR-31 | Iceberg maintenance is the last task of the nightly run. | Eng 7; BD Iceberg clean-up |
 | PR-32 | Backfills run only during work sessions, never in the nightly run. | BD Backfills |
 | PR-33 | Each project's job limits (rows, runtime, GPU hours, query limits) are set from its measured size estimate and written in its design note. | BP Hard limits table; BD Data sizes |
