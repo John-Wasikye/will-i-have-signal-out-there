@@ -15,7 +15,7 @@ This document covers how the shared platform runs day to day: the nightly schedu
 
 | Job | When | Where | Maximum |
 |---|---|---|---|
-| Nightly run (every project's pipelines, in order) | 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern) | Session box, spot only | 2 hours. Usually about 45 minutes |
+| Nightly run (every project's pipelines, in order) | 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern) | Session box, on demand (ADR-0033) | 2 hours. Usually about 45 minutes |
 | Platform status file (`status.json`) | After each run | Written by the run, read by the status page | Part of the run |
 | Iceberg maintenance (compact, expire snapshots, remove orphan files) | Last task of the nightly run | Session box | Part of the run |
 | CI on every push | On every push | GitHub Actions, on GitHub's hosted machines | Not billed (public repository) |
@@ -60,9 +60,11 @@ Estimates are from public price pages as of Oct 8, 2026. They are checked before
 | S3 storage | Up to $3.45 | Up to $3.45 | Clean-up rules (section 5) and a size alarm |
 | Fargate ingest tasks | About $1 | About $1 | Fixed schedule |
 | Public IPv4 while running | $0.50 | $0.50 | Only while the box runs |
-| Nightly run, about 22 hours a month | $2 to $3.35 | $2 to $3.35 | Always spot; 2-hour maximum |
-| AWS total | $18 to $25 | About $37 | $40 budget as backup |
+| Nightly run, about 22 hours a month | $2 to $3.35 | $5.91 | On demand since Nov 13, 2026 (ADR-0033); 2-hour maximum |
+| AWS total | $18 to $25 | About $40 | $40 budget as backup |
 | Snowflake after the trial | Up to $6 | Up to $6 | 3 credits a month; query time limit |
+
+Since Nov 13, 2026 the session box runs on demand ([ADR-0033](adrs/0033-session-box-on-demand.md)), so the On-demand column applies to the box. The on-demand nightly cell said $2 to $3.35 until then; 22 hours at $0.2688 is $5.91. Measured use from Oct 14 to Nov 13, 2026 was about 13 box hours, and the whole AWS bill for those 30 days was $4.74.
 
 The cost of the model API is in the trip-planning project's own documents (Project 1, ADR 0038). Its limit is $10 a month.
 
@@ -73,8 +75,8 @@ Each runbook names the symptom, how it is found, the first action, and what to r
 ### PRB-1: The session box does not start at 10:00 UTC
 
 - **Found by:** no run has started. The status page shows the night as skipped.
-- **First action:** check spot capacity for the instance type. If spot is unavailable, the night is skipped and the next run catches up.
-- **Fix:** if spot is unavailable several nights in a row, change the instance choice in the design doc. Switching to on-demand needs a recorded decision and a cost check, because the nightly run is spot only.
+- **First action:** check the start schedule's failed tries in the audit trail (`InsufficientInstanceCapacity` means AWS had no capacity). The night is skipped and the next run catches up.
+- **Fix:** if the box fails to start several nights in a row, change the instance size or zone in the design doc. Spot was dropped for this reason on Nov 13, 2026 (ADR-0033).
 - **Record:** a note. An incident if two nights in a row are skipped.
 
 ### PRB-2: The box stops at the 2-hour maximum
@@ -86,6 +88,7 @@ Each runbook names the symptom, how it is found, the first action, and what to r
 
 ### PRB-3: A spot server is taken back mid-run
 
+- **Since Nov 13, 2026:** the box runs on demand (ADR-0033), so AWS no longer takes it back. This runbook applies only if the box returns to spot.
 - **Found by:** the watchdog reads AWS's two-minute warning, saves the database, emails me, and powers the box off. The run stops.
 - **First action:** rerun on a new box. Every job overwrites its own partition, so a rerun replaces only that day.
 - **Record:** a note, not an incident, because nothing broke. The note is the stop email ("AWS will stop the box at ...") and the watchdog's log on the box (`journalctl -u box-watchdog -b -1` after the next boot). The same applies to a spot warning during a work session.

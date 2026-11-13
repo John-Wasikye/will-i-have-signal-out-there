@@ -1,5 +1,11 @@
 # Changelog: Platform
 
+## Nov 13, 2026: the session box runs on demand
+
+- ADR-0033: the session box (dev and live) runs on demand, not on spot. It replaces point 3 of ADR-0012 ("Spot only"). From Nov 10, 2026 AWS reclaimed the spot box or had no spot capacity on most nights, and its capacity score for `t4g.2xlarge` was 1 out of 10 in every us-east-1 zone.
+- The design doc, requirements PR-08 and PR-30, the platform requirements, runbooks PRB-1 and PRB-3 and the cost table follow. The on-demand nightly cost cell said $2 to $3.35; 22 hours at $0.2688 is $5.91, so the planned on-demand AWS total is about $40.
+- The watchdog keeps its spot notice check; on demand it never fires.
+
 ## Oct 28, 2026: incident records live in S3 and can be closed
 
 - Each incident is filed in the lake as soon as it opens, numbered from what the lake already holds, and an upload never replaces a record the lake has (ADR-0024 update).

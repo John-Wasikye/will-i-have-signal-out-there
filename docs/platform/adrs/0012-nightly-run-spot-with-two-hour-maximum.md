@@ -1,6 +1,6 @@
 # 0012. The nightly run is every night, on spot capacity, stops when done, with a two-hour maximum
 
-- Status: Accepted. Decided by John, Oct 9, 2026 (BPD, "Data freshness" and "Nightly shutdown"). The start time of 10:00 UTC was a Default and is confirmed by John, Oct 9, 2026.
+- Status: Accepted. Decided by John, Oct 9, 2026 (BPD, "Data freshness" and "Nightly shutdown"). The start time of 10:00 UTC was a Default and is confirmed by John, Oct 9, 2026. Point 3 (spot only) is replaced by [ADR-0033](0033-session-box-on-demand.md) (Nov 13, 2026): the box runs on demand.
 - Date: Oct 9, 2026.
 
 ## Context

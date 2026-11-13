@@ -15,7 +15,7 @@ This document says how the project runs day to day: when things happen, what is 
 
 | Job | When | Where it runs | Maximum run time |
 |---|---|---|---|
-| Nightly pipeline run (C1 to C10, plus Iceberg maintenance last) | Every day at 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern) | Session box, spot only | 2 hours. Usually about 45 minutes |
+| Nightly pipeline run (C1 to C10, plus Iceberg maintenance last) | Every day at 10:00 UTC (3 a.m. Arizona, 6 a.m. US Eastern) | Session box, on demand (platform ADR-0033) | 2 hours. Usually about 45 minutes |
 | Orbit element pull (C1) | At most once per 2-hour update, inside the nightly run | Session box | Stops on any response other than HTTP 200 |
 | Nightly report copy (C23, Phase B) | Inside the nightly run | Session box, reading DynamoDB | Part of the 2-hour maximum |
 | Kafka orbit stream (C14, Phase B) | Inside the nightly run, with availableNow | Session box | Part of the 2-hour maximum |
@@ -68,11 +68,13 @@ Estimates are from public price pages as of Oct 8, 2026. They are rechecked befo
 | S3 storage, up to about 150 GB by Phase C (far less early on) | Up to $3.45 | Up to $3.45 | Clean-up rules (section 6); size alarm |
 | Fargate ingest tasks | About $1 | About $1 | Fixed schedule |
 | Public IPv4 while running | $0.50 | $0.50 | Only while the box runs |
-| Nightly pipeline run, about 22 hours a month | $2 to $3.35 | $2 to $3.35 | Always spot; 2-hour maximum |
-| AWS total | $18 to $25 | About $37 | $40 AWS budget as backup |
+| Nightly pipeline run, about 22 hours a month | $2 to $3.35 | $5.91 | On demand since Nov 13, 2026 (platform ADR-0033); 2-hour maximum |
+| AWS total | $18 to $25 | About $40 | $40 AWS budget as backup |
 | Snowflake after the trial | Up to $6 | Up to $6 | 3 credits a month; query time limit |
 | Model API, cheapest model only | $5 to $10 | $5 | $10 a month spend limit; daily question cap; token limit per answer |
-| All in, normal month | About $23 to $46 | About $45 to $48 | Under $50 a month |
+| All in, normal month | About $23 to $46 | About $48 to $51 | Under $50 a month |
+
+Since Nov 13, 2026 the session box runs on demand ([platform ADR-0033](../platform/adrs/0033-session-box-on-demand.md)), so the On-demand column applies to the box. The on-demand nightly cell said $2 to $3.35 until then; 22 hours at $0.2688 is $5.91. Measured use from Oct 14 to Nov 13, 2026 was about 13 box hours, and the whole AWS bill for those 30 days was $4.74.
 
 The skeleton and Phase A months are usually under $20, because they need few box hours and no warehouse.
 
@@ -154,16 +156,17 @@ Each runbook names the symptom, how it is detected, what the visitor sees, the f
 - **Fix:** move the slow step out of the nightly run if it can run in a work session (backfills always run in sessions). Otherwise, change the step.
 - **Record:** an incident with the step and its time.
 
-### RB-8: Spot capacity is unavailable at 10:00 UTC
+### RB-8: The box cannot start at 10:00 UTC
 
 - **Detected by:** the box does not start. The night is recorded as skipped.
 - **Visitor sees:** the previous data, with the late notice once it is late.
 - **First action:** none. The next run catches up.
-- **Fix:** if spot is unavailable for several nights, reconsider the instance choice in the design doc. The build plan makes the nightly run spot only, so switching it to on-demand needs a recorded decision and a new cost check.
+- **Fix:** if the box fails to start for several nights, reconsider the instance size or zone in the design doc. Spot was dropped for this reason on Nov 13, 2026 ([platform ADR-0033](../platform/adrs/0033-session-box-on-demand.md)).
 - **Record:** a note in the metrics table. An incident if two nights in a row are skipped.
 
 ### RB-9: A spot server is taken back mid-run
 
+- **Since Nov 13, 2026:** the box runs on demand (platform ADR-0033), so AWS no longer takes it back. This runbook applies only if the box returns to spot.
 - **Detected by:** the interruption handler records the two-minute warning and the run stops.
 - **Visitor sees:** the previous data.
 - **First action:** rerun the nightly pipeline on a new box.
