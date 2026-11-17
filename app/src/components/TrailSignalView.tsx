@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { openReportStore } from '../lib/reportStore'
 import { loadCarrier } from '../lib/reports'
-import { formatUtc } from '../lib/status'
-import { photoFor, profileLine, terrainFor, toFeet, type TrailPhoto } from '../lib/trailMedia'
+import { formatUtc, formatUtcRange } from '../lib/status'
+import { photoFor, profileLine, terrainFor, type TrailPhoto } from '../lib/trailMedia'
+import { formatDistance, formatElevation } from '../lib/units'
 import {
   coveredPointCount,
   distanceKm,
@@ -127,7 +128,7 @@ function ElevationProfile({ elevations, selected, onSelect }: ElevationProfilePr
         viewBox={`0 0 ${MAP_WIDTH} ${PROFILE_HEIGHT}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Elevation along the trail, between ${low} and ${high} meters`}
+        aria-label={`Elevation along the trail, between ${formatElevation(low)} and ${formatElevation(high)}`}
         onClick={selectAlong}
       >
         <polygon
@@ -138,8 +139,8 @@ function ElevationProfile({ elevations, selected, onSelect }: ElevationProfilePr
         <line className="profile-you" x1={you.x} x2={you.x} y1={0} y2={PROFILE_HEIGHT} />
       </svg>
       <p className="profile-scale">
-        <span>Highest {high.toLocaleString('en-US')} m</span>
-        <span>Lowest {low.toLocaleString('en-US')} m</span>
+        <span>Highest {formatElevation(high)}</span>
+        <span>Lowest {formatElevation(low)}</span>
       </p>
     </figure>
   )
@@ -194,7 +195,8 @@ function SignalBars({ on }: { on: boolean }) {
   )
 }
 
-function satelliteAnswer(point: PointSignal, now: Date, late: boolean): string {
+function satelliteAnswer(point: PointSignal, carrier: string, now: Date, late: boolean): string {
+  if (!offersSatellite(carrier)) return 'Needs T-Mobile'
   if (late) return 'Data is late, see the windows below'
   if (isReachableAt(point.windows, now)) return 'Reachable now'
   const next = nextWindow(point.windows, now)
@@ -204,20 +206,20 @@ function satelliteAnswer(point: PointSignal, now: Date, late: boolean): string {
 interface PointDetailProps {
   point: PointSignal
   elevationM?: number
+  carrier: string
   now: Date
   late: boolean
 }
 
-function PointDetail({ point, elevationM, now, late }: PointDetailProps) {
+function PointDetail({ point, elevationM, carrier, now, late }: PointDetailProps) {
   const windows = windowsWithPassedFlag(point.windows, now)
   const covered = point.coverage.some((item) => item.covered)
   return (
     <section className="point-detail" aria-labelledby="point-heading">
-      <h3 id="point-heading">About {distanceKm(point.seq).toFixed(2)} km along the trail</h3>
+      <h3 id="point-heading">About {formatDistance(distanceKm(point.seq))} along the trail</h3>
       {elevationM !== undefined && (
         <p className="point-height">
-          Elevation about {elevationM.toLocaleString('en-US')} m (
-          {toFeet(elevationM).toLocaleString('en-US')} ft)
+          Elevation about {formatElevation(elevationM)}
         </p>
       )}
       <div className="answer-tiles">
@@ -233,25 +235,29 @@ function PointDetail({ point, elevationM, now, late }: PointDetailProps) {
           </ul>
         </div>
         <div className="answer-tile">
-          <p className="answer-label">Satellite</p>
-          <p className="answer-value">{satelliteAnswer(point, now, late)}</p>
+          <p className="answer-label">Satellite text</p>
+          <p className="answer-value">{satelliteAnswer(point, carrier, now, late)}</p>
         </div>
       </div>
-      <h4>Satellite windows from this spot</h4>
-      {windows.length === 0 ? (
-        <p>No satellite is predicted to be reachable from this point.</p>
-      ) : (
-        <ol className="window-list">
-          {windows.map((window) => (
-            <li
-              key={window.start_utc}
-              className={window.passed ? 'window window-passed' : 'window'}
-            >
-              {formatUtc(window.start_utc)} to {formatUtc(window.end_utc)}
-              {window.passed && ' (passed)'}
-            </li>
-          ))}
-        </ol>
+      {offersSatellite(carrier) && (
+        <>
+          <h4>Satellite windows from this spot</h4>
+          {windows.length === 0 ? (
+            <p>No satellite is predicted to be reachable from this point.</p>
+          ) : (
+            <ol className="window-list">
+              {windows.map((window) => (
+                <li
+                  key={window.start_utc}
+                  className={window.passed ? 'window window-passed' : 'window'}
+                >
+                  {formatUtcRange(window.start_utc, window.end_utc)}
+                  {window.passed && ' (passed)'}
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
       )}
     </section>
   )
@@ -397,6 +403,7 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
           <PointDetail
             point={point}
             elevationM={terrain?.elevationsM[shownIndex]}
+            carrier={carrier}
             now={now}
             late={late}
           />

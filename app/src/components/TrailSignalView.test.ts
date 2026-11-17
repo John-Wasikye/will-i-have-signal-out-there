@@ -71,6 +71,22 @@ describe('TrailSignalView', () => {
     expect(visibleText(markup)).toMatch(/Elevation about [\d,]+ m \([\d,]+ ft\)/)
   })
 
+  it('shows heights and distances in feet and miles as well, for hikers in the United States', () => {
+    const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
+    const text = visibleText(renderMarkup(createElement(TrailSignalView, { signal: known, now })))
+    expect(text).toMatch(/Highest [\d,]+ m \([\d,]+ ft\)/)
+    expect(text).toMatch(/Lowest [\d,]+ m \([\d,]+ ft\)/)
+    expect(text).toContain('About 0.00 km (0.00 mi) along the trail')
+  })
+
+  it('gives the heights in feet too in the description of the elevation chart', () => {
+    const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
+    const markup = renderMarkup(createElement(TrailSignalView, { signal: known, now }))
+    expect(markup).toMatch(
+      /aria-label="Elevation along the trail, between [\d,]+ m \([\d,]+ ft\) and [\d,]+ m \([\d,]+ ft\)"/,
+    )
+  })
+
   it('shows a photo of the trail with its credit', () => {
     const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
     const markup = renderMarkup(createElement(TrailSignalView, { signal: known, now }))
@@ -104,6 +120,16 @@ describe('TrailSignalView', () => {
     expect(text).toContain('Reachable now')
   })
 
+  it('names the satellite tile "Satellite text", with no suffix, on T-Mobile', () => {
+    const text = visibleText(render(now))
+    expect(text).toContain('Satellite text Reachable now')
+    expect(text).not.toContain('T-Mobile only')
+  })
+
+  it('lists the satellite windows from the chosen spot on T-Mobile', () => {
+    expect(visibleText(render(now))).toContain('Satellite windows from this spot')
+  })
+
   it('leaves the satellite out of the key when the data is late', () => {
     const text = visibleText(render(late))
     expect(text).not.toContain('a satellite is reachable now')
@@ -129,6 +155,12 @@ describe('TrailSignalView', () => {
   it('lists the first point by default, with its coverage', () => {
     const text = visibleText(render(now))
     expect(text).toContain('T-Mobile: covered')
+  })
+
+  it('reads a satellite window as one range, with the zone said once', () => {
+    const items = render(now).match(/<li class="window[^"]*">[^<]*<\/li>/g) ?? []
+    expect(items).toHaveLength(2)
+    for (const item of items) expect(visibleText(item)).toMatch(/\d{4}, \d{1,2}:\d{2} [AP]M to \d{1,2}:\d{2} [AP]M \S+/)
   })
 
   it('draws a passed window in grey with a label and never hides it', () => {
@@ -203,6 +235,18 @@ describe('TrailSignalView without T-Mobile on the map', () => {
   it('leaves the satellite out of the key, because the texts need T-Mobile', () => {
     expect(visibleText(markup)).not.toContain('satellite is reachable now')
     expect(visibleText(markup)).toContain('No coverage claimed')
+  })
+
+  it('says the satellite text needs T-Mobile in the point details', () => {
+    expect(visibleText(markup)).toContain('Satellite text Needs T-Mobile')
+  })
+
+  it('leaves the satellite windows and their heading out of the point details', () => {
+    const text = visibleText(markup)
+    expect(text).not.toContain('Satellite windows from this spot')
+    expect(text).not.toContain('No satellite is predicted')
+    expect(text).not.toContain('Reachable now')
+    expect(markup).not.toContain('class="window')
   })
 
   it('leaves the satellite count out of the map label', () => {

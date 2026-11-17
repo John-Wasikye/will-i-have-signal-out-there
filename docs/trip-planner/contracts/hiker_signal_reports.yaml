@@ -1,15 +1,15 @@
-# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 10, 2026): names and fields as built in C22 and C23.
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 10, 2026): names and fields as built in C22 and C23. 0.2.1 approved by John (Nov 17, 2026): the descriptions use the new button words.
 # Table and attribute names are proposals (OQ-21).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-hiker-signal-reports
 name: hiker_signal_reports
-version: 0.2.0
+version: 0.2.1
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
-  purpose: Hiker reports "I had signal here" or "I had no signal here", written by Lambda to DynamoDB, copied nightly to the lake and Snowflake, used as labels for the confidence model and for per-area counts.
+  purpose: Hiker reports "Yes, I have signal" or "No signal", written by Lambda to DynamoDB, copied nightly to the lake and Snowflake, used as labels for the confidence model and for per-area counts.
   limitations: A report holds only the H3 resolution 9 cell, carrier, signal yes or no and the time rounded to the hour. It never carries a visitor ID or exact coordinates. Raw rows delete themselves 30 days after the nightly copy. Point-in-time recovery is OFF for this table, so deletion is final at 30 days (ADR 0022, Decided by John, Oct 9, 2026).
   usage: Nightly copy (C23); model labels (C17); counts per area on the page.
 team:
@@ -57,7 +57,7 @@ schema:
       - name: had_signal
         logicalType: boolean
         required: true
-        description: True for "I had signal here", false for "I had no signal here".
+        description: True for "Yes, I have signal", false for "No signal".
       - name: report_hour_utc
         logicalType: timestamp
         required: true

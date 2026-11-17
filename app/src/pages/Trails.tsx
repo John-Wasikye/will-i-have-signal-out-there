@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { ColdStartNotice } from '../components/ColdStartNotice'
 import { Credits } from '../components/Credits'
 import { DtcRequirementsNote } from '../components/DtcRequirementsNote'
 import { ReportButtons } from '../components/ReportButtons'
 import { ReportCounts } from '../components/ReportCounts'
+import { TrailPlaceholder } from '../components/TrailPlaceholder'
 import { TrailSignalView } from '../components/TrailSignalView'
 import { reportCountsUrl, trailSignalUrl, trailsUrl } from '../lib/api'
 import { latestOnly } from '../lib/latestOnly'
 import type { ReportCount } from '../lib/reportCounts'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
-import { PHASE_A_TRAILS } from '../lib/trails'
+import { useNow } from '../lib/useNow'
+import { usePageTitle } from '../lib/usePageTitle'
 
 const LOAD_ERROR = 'The trail data could not be loaded. Try again.'
-const MINUTE_MS = 60_000
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
@@ -21,6 +21,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export function Trails() {
+  usePageTitle('Trails')
   const [trails, setTrails] = useState<TrailSummary[]>([])
   const [trailId, setTrailId] = useState('')
   const [signal, setSignal] = useState<TrailSignal | null>(null)
@@ -28,14 +29,8 @@ export function Trails() {
   const [failed, setFailed] = useState(false)
   const [counts, setCounts] = useState<ReportCount[] | null>(null)
   const [countsFailed, setCountsFailed] = useState(false)
-  const [now, setNow] = useState(() => new Date())
+  const now = useNow()
   const beginRequest = useRef(latestOnly())
-
-  // Lateness and passed windows depend on the time, so they are checked again while the page is open.
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), MINUTE_MS)
-    return () => clearInterval(timer)
-  }, [])
 
   function chooseTrail(id: string) {
     setTrailId(id)
@@ -82,6 +77,11 @@ export function Trails() {
   return (
     <>
       <h2 className="walk-heading">Walk a trail before you go</h2>
+      <p className="lede">
+        Choose a trail, pick your carrier, and press "Walk the trail". The map then shows where that
+        carrier claims coverage, using the map of the Federal Communications Commission (FCC), and,
+        on T-Mobile, when a satellite text could get through.
+      </p>
       <div className="trail-choices" role="group" aria-label="Choose a trail">
         <p className="trail-choices-label">Choose a trail</p>
         {trails.map((trail) => (
@@ -97,7 +97,7 @@ export function Trails() {
         ))}
       </div>
 
-      {loading && <ColdStartNotice />}
+      {loading && <TrailPlaceholder />}
       {failed && (
         <p role="alert" className="error-text">
           {LOAD_ERROR}
@@ -107,12 +107,6 @@ export function Trails() {
       <ReportCounts counts={counts} failed={countsFailed} />
 
       <ReportButtons />
-
-      <p className="lede">
-        I cover three main trails at Grand Canyon National Park: {PHASE_A_TRAILS.join(', ')}. Choose
-        one, press walk, and watch where T-Mobile claims coverage and where a satellite could be
-        reachable.
-      </p>
 
       <DtcRequirementsNote />
       <Credits />

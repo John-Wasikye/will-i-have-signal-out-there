@@ -8,14 +8,13 @@ function renderPage(path: string): string {
   return renderMarkup(createElement(MemoryRouter, { initialEntries: [path] }, createElement(App)))
 }
 
-const pages = ['/', '/trails', '/about', '/lookup', '/status', '/no-such-page']
+const pages = ['/', '/trails', '/about', '/status', '/no-such-page']
 
 describe('the development banner', () => {
-  it.each(pages)('is shown above the navigation on %s', (path) => {
+  it.each(pages)('is gone from %s, because the footer carries the safety note', (path) => {
     const markup = renderPage(path)
-    const bannerAt = markup.indexOf('Under development:')
-    expect(bannerAt).toBeGreaterThanOrEqual(0)
-    expect(bannerAt).toBeLessThan(markup.indexOf('<header'))
+    expect(markup).not.toContain('dev-banner')
+    expect(visibleText(markup)).not.toContain('Under development')
   })
 })
 
@@ -40,12 +39,44 @@ describe('the navigation', () => {
     expect(text).toContain('Status')
   })
 
-  it('leaves out the lookup page, which is a developer sample', () => {
-    expect(renderPage('/')).not.toContain('href="/lookup"')
+})
+
+describe('the site footer', () => {
+  it.each(pages)('follows the main part of the page on %s', (path) => {
+    const markup = renderPage(path)
+    expect(markup.indexOf('<footer')).toBeGreaterThan(markup.indexOf('</main>'))
+  })
+
+  it.each(pages)('says it is a portfolio project and not to rely on it for safety on %s', (path) => {
+    const footer = visibleText(renderPage(path).split('<footer')[1] ?? '')
+    expect(footer).toContain('I built this site as a portfolio project.')
+    expect(footer).toContain(
+      'I have not checked its predictions in the field, so do not rely on it for your safety.',
+    )
+  })
+
+  it.each(pages)('links to how it works, status, the credits and the source code on %s', (path) => {
+    const footer = renderPage(path).split('<footer')[1] ?? ''
+    expect(footer).toMatch(/<a href="\/about"[^>]*>How it works<\/a>/)
+    expect(footer).toMatch(/<a href="\/status"[^>]*>Status<\/a>/)
+    expect(footer).toMatch(/<a href="\/about#credits-heading"[^>]*>Data sources and credits<\/a>/)
+    expect(footer).toMatch(
+      /<a href="https:\/\/github\.com\/John-Wasikye\/will-i-have-signal-out-there" rel="noopener noreferrer">Source code on GitHub<\/a>/,
+    )
+  })
+
+  it('has a credits heading on the About page for the footer link to reach', () => {
+    expect(renderPage('/about')).toContain('id="credits-heading"')
   })
 })
 
 describe('routes', () => {
+  it('shows a page not found page with a way back, not a bare heading', () => {
+    const markup = renderPage('/no-such-page')
+    expect(visibleText(markup)).toContain('I could not find that page.')
+    expect(markup).toContain('<h1>Page not found</h1>')
+  })
+
   it('makes the trail tool the home page', () => {
     const text = visibleText(renderPage('/'))
     expect(text).toContain('Choose a trail')
@@ -61,20 +92,20 @@ describe('routes', () => {
   it('moves the explanation to /about', () => {
     const text = visibleText(renderPage('/about'))
     expect(text).toContain('How it works')
-    expect(text).toContain('Phase A')
+    expect(text).toContain('What it covers today')
     expect(text).not.toContain('Page not found')
   })
 
   it('serves the trails page at /trails', () => {
     const text = visibleText(renderPage('/trails'))
-    expect(text).toContain('Bright Angel')
+    expect(text).toContain('Walk a trail before you go')
     expect(text).not.toContain('Page not found')
   })
 
-  it('keeps the lookup page working', () => {
+  it('shows the page not found page at /lookup, because the developer lookup page is gone', () => {
     const text = visibleText(renderPage('/lookup'))
-    expect(text).toContain('Enter a sample key')
-    expect(text).not.toContain('Page not found')
+    expect(text).toContain('Page not found')
+    expect(text).not.toContain('Enter a sample key')
   })
 
   it('keeps the status page working', () => {
@@ -85,6 +116,10 @@ describe('routes', () => {
 })
 
 describe('visible text on every page', () => {
+  it.each(pages)('never uses the word Phase on %s', (path) => {
+    expect(visibleText(renderPage(path))).not.toContain('Phase')
+  })
+
   it.each(pages)('uses no em dash, en dash or spaced hyphen on %s', (path) => {
     const text = visibleText(renderPage(path))
     expect(text).not.toContain('—')

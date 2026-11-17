@@ -47,8 +47,12 @@ const readablePairs = [
   ['color-on-accent', 'color-accent'],
   ['color-error', 'color-bg'],
   ['color-text', 'color-notice-bg'],
-  ['color-banner-text', 'color-banner-bg'],
   ['color-passed', 'color-card'],
+  ['color-on-accent', 'color-coverage'],
+  ['color-on-accent', 'color-error'],
+  ['color-error', 'color-card'],
+  ['color-text', 'color-map-bg'],
+  ['color-muted', 'color-map-bg'],
 ]
 
 describe.each([
@@ -77,6 +81,136 @@ describe('the color modes', () => {
   })
 })
 
+describe('the site footer', () => {
+  const rules = (css.match(/\.(?:site-footer|footer-links)[^{]*\{[^}]*\}/g) ?? []).join('\n')
+
+  it('is styled in the stylesheet', () => {
+    expect(rules).not.toBe('')
+  })
+
+  it('takes every color from the color variables, so both color modes work', () => {
+    expect(rules).not.toMatch(/#[0-9a-f]{3,6}\b/i)
+  })
+
+  it('lets the links wrap on a narrow phone', () => {
+    expect(rules).toContain('flex-wrap: wrap')
+  })
+})
+
+describe('the build diagram', () => {
+  const rules = (css.match(/\.(?:build-diagram|diagram-[\w-]+)[^{]*\{[^}]*\}/g) ?? []).join('\n')
+
+  it('is styled in the stylesheet, by classes', () => {
+    for (const name of ['.build-diagram', '.diagram-box', '.diagram-title', '.diagram-note', '.diagram-arrow']) {
+      expect(rules).toContain(name)
+    }
+  })
+
+  it('takes every color from the color variables, so both color modes work', () => {
+    expect(rules).not.toMatch(/#[0-9a-f]{3,6}\b/i)
+  })
+
+  it('shrinks to the width of the page instead of scrolling sideways', () => {
+    expect(rules).toMatch(/\.build-diagram[^{]*\{[^}]*max-width:\s*\d+px/)
+    expect(rules).toMatch(/\.build-diagram[^{]*\{[^}]*width:\s*100%/)
+  })
+})
+
+describe('the report buttons', () => {
+  // The first rule that starts with this selector, up to its closing brace.
+  function rule(selector: string): string {
+    const start = css.indexOf(`${selector} {`)
+    return start < 0 ? '' : css.slice(start, css.indexOf('}', start))
+  }
+
+  it.each(['.report-button', '.report-yes', '.report-no', '.report-help summary'])(
+    'styles %s',
+    (selector) => {
+      expect(rule(selector)).not.toBe('')
+    },
+  )
+
+  it('makes each button at least 44 px high', () => {
+    const height = rule('.report-button').match(/min-height:\s*(\d+)px/)?.[1]
+    expect(Number(height)).toBeGreaterThanOrEqual(44)
+  })
+
+  it('fills the yes button with the coverage green and outlines the no button in the error red', () => {
+    expect(rule('.report-yes')).toContain('background: var(--color-coverage)')
+    expect(rule('.report-no')).toContain('border-color: var(--color-error)')
+  })
+
+  it('takes no height or margin while the status line is empty, but stays in the page', () => {
+    expect(rule('.report-status')).not.toContain('min-height')
+    expect(rule('.report-status:empty')).toContain('margin: 0')
+    expect(rule('.report-status:empty')).not.toContain('display: none')
+  })
+
+  it('has hover states for both buttons', () => {
+    expect(rule('.report-yes:hover')).not.toBe('')
+    expect(rule('.report-no:hover')).not.toBe('')
+  })
+
+  it('takes every color from the color variables, so both color modes work', () => {
+    const all = ['.report-button', '.report-yes', '.report-no', '.report-yes:hover', '.report-no:hover']
+      .map(rule)
+      .join('\n')
+    expect(all).not.toMatch(/#[0-9a-f]{3,6}\b/i)
+  })
+})
+
+describe('the trail placeholder', () => {
+  const start = css.indexOf('.trail-placeholder {')
+  const base = start < 0 ? '' : css.slice(start, css.indexOf('}', start))
+
+  it('reserves height, so the sections below do not move when the trail arrives', () => {
+    expect(base).toContain('min-height: 46rem;')
+  })
+
+  it('reserves more height on a phone, where the trail view is stacked and taller', () => {
+    expect(css).toMatch(
+      /@media \(max-width: 760px\) \{[^@]*?\.trail-placeholder \{\s*min-height: 92rem;/,
+    )
+  })
+
+  it('does not animate, so it has nothing to switch off for reduced motion', () => {
+    expect(base).not.toContain('animation')
+  })
+})
+
+describe('the header on a phone', () => {
+  // The hero rules for narrow screens are the last block at the breakpoint the stylesheet uses.
+  const start = css.lastIndexOf('@media (max-width: 760px) {')
+  const phone = start < 0 ? '' : css.slice(start, css.indexOf('\n}\n', start))
+
+  function size(selector: string, property: string): number {
+    const at = phone.indexOf(`\n  ${selector} {`)
+    const body = at < 0 ? '' : phone.slice(at, phone.indexOf('}', at))
+    const match = body.match(new RegExp(`${property}:\\s*([\\d.]+)(px|rem)`))
+    if (!match) return Number.NaN
+    return Number(match[1]) * (match[2] === 'rem' ? 16 : 1)
+  }
+
+  it('has rules for narrow screens that make the hero shorter', () => {
+    expect(phone).toContain('\n  .hero-text h1 {')
+  })
+
+  it('uses a smaller heading than the 2.3rem minimum of a wide screen', () => {
+    expect(size('.hero-text h1', 'font-size')).toBeLessThan(2.3 * 16)
+  })
+
+  it('draws lower mountains in the hero and on the other pages', () => {
+    expect(size('.hero .mountains', 'height')).toBeLessThanOrEqual(72)
+    expect(size('.mountains', 'height')).toBeLessThanOrEqual(64)
+  })
+
+  it('leaves the wide screen header as it was', () => {
+    expect(css).toContain('font-size: clamp(2.3rem, 6vw, 3.8rem);')
+    expect(css).toContain('height: clamp(110px, 15vw, 230px);')
+    expect(css).toContain('height: clamp(96px, 16.7vw, 280px);')
+  })
+})
+
 describe('phone width', () => {
   it('does not hide sideways overflow, so a too wide element shows up in checks', () => {
     expect(css).not.toContain('overflow-x: hidden')
@@ -91,5 +225,41 @@ describe('the page head', () => {
   it('tints the phone browser bar in both color modes', () => {
     expect(indexHtml).toContain('name="theme-color" media="(prefers-color-scheme: light)"')
     expect(indexHtml).toContain('name="theme-color" media="(prefers-color-scheme: dark)"')
+  })
+})
+
+describe('the link preview card', () => {
+  function meta(key: string): string | undefined {
+    return indexHtml.match(new RegExp(`<meta\\s+(?:property|name)="${key}"\\s+content="([^"]*)"`))?.[1]
+  }
+
+  const shippedPhotos = Object.keys(import.meta.glob('../public/trails/*.jpg'))
+
+  it('gives the title, the type and the address of the site', () => {
+    expect(meta('og:title')).toBe('Will I have signal out there?')
+    expect(meta('og:type')).toBe('website')
+    expect(meta('og:url')).toBe('https://signal.johnwasikye.com/')
+  })
+
+  it('reuses the page description, and the description names the three carriers', () => {
+    const description = meta('description')
+    expect(meta('og:description')).toBe(description)
+    expect(description).toContain('AT&amp;T, T-Mobile and Verizon')
+  })
+
+  it('uses a photo the site already ships, at an absolute https address', () => {
+    const image = meta('og:image')
+    expect(image).toMatch(/^https:\/\/signal\.johnwasikye\.com\/trails\/[\w-]+\.jpg$/)
+    expect(image).toBe('https://signal.johnwasikye.com/trails/grca-bright-angel.jpg')
+    expect(shippedPhotos).toContain('../public/trails/grca-bright-angel.jpg')
+  })
+
+  it('describes the photo for people who cannot see it', () => {
+    expect(meta('og:image:alt')?.length).toBeGreaterThan(20)
+    expect(meta('twitter:image:alt')).toBe(meta('og:image:alt'))
+  })
+
+  it('asks for a large image card', () => {
+    expect(meta('twitter:card')).toBe('summary_large_image')
   })
 })

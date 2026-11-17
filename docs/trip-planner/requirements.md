@@ -208,6 +208,8 @@ Numbering note: IDs are never renumbered. Some IDs appear out of order because r
 | FR-68 | The assistant answers only within the prediction span and says so when asked about later days | F-1B.6 | ADR 0021 |
 | FR-69 | The reports table has point-in-time recovery switched off, so deletion is final at 30 days; other tables keep it on | F-1B.8 | ADR 0022 |
 
+Update, Nov 17, 2026: John approved new wording for the report buttons, "Yes, I have signal" and "No signal", under the heading "On the trail right now? Report your signal". FR-49, feature F-1B.8 and the hiker on the trail row of the users table keep the words "I had signal here" and "I had no signal here" as they were written when they were approved. The meaning, the report fields and the API values are unchanged.
+
 ### 4.3 Phase C
 
 | ID | Requirement | Feature |

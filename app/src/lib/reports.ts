@@ -12,6 +12,9 @@
 import { reportsUrl } from './api'
 
 /** The carriers a hiker can pick. platform/serving/reports.py accepts the same list. */
+/** An H3 resolution 9 cell is about this wide. The pages say so in words, so they share one number. */
+export const REPORT_AREA_WIDTH_M = 350
+
 export const CARRIERS = ['AT&T', 'T-Mobile', 'Verizon'] as const
 export type Carrier = (typeof CARRIERS)[number]
 

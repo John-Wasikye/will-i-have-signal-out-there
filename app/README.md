@@ -1,6 +1,6 @@
 # Site
 
-This is the public website for my trip planner, Will I have signal out there? The trail tool is the home page, and it also answers at `/trails`. There is a how it works page at `/about`, a status page that shows whether the data is up to date, and a developer lookup page at `/lookup` that is not in the navigation. A banner on every page says the site is under development. I built it with Vite, React and TypeScript. It compiles to plain static files, so the site has no server of its own. The trail tool, the status page and the lookup page call the API.
+This is the public website for my trip planner, Will I have signal out there? The trail tool is the home page, and it also answers at `/trails`. There is a how it works page at `/about`, a status page that shows whether the data is up to date. A footer on every page says I built the site as a portfolio project and have not checked its predictions in the field. I built it with Vite, React and TypeScript. It compiles to plain static files, so the site has no server of its own. The trail tool and the status page call the API.
 
 ## Run it
 
@@ -17,7 +17,7 @@ Run these commands from this `app` folder:
 
 ## Environment
 
-`VITE_API_BASE_URL` is the base URL of the API, with no trailing slash. The lookup page calls `${VITE_API_BASE_URL}/v1/sample?key=...`.
+`VITE_API_BASE_URL` is the base URL of the API, with no trailing slash. The trail tool calls it, for example `${VITE_API_BASE_URL}/trails`.
 
 For local work, I copy `.env.example` to `.env.local` and set the value there. Vite reads this variable when it runs or builds, so I set it before I run `npm run build` for a deployed site.
 

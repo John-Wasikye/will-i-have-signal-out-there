@@ -10,8 +10,6 @@
   --color-notice-border: #a8642a;
   --color-error: #9a2f1d;
   --color-map-bg: #e8decb;
-  --color-banner-bg: #e6b45a;
-  --color-banner-text: #2a2319;
   --color-passed: #6c6962;
   --color-coverage: #4f7349;
   --color-reach: #b8602e;
@@ -44,8 +42,6 @@
     --color-notice-border: #d99a4e;
     --color-error: #f4a18c;
     --color-map-bg: #352c23;
-    --color-banner-bg: #6e4c17;
-    --color-banner-text: #fff1d6;
     --color-passed: #a5a199;
     --color-coverage: #8db57f;
     --color-reach: #e8955c;
@@ -305,17 +301,6 @@ h1 {
   margin-top: 0;
 }
 
-.dev-banner {
-  background: var(--color-banner-bg);
-  color: var(--color-banner-text);
-}
-
-.dev-banner p {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 10px var(--gutter);
-}
-
 .error-text {
   color: var(--color-error);
   font-weight: 600;
@@ -323,39 +308,6 @@ h1 {
 
 label {
   font-weight: 600;
-}
-
-.lookup-form input {
-  width: 100%;
-  padding: 10px 12px;
-  font: inherit;
-  color: var(--color-text);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-}
-
-.lookup-form {
-  display: grid;
-  gap: 8px;
-  max-width: 420px;
-}
-
-.lookup-form button {
-  justify-self: start;
-  padding: 10px 20px;
-  font: inherit;
-  font-weight: 600;
-  border: none;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  cursor: pointer;
-}
-
-.lookup-form button:disabled {
-  opacity: 0.6;
-  cursor: progress;
 }
 
 .valid-until {
@@ -455,6 +407,21 @@ label {
   align-items: start;
 }
 
+/* The heights come from measuring the trail view (.walker) in a browser with a 16 px root font:
+   741 px tall at 1024 px wide, where its two panels sit side by side, and 1481 px tall at 375 px
+   wide, where they stack. They keep the sections below from jumping when the trail arrives. */
+.trail-placeholder {
+  min-height: 46rem;
+  padding: 16px 20px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.trail-placeholder .notice {
+  margin: 0;
+}
+
 .walker .panel {
   margin: 0;
 }
@@ -462,6 +429,10 @@ label {
 @media (max-width: 760px) {
   .walker {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trail-placeholder {
+    min-height: 92rem;
   }
 }
 
@@ -746,7 +717,9 @@ label {
 
 .profile-scale {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 0 16px;
   margin: 4px 0 0;
   color: var(--color-muted);
   font-size: 0.9rem;
@@ -896,8 +869,184 @@ input[type='range'] {
   gap: 8px;
 }
 
-.report-status {
-  min-height: 1.5em;
-  margin-top: 12px;
+.report-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 16px;
+  font: inherit;
   font-weight: 700;
+  border: 2px solid;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.report-mark {
+  margin-right: 8px;
+}
+
+.report-yes {
+  color: var(--color-on-accent);
+  background: var(--color-coverage);
+  border-color: var(--color-coverage);
+}
+
+.report-yes:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.report-no {
+  color: var(--color-error);
+  background: var(--color-card);
+  border-color: var(--color-error);
+}
+
+.report-no:hover {
+  color: var(--color-on-accent);
+  background: var(--color-error);
+}
+
+.report-privacy {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.report-help {
+  margin-top: 8px;
+}
+
+.report-help summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.report-help p {
+  margin: 0 0 8px;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.report-status {
+  margin: 12px 0 0;
+  font-weight: 700;
+}
+
+/* Not display: none, because a live region has to exist before its text changes. */
+.report-status:empty {
+  margin: 0;
+}
+
+.site-footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px var(--gutter) 32px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.site-footer p {
+  margin: 0 0 8px;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The header is tall for a phone, so the trail tool started below the first screen. */
+@media (max-width: 760px) {
+  .header-bar {
+    padding-top: 8px;
+  }
+
+  .brand {
+    font-size: 1rem;
+  }
+
+  .header-bar .logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .hero-text {
+    padding-top: 4px;
+  }
+
+  .hero-text h1 {
+    margin-bottom: 4px;
+    font-size: 1.75rem;
+  }
+
+  .hero-text p {
+    font-size: 1rem;
+  }
+
+  .mountains {
+    height: 64px;
+  }
+
+  .hero .mountains {
+    height: 72px;
+  }
+
+  .hero-hiker .logo {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+.panel ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.build-diagram {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  margin: 16px auto;
+}
+
+.diagram-box {
+  fill: var(--color-map-bg);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+}
+
+.diagram-title {
+  fill: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.diagram-note {
+  fill: var(--color-muted);
+  font-size: 13px;
+}
+
+.diagram-arrow {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.build-steps {
+  margin: 0 0 16px;
 }

@@ -19,7 +19,7 @@ This folder is the documentation for Project 1. It is written so that someone wh
 - **What it shows:** for each point along a trail, whether the carrier's coverage map says there is signal, and whether a satellite overhead could reach the phone, with canyon walls and mountains taken into account.
 - **How far to trust it:** the coverage map is a model's claim. Where measured speed tests exist nearby, the page gives a confidence level. Where they do not, the page says "Not enough measurements here; the coverage map's claim is unverified." It does not guess.
 - **Late data is never hidden.** If the nightly update fails, the page keeps the old data and shows a visible late notice with the time of the last good run.
-- **Hikers can report.** In Phase B, a hiker with no signal can tap "I had signal here" or "I had no signal here". The phone reduces its location to a cell about 350 m across, and exact coordinates never leave the phone.
+- **Hikers can report.** In Phase B, a hiker can tap "Yes, I have signal" or "No signal". The phone reduces its location to a cell about 350 m across, and exact coordinates never leave the phone.
 - **Phase A (first live version):** Grand Canyon's Bright Angel, South Kaibab and North Kaibab trails, with T-Mobile, for the next 24 hours of satellite passes. Phase B adds every carrier, measured speeds, a warehouse, the confidence model, a trip assistant and hiker reports. Phase C (second round) adds every national park, route upload and an offline trip pack.
 
 ## 2. How it works, in one picture

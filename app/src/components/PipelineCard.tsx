@@ -1,4 +1,6 @@
+import { describePipeline } from '../lib/pipelineNames'
 import { formatUtc, type Pipeline } from '../lib/status'
+import type { PredictionsCard as PredictionsCardState } from '../lib/trailPredictions'
 
 const STATE_LABELS: Record<Pipeline['state'], string> = {
   ok: 'Working',
@@ -6,44 +8,25 @@ const STATE_LABELS: Record<Pipeline['state'], string> = {
   failed: 'Failed',
 }
 
-const SYSTEM_CHECK = {
-  title: 'Nightly system check',
-  about:
-    'A small test job that proves the nightly system works from start to finish. It does not make the trail predictions: those are covered at the top of this page.',
-}
-
-const KNOWN_PIPELINES: Record<string, typeof SYSTEM_CHECK> = {
-  platform_skeleton: SYSTEM_CHECK,
-  sample_pipeline: SYSTEM_CHECK,
-}
-
-function plainName(codeName: string): string {
-  const words = codeName.replace(/_/g, ' ')
-  return words.charAt(0).toUpperCase() + words.slice(1)
-}
-
 function StateBadge({ state }: { state: Pipeline['state'] }) {
   return <span className={`state-badge state-${state}`}>{STATE_LABELS[state]}</span>
 }
 
 export function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
-  const known = KNOWN_PIPELINES[pipeline.name]
+  const { title, about } = describePipeline(pipeline.name)
   const incidentIsSafe = pipeline.incident_url?.startsWith('https://') ?? false
 
   return (
     <li className="card">
       <StateBadge state={pipeline.state} />
-      <h3>{known?.title ?? plainName(pipeline.name)}</h3>
-      {known && <p>{known.about}</p>}
+      <h3>{title}</h3>
+      {about && <p>{about}</p>}
       <dl className="facts">
         <dt>Last finished</dt>
         <dd>{formatUtc(pipeline.last_good_run_utc)}</dd>
         <dt>Schedule</dt>
-        <dd>Should run at least every {pipeline.freshness_target_hours} hours</dd>
+        <dd>Every night. Counted as late after {pipeline.freshness_target_hours} hours.</dd>
       </dl>
-      {pipeline.last_row_count !== undefined && (
-        <p className="note-text">Test records checked: {pipeline.last_row_count}</p>
-      )}
       {incidentIsSafe && (
         <p>
           <a href={pipeline.incident_url} rel="noopener noreferrer">
@@ -72,5 +55,28 @@ export function PipelineKey() {
         data.
       </li>
     </ul>
+  )
+}
+
+/** The nightly trail run, built from the trail answer, so it sits first among the pipelines. */
+export function PredictionsCard({ card }: { card: PredictionsCardState }) {
+  return (
+    <li className="card">
+      {card.kind === 'ready' && <StateBadge state={card.state} />}
+      <h3>Trail predictions</h3>
+      <p>The nightly job that works out coverage and satellite windows for every trail.</p>
+      {card.kind === 'loading' && <p>Loading the trail predictions.</p>}
+      {card.kind === 'error' && <p role="alert">The trail predictions are unavailable right now.</p>}
+      {card.kind === 'ready' && (
+        <dl className="facts">
+          <dt>Last finished</dt>
+          <dd>{formatUtc(card.lastGoodRunUtc)}</dd>
+          <dt>Valid until</dt>
+          <dd>{formatUtc(card.validUntilUtc)}</dd>
+          <dt>Schedule</dt>
+          <dd>Every night at 10:00 UTC.</dd>
+        </dl>
+      )}
+    </li>
   )
 }

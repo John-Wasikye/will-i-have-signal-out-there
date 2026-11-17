@@ -6,10 +6,21 @@ import { Trails } from './Trails'
 describe('Trails page', () => {
   const text = visibleText(renderMarkup(createElement(Trails)))
 
-  it('lists the three Phase A trails by name', () => {
-    expect(text).toContain('Bright Angel')
-    expect(text).toContain('South Kaibab')
-    expect(text).toContain('North Kaibab')
+  it('introduces the tool directly under the heading', () => {
+    expect(text).toContain(
+      'Walk a trail before you go Choose a trail, pick your carrier, and press "Walk the trail".',
+    )
+    expect(text).toContain('on T-Mobile, when a satellite text could get through')
+  })
+
+  it('spells out FCC where the page first mentions it', () => {
+    expect(text).toContain('Federal Communications Commission (FCC)')
+    expect(text.indexOf('FCC')).toBe(text.indexOf('(FCC)') + 1)
+  })
+
+  it('no longer ends with the old paragraph about T-Mobile coverage', () => {
+    expect(text).not.toContain('I cover three main trails')
+    expect(text).not.toContain('where T-Mobile claims coverage and where a satellite')
   })
 
   it('no longer says the data is coming soon', () => {
@@ -31,8 +42,15 @@ describe('Trails page', () => {
   })
 
   it('lets a hiker report signal from the trail page (FR-49)', () => {
-    expect(text).toContain('I had signal here')
-    expect(text).toContain('I had no signal here')
+    expect(text).toContain('Yes, I have signal')
+    expect(text).toContain('No signal')
+    expect(text).not.toContain('I had signal here')
+  })
+
+  it('holds the place of the trail view while the trail loads, so the report section does not jump', () => {
+    const markup = renderMarkup(createElement(Trails))
+    expect(markup).toContain('class="trail-placeholder"')
+    expect(markup.indexOf('trail-placeholder')).toBeLessThan(markup.indexOf('report-panel'))
   })
 
   it('shows the cold start notice', () => {

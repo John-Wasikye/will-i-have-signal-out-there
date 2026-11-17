@@ -10,6 +10,28 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 16, 2026: site text refresh
+
+- The site text no longer says "Phase A" or "One carrier: T-Mobile". The How it works page lists what the site covers today (three trails, three carriers on 4G LTE and 5G, satellite texts on T-Mobile, the next 24 hours, hiker reports) and what is still to come. The credit lines and the coverage disclaimer from ADR 0037 are unchanged.
+- The status page gives the exact time left in hours and minutes and the next nightly run in the reader's own time zone, and it keeps the figure current while the page is open. Every time on the site now ends with its time zone name.
+- Every page has its own tab title and a footer, the not-found page has a way back to the trails, and the trail view shows feet and miles next to meters and kilometers.
+- The site tests went from 257 to 329.
+
+### Nov 17, 2026: site changes after review
+
+- John decided to remove the "Under development" banner from every page and keep the safety note in the footer: "I have not checked its predictions in the field, so do not rely on it for your safety." The README and the site README now say so. The Oct and Nov entries above that mention the banner are history and stay as written.
+- John decided to remove the developer lookup page `/lookup` from the public site. The Nov 5 entry says it stayed because PR-12 names it; PR-12, the platform design doc, the platform requirements and ADR 0026 now carry a dated line that the page is gone and the API route `/sample` stays. `/lookup` shows the page not found page.
+- The point details show the satellite tile and windows only when the chosen carrier is T-Mobile; other carriers see "Needs T-Mobile".
+- The late notice uses the same plain pipeline name as its card, and the card no longer shows the test record count.
+- The report area width reads "about 350 m (1,150 ft) across", and the trails page spells out the Federal Communications Commission (FCC).
+- John approved new wording and styling for the report section: "Yes, I have signal" and "No signal" under "On the trail right now? Report your signal". FR-49 and the other places that fix the old button words carry a dated line and keep their original text.
+- John approved contract `hiker_signal_reports` 0.2.1 on Nov 17, 2026: the purpose and the `had_signal` description use the new button words "Yes, I have signal" and "No signal". Names, fields and values are unchanged.
+- The status line under the report buttons takes no space while it is empty, and the trails page holds the place of the trail view while a trail loads, so the sections below do not jump. The header is shorter on a phone.
+- Links to the site preview with a title, a description and the Bright Angel photo (Open Graph and Twitter card tags). No image was added.
+- The status page lists "Trail predictions" as its first pipeline card, built from the trail answer, so a late trail run no longer sits beside a card that says "Working". It has no Failed state, because the trail answer cannot show one.
+- The How it works page has a "How it is built" section with a diagram and links to the design documents and decision records in the public repository.
+- The site tests went from 329 to 409.
+
 ### Nov 16, 2026: unplaceable satellites, tie in reachable periods
 
 - `compute_windows` failed on Nov 15 and 16 with "SGP4 could not place satellites [58706]": STARLINK-11075 is re-entering the atmosphere, and SGP4 failed for it from minute 1215 of the span on Nov 15 and from minute 0 on Nov 16. The step now skips a satellite SGP4 cannot place at any minute for the whole night and returns the ids as `skipped_satellites`. It stops only when more than 5 percent of the satellites cannot be placed, or none can, because that points at a bad element file. `teme_positions` stays strict as the backstop. The design doc (table 7.B, C5 and the nightly flow) says so.
