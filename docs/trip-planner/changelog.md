@@ -26,7 +26,11 @@ This file records two things: changes to the documents, and, once code exists, c
 - The report area width reads "about 350 m (1,150 ft) across", and the trails page spells out the Federal Communications Commission (FCC).
 - John approved new wording and styling for the report section: "Yes, I have signal" and "No signal" under "On the trail right now? Report your signal". FR-49 and the other places that fix the old button words carry a dated line and keep their original text.
 - John approved contract `hiker_signal_reports` 0.2.1 on Nov 17, 2026: the purpose and the `had_signal` description use the new button words "Yes, I have signal" and "No signal". Names, fields and values are unchanged.
-- The site tests went from 329 to 347.
+- The status line under the report buttons takes no space while it is empty, and the trails page holds the place of the trail view while a trail loads, so the sections below do not jump. The header is shorter on a phone.
+- Links to the site preview with a title, a description and the Bright Angel photo (Open Graph and Twitter card tags). No image was added.
+- The status page lists "Trail predictions" as its first pipeline card, built from the trail answer, so a late trail run no longer sits beside a card that says "Working". It has no Failed state, because the trail answer cannot show one.
+- The How it works page has a "How it is built" section with a diagram and links to the design documents and decision records in the public repository.
+- The site tests went from 329 to 409.
 
 ### Nov 16, 2026: unplaceable satellites, tie in reachable periods
 
