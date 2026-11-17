@@ -42,8 +42,9 @@ describe('Trails page', () => {
   })
 
   it('lets a hiker report signal from the trail page (FR-49)', () => {
-    expect(text).toContain('I had signal here')
-    expect(text).toContain('I had no signal here')
+    expect(text).toContain('Yes, I have signal')
+    expect(text).toContain('No signal')
+    expect(text).not.toContain('I had signal here')
   })
 
   it('shows the cold start notice', () => {

@@ -62,7 +62,7 @@ function outcome(summary: FlushSummary): string {
   return parts.join(' ')
 }
 
-/** "I had signal here" and "I had no signal here" (C21, FR-49 to FR-52). */
+/** "Yes, I have signal" and "No signal" (C21, FR-49 to FR-52). */
 export function ReportButtons() {
   const [carrier, setCarrier] = useState<Carrier | ''>('')
   const [waiting, setWaiting] = useState(0)
@@ -157,12 +157,8 @@ export function ReportButtons() {
 
   return (
     <section className="panel report-panel" aria-labelledby="report-heading">
-      <h2 id="report-heading">Tell other hikers</h2>
-      <p>
-        Did you have signal where you are standing? Your phone turns your position into an area about{' '}
-        {formatAreaWidth(REPORT_AREA_WIDTH_M)} across and sends only that area, your carrier, and the hour. Your exact position never
-        leaves your phone.
-      </p>
+      <h2 id="report-heading">On the trail right now? Report your signal</h2>
+      <p>Do you have signal where you are standing?</p>
       <label className="report-carrier">
         Your carrier{' '}
         <select value={carrier} onChange={(event) => chooseCarrier(event.target.value)}>
@@ -177,20 +173,34 @@ export function ReportButtons() {
         </select>
       </label>
       <div className="report-buttons">
-        <button type="button" className="trail-choice" onClick={() => report(true)}>
-          I had signal here
+        <button type="button" className="report-button report-yes" onClick={() => report(true)}>
+          <span className="report-mark" aria-hidden="true">
+            ✓
+          </span>
+          Yes, I have signal
         </button>
-        <button type="button" className="trail-choice" onClick={() => report(false)}>
-          I had no signal here
+        <button type="button" className="report-button report-no" onClick={() => report(false)}>
+          <span className="report-mark" aria-hidden="true">
+            ✗
+          </span>
+          No signal
         </button>
       </div>
       <p aria-live="polite" className="report-status">
         {[message, waitingNote(waiting)].filter(Boolean).join(' ')}
       </p>
-      <p className="report-help">
-        With no signal, a report waits on your phone. Android sends it by itself when signal returns,
-        even with this page closed. On iPhone, open this page again when you have signal.
+      <p className="report-privacy">
+        Your phone will ask for your location. Only an area about{' '}
+        {formatAreaWidth(REPORT_AREA_WIDTH_M)} across, your carrier and the hour are sent. Your
+        exact position never leaves your phone.
       </p>
+      <details className="report-help">
+        <summary>How it works without signal</summary>
+        <p>
+          A report waits on your phone. Android sends it by itself when signal returns, even with
+          this page closed. On iPhone, open this page again when you have signal.
+        </p>
+      </details>
     </section>
   )
 }

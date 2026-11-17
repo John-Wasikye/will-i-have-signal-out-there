@@ -36,7 +36,7 @@ export function About() {
           </li>
           <li>
             Hiker reports let you tell other hikers where you had signal and where you did not. A
-            report is one tap on "I had signal here" or "I had no signal here". Only an area about{' '}
+            report is one tap on "Yes, I have signal" or "No signal". Only an area about{' '}
             {formatAreaWidth(REPORT_AREA_WIDTH_M)} across, your carrier and the hour leave your
             phone. The page shows counts for an area once it has at least 5 reports in 7 days.
           </li>

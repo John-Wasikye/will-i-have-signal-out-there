@@ -48,6 +48,9 @@ const readablePairs = [
   ['color-error', 'color-bg'],
   ['color-text', 'color-notice-bg'],
   ['color-passed', 'color-card'],
+  ['color-on-accent', 'color-coverage'],
+  ['color-on-accent', 'color-error'],
+  ['color-error', 'color-card'],
 ]
 
 describe.each([
@@ -89,6 +92,43 @@ describe('the site footer', () => {
 
   it('lets the links wrap on a narrow phone', () => {
     expect(rules).toContain('flex-wrap: wrap')
+  })
+})
+
+describe('the report buttons', () => {
+  // The first rule that starts with this selector, up to its closing brace.
+  function rule(selector: string): string {
+    const start = css.indexOf(`${selector} {`)
+    return start < 0 ? '' : css.slice(start, css.indexOf('}', start))
+  }
+
+  it.each(['.report-button', '.report-yes', '.report-no', '.report-help summary'])(
+    'styles %s',
+    (selector) => {
+      expect(rule(selector)).not.toBe('')
+    },
+  )
+
+  it('makes each button at least 44 px high', () => {
+    const height = rule('.report-button').match(/min-height:\s*(\d+)px/)?.[1]
+    expect(Number(height)).toBeGreaterThanOrEqual(44)
+  })
+
+  it('fills the yes button with the coverage green and outlines the no button in the error red', () => {
+    expect(rule('.report-yes')).toContain('background: var(--color-coverage)')
+    expect(rule('.report-no')).toContain('border-color: var(--color-error)')
+  })
+
+  it('has hover states for both buttons', () => {
+    expect(rule('.report-yes:hover')).not.toBe('')
+    expect(rule('.report-no:hover')).not.toBe('')
+  })
+
+  it('takes every color from the color variables, so both color modes work', () => {
+    const all = ['.report-button', '.report-yes', '.report-no', '.report-yes:hover', '.report-no:hover']
+      .map(rule)
+      .join('\n')
+    expect(all).not.toMatch(/#[0-9a-f]{3,6}\b/i)
   })
 })
 

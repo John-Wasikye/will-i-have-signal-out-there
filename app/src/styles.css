@@ -850,6 +850,72 @@ input[type='range'] {
   gap: 8px;
 }
 
+.report-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 700;
+  border: 2px solid;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.report-mark {
+  margin-right: 8px;
+}
+
+.report-yes {
+  color: var(--color-on-accent);
+  background: var(--color-coverage);
+  border-color: var(--color-coverage);
+}
+
+.report-yes:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.report-no {
+  color: var(--color-error);
+  background: var(--color-card);
+  border-color: var(--color-error);
+}
+
+.report-no:hover {
+  color: var(--color-on-accent);
+  background: var(--color-error);
+}
+
+.report-privacy {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.report-help {
+  margin-top: 8px;
+}
+
+.report-help summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.report-help p {
+  margin: 0 0 8px;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
 .report-status {
   min-height: 1.5em;
   margin-top: 12px;

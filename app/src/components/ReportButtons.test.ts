@@ -7,14 +7,69 @@ describe('ReportButtons', () => {
   const markup = renderMarkup(createElement(ReportButtons))
   const text = visibleText(markup)
 
-  it('offers both report buttons (FR-49)', () => {
-    expect(text).toContain('I had signal here')
-    expect(text).toContain('I had no signal here')
-    expect(markup.match(/<button/g)).toHaveLength(2)
+  // The buttons carry a hidden check mark or cross, so the plain words are what is left once
+  // the hidden parts are taken out, which is also the name a screen reader gives.
+  const buttons = (markup.match(/<button[^>]*>.*?<\/button>/g) ?? []).map((button) => ({
+    html: button,
+    name: visibleText(button.replace(/<span[^>]*aria-hidden="true"[^>]*>.*?<\/span>/g, '')),
+  }))
+
+  it('starts with a heading that tells a hiker on the trail what to do', () => {
+    expect(markup).toContain('<h2 id="report-heading">On the trail right now? Report your signal</h2>')
+    expect(text).not.toContain('Tell other hikers')
   })
 
-  it('gives the width of the area in feet too', () => {
-    expect(text).toContain('about 350 m (1,150 ft) across')
+  it('asks one question', () => {
+    expect(text).toContain('Do you have signal where you are standing?')
+  })
+
+  it('offers both report buttons, named in the present tense (FR-49)', () => {
+    expect(buttons.map((button) => button.name)).toEqual(['Yes, I have signal', 'No signal'])
+  })
+
+  it('has dropped the old button words', () => {
+    expect(text).not.toContain('I had signal here')
+    expect(text).not.toContain('I had no signal here')
+  })
+
+  it('styles the buttons as answers, not as the trail picker', () => {
+    expect(buttons[0].html).toMatch(/class="report-button report-yes"/)
+    expect(buttons[1].html).toMatch(/class="report-button report-no"/)
+    expect(markup).not.toContain('trail-choice')
+  })
+
+  it('hides the check mark and the cross from screen readers', () => {
+    expect(buttons[0].html).toContain('<span class="report-mark" aria-hidden="true">')
+    expect(buttons[1].html).toContain('<span class="report-mark" aria-hidden="true">')
+  })
+
+  it('puts the carrier picker before the buttons', () => {
+    expect(markup.indexOf('Your carrier')).toBeLessThan(markup.indexOf('report-yes'))
+  })
+
+  it('shows the answer to a tap directly after the buttons, before the privacy note', () => {
+    const buttonsAt = markup.lastIndexOf('</button>')
+    const statusAt = markup.indexOf('class="report-status"')
+    const privacyAt = markup.indexOf('Your phone will ask for your location.')
+    expect(buttonsAt).toBeLessThan(statusAt)
+    expect(statusAt).toBeLessThan(privacyAt)
+  })
+
+  it('has a privacy note under the status line, with the area in feet too', () => {
+    expect(text).toContain(
+      'Your phone will ask for your location. Only an area about 350 m (1,150 ft) across, your ' +
+        'carrier and the hour are sent. Your exact position never leaves your phone.',
+    )
+  })
+
+  it('folds the explanation for no signal away in a details element, after the privacy note', () => {
+    const details = markup.slice(markup.indexOf('<details'))
+    expect(markup.indexOf('<details')).toBeGreaterThan(markup.indexOf('Your exact position'))
+    expect(details).toMatch(/<summary[^>]*>How it works without signal<\/summary>/)
+    expect(visibleText(details)).toContain(
+      'A report waits on your phone. Android sends it by itself when signal returns, even with ' +
+        'this page closed. On iPhone, open this page again when you have signal.',
+    )
   })
 
   it('lets the hiker pick each carrier the API accepts', () => {

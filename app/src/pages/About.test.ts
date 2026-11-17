@@ -42,6 +42,12 @@ describe('About page', () => {
     expect(text).toContain('at least 5 reports in 7 days')
   })
 
+  it('names the report buttons by their words', () => {
+    expect(text).toContain('one tap on "Yes, I have signal" or "No signal"')
+    expect(text).not.toContain('I had signal here')
+    expect(text).not.toContain('I had no signal here')
+  })
+
   it('looks ahead without promising dates', () => {
     expect(text).toContain('Still to come')
     expect(text).toContain('more places than Grand Canyon')
