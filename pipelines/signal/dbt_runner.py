@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -18,6 +19,9 @@ from pathlib import Path
 
 DBT_TIMEOUT_SECONDS = 900
 FAILURE_LINES_KEPT = 40
+SUMMARY_START = "Completed with"  # dbt lists what failed from this line on
+_COLOUR_CODE = re.compile(r"\x1b\[[0-9;]*m")
+_ONLY_A_TIME = re.compile(r"\s*(\d\d:\d\d:\d\d)?\s*")
 
 
 class DbtBuildFailed(RuntimeError):
@@ -64,5 +68,21 @@ def run_dbt(
         check=False,
     )
     if result.returncode != 0:
-        tail = "\n".join(result.stdout.splitlines()[-FAILURE_LINES_KEPT:])
-        raise DbtBuildFailed(f"dbt build failed with exit code {result.returncode}:\n{tail}")
+        raise DbtBuildFailed(
+            f"dbt build failed with exit code {result.returncode}:\n{failure_text(result.stdout)}"
+        )
+
+
+def failure_text(output: str) -> str:
+    """Return the last lines of dbt's output, with its summary of what failed moved to the top.
+
+    The alert email and the incident record keep only the start of an error, and dbt prints what
+    failed at the very end, so without the move they showed passing tests only. Colour codes and
+    lines that hold only a time are left out.
+    """
+    plain = _COLOUR_CODE.sub("", output).splitlines()
+    lines = [line for line in plain if not _ONLY_A_TIME.fullmatch(line)][-FAILURE_LINES_KEPT:]
+    starts = [i for i, line in enumerate(lines) if SUMMARY_START in line]
+    if starts:
+        lines = lines[starts[-1] :] + lines[: starts[-1]]
+    return "\n".join(lines)
