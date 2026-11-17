@@ -1007,3 +1007,45 @@ input[type='range'] {
     height: 32px;
   }
 }
+
+.panel ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.build-diagram {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  margin: 16px auto;
+}
+
+.diagram-box {
+  fill: var(--color-map-bg);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+}
+
+.diagram-title {
+  fill: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.diagram-note {
+  fill: var(--color-muted);
+  font-size: 13px;
+}
+
+.diagram-arrow {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.build-steps {
+  margin: 0 0 16px;
+}

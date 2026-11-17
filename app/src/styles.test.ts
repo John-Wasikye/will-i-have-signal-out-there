@@ -51,6 +51,8 @@ const readablePairs = [
   ['color-on-accent', 'color-coverage'],
   ['color-on-accent', 'color-error'],
   ['color-error', 'color-card'],
+  ['color-text', 'color-map-bg'],
+  ['color-muted', 'color-map-bg'],
 ]
 
 describe.each([
@@ -92,6 +94,25 @@ describe('the site footer', () => {
 
   it('lets the links wrap on a narrow phone', () => {
     expect(rules).toContain('flex-wrap: wrap')
+  })
+})
+
+describe('the build diagram', () => {
+  const rules = (css.match(/\.(?:build-diagram|diagram-[\w-]+)[^{]*\{[^}]*\}/g) ?? []).join('\n')
+
+  it('is styled in the stylesheet, by classes', () => {
+    for (const name of ['.build-diagram', '.diagram-box', '.diagram-title', '.diagram-note', '.diagram-arrow']) {
+      expect(rules).toContain(name)
+    }
+  })
+
+  it('takes every color from the color variables, so both color modes work', () => {
+    expect(rules).not.toMatch(/#[0-9a-f]{3,6}\b/i)
+  })
+
+  it('shrinks to the width of the page instead of scrolling sideways', () => {
+    expect(rules).toMatch(/\.build-diagram[^{]*\{[^}]*max-width:\s*\d+px/)
+    expect(rules).toMatch(/\.build-diagram[^{]*\{[^}]*width:\s*100%/)
   })
 })
 

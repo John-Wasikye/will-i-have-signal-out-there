@@ -70,3 +70,54 @@ describe('About page', () => {
     expect(text).toContain('CelesTrak')
   })
 })
+
+describe('About page, how it is built', () => {
+  const markup = renderMarkup(createElement(MemoryRouter, null, createElement(About)))
+  const text = visibleText(markup)
+  const section = markup.slice(markup.indexOf('id="built-heading"'), markup.indexOf('id="dtc-heading"'))
+  const list = section.slice(section.indexOf('<ol'), section.indexOf('</ol>'))
+  const listText = visibleText(list)
+
+  it('comes after Behind the scenes and before the Direct-to-Cell note', () => {
+    expect(text.indexOf('Behind the scenes')).toBeLessThan(text.indexOf('How it is built'))
+    expect(text.indexOf('How it is built')).toBeLessThan(text.indexOf('What Direct-to-Cell needs'))
+  })
+
+  it('shows the diagram', () => {
+    expect(section).toContain('class="build-diagram"')
+  })
+
+  it('lists the five steps in order', () => {
+    const steps = ['Public data', 'Nightly job', 'Data lake', 'Checked marts', 'Small web service']
+    const positions = steps.map((step) => listText.indexOf(step))
+    expect(positions.every((at) => at >= 0)).toBe(true)
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
+  })
+
+  it.each(['Airflow', 'Spark', 'Iceberg', 'S3', 'dbt', 'DuckDB', 'Parquet', 'FastAPI', 'Lambda', 'React', 'CloudFront'])(
+    'names %s once in the list of steps',
+    (tool) => {
+      expect(listText.split(tool)).toHaveLength(2)
+    },
+  )
+
+  it('spells out each abbreviation the first time it appears', () => {
+    expect(listText).toContain("S3, Amazon's Simple Storage Service")
+    expect(listText).toContain('dbt (data build tool)')
+  })
+
+  it('says the page keeps working while the nightly server is off', () => {
+    expect(listText).toContain('even while the nightly server is off')
+  })
+
+  it('links to the design documents in the public repository', () => {
+    const repo = 'https://github.com/John-Wasikye/will-i-have-signal-out-there/tree/main/docs'
+    for (const folder of ['trip-planner', 'platform']) {
+      expect(section).toContain(`<a href="${repo}/${folder}" rel="noopener noreferrer">`)
+    }
+  })
+
+  it('has no number that could go stale', () => {
+    expect(visibleText(section)).not.toMatch(/\d{2}/)
+  })
+})
