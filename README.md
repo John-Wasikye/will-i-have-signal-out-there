@@ -63,7 +63,7 @@ npm run build
 npm run dev
 ```
 
-`npm test` should report about 257 tests passing. `npm run dev` starts a local preview. The status page reads `app/public/status.json`.
+`npm test` should report about 329 tests passing. `npm run dev` starts a local preview. The status page reads `app/public/status.json`.
 
 ### 3. Terraform
 

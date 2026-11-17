@@ -10,6 +10,13 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 16, 2026: site text refresh
+
+- The site text no longer says "Phase A" or "One carrier: T-Mobile". The How it works page lists what the site covers today (three trails, three carriers on 4G LTE and 5G, satellite texts on T-Mobile, the next 24 hours, hiker reports) and what is still to come. The credit lines and the coverage disclaimer from ADR 0037 are unchanged.
+- The status page gives the exact time left in hours and minutes and the next nightly run in the reader's own time zone, and it keeps the figure current while the page is open. Every time on the site now ends with its time zone name.
+- Every page has its own tab title and a footer, the not-found page has a way back to the trails, and the trail view shows feet and miles next to meters and kilometers.
+- The site tests went from 257 to 329.
+
 ### Nov 16, 2026: unplaceable satellites, tie in reachable periods
 
 - `compute_windows` failed on Nov 15 and 16 with "SGP4 could not place satellites [58706]": STARLINK-11075 is re-entering the atmosphere, and SGP4 failed for it from minute 1215 of the span on Nov 15 and from minute 0 on Nov 16. The step now skips a satellite SGP4 cannot place at any minute for the whole night and returns the ids as `skipped_satellites`. It stops only when more than 5 percent of the satellites cannot be placed, or none can, because that points at a bad element file. `teme_positions` stays strict as the backstop. The design doc (table 7.B, C5 and the nightly flow) says so.
