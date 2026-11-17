@@ -14,6 +14,8 @@ Every project serves a site and an API from published tables. One template is re
 3. The page shows the cold-start notice, in the plan's wording: "The first request after a period of inactivity may take up to 10 seconds while the service initializes."
 4. Cold-start time and warm latency are measured in step 1B.9 and published in each README (BPD, "Cold starts").
 
+Update, Nov 17, 2026: John decided to remove the developer lookup page from the public site, so the site no longer has a lookup form or an answer card. The API route `/sample` stays. The rest of this decision is unchanged.
+
 ## Alternatives considered
 
 - A server that stays on: rejected for cost (BP, "Always-on parts").

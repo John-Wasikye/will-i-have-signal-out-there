@@ -252,6 +252,7 @@ Function, class, file and table names here are proposals. They become binding wh
 
 - Job: a site template with a map component, a lookup form, an answer card and a status page, and a preview deploy for every pull request [BP 0.4].
 - Components (proposed): `MapView`, `LookupForm`, `AnswerCard`, `StatusPage` (reads status.json), `ColdStartNotice`, `LateNotice` (always shown when the data is late, with the time of the last good run).
+- Update, Nov 17, 2026: John decided to remove the developer lookup page from the public site, so the site no longer has `LookupForm` or `AnswerCard`. The API route `/sample` stays.
 - Preview deploys: each pull request gets its own preview link before merge (mechanism open, OQ-P05).
 
 ### 7.8 Status and metrics: Platform/ops/

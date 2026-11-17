@@ -99,6 +99,8 @@ The skeleton is a walking skeleton: every main part is in place and connected en
 | PR-14 | A missed freshness target or failed run sends an email. Each real incident gets a short record: what broke, the cause and the fix. | 0.5 | BP 0.5; ADR-0024 |
 | PR-15 | Every Spark job has a maximum number of rows read and written and a maximum runtime. A job over either limit stops before publishing and opens an incident. | Hard limits | BP Hard limits |
 
+Update, Nov 17, 2026: John decided to remove the developer lookup page from the public site, so the site no longer has a lookup form or an answer card. The API route `/sample` stays. The cold-start notice in PR-12 and the status page are unchanged.
+
 ### 3.2 Operations hardening (step 1B.9, after Project 1 Phase A)
 
 Moved here from the skeleton so the first page goes live sooner [BD Extras moved later].

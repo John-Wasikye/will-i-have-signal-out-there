@@ -87,6 +87,7 @@ The serving template is the setup every project's website and API reuse.
 - **Which API Gateway type.** The HTTP type serves public pages. The REST type is used only where API keys and per-key usage plans are needed. Project 1 issues no API keys, so it uses the HTTP type.
 - **Always-on writes.** A Lambda function, or any other service that runs at any hour, writes only to always-on storage: S3, DynamoDB, CloudWatch and X-Ray. The session box is not always on, so Lambda never depends on it (engineering standard 16).
 - **Website.** A React and TypeScript site with a map component, a lookup form, an answer card and a status page. Each page gets a preview link per pull request.
+  - Update, Nov 17, 2026: John decided to remove the developer lookup page from the public site, so the site no longer has a lookup form or an answer card. The API route `/sample` stays.
 - **Cold-start notice.** The site shows exactly this text: "The first request after a period of inactivity may take up to 10 seconds while the service initializes."
 - **Acceptance.** The sample endpoint answers with the session box off.
 

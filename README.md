@@ -2,7 +2,7 @@
 
 I am building a trip planner for hikers, campers and backpackers. You pick a trail and see where each phone carrier has coverage, where it drops out, and when a Starlink Direct-to-Cell satellite text could get through. This repository holds the data platform behind the planner and the planner's code.
 
-The site is live at **https://signal.johnwasikye.com**, with an "Under development" banner on every page. Phase A is deployed: for Bright Angel, South Kaibab and North Kaibab at Grand Canyon, the trail page shows where the FCC data says AT&T, T-Mobile and Verizon have coverage, and when a satellite is predicted to be reachable, for the next 24 hours. I have not checked these predictions in the field, so please do not rely on them for your safety.
+The site is live at **https://signal.johnwasikye.com**, and the footer of every page says I built it as a portfolio project and have not checked its predictions in the field. Phase A is deployed: for Bright Angel, South Kaibab and North Kaibab at Grand Canyon, the trail page shows where the FCC data says AT&T, T-Mobile and Verizon have coverage, and when a satellite is predicted to be reachable, for the next 24 hours. I have not checked these predictions in the field, so please do not rely on them for your safety.
 
 ## What I have built
 
@@ -11,13 +11,13 @@ Everything runs on AWS in two separate environments, dev and live, built with Te
 | Part | Folder | Status |
 |---|---|---|
 | Serving API (FastAPI, DuckDB over Parquet, on Lambda behind API Gateway) | `platform/serving` | Live |
-| Site (Vite, React, TypeScript, on CloudFront) | `app` | Live, with the development banner |
+| Site (Vite, React, TypeScript, on CloudFront) | `app` | Live, with the safety note in the footer |
 | Session box: an on-demand server that boots each night and runs Airflow and Spark on k3s, then stops | `platform/box` | Live. Saves the Airflow database to S3 before it stops. It ran on spot until Nov 13, 2026, when AWS kept taking it back mid-run |
 | Nightly Airflow DAGs (platform skeleton and the Phase A signal run) | `pipelines/platform/dags`, `pipelines/signal/dags` | Live, every night at 10:00 UTC |
 | Publish gate, write-audit-publish, status file, run metrics and incident records | `pipelines/platform/publish` | Live |
 | Phase A steps: orbits (C1), Direct-to-Cell selector (C2), trails (C3), terrain horizon (C4), satellite windows (C5), FCC coverage (C6), dbt marts (C7), contract diff (C8), publish gate (C9), publisher (C10) | `pipelines/signal` | Live, in the nightly DAG |
 | Trail API (C11) and trail page (C12) | `platform/serving/trails.py`, `app/src/pages/Trails.tsx` | Live. They read published files, so they work with the session box off |
-| Phase B report API (C22): takes a hiker's "I had signal here" or "I had no signal here", with limits per visitor, per place and per day, and stores it in DynamoDB | `platform/serving/reports.py`, `platform/terraform/modules/serving/reports.tf` | Live |
+| Phase B report API (C22): takes a hiker's report that they did or did not have signal, with limits per visitor, per place and per day, and stores it in DynamoDB | `platform/serving/reports.py`, `platform/terraform/modules/serving/reports.tf` | Live |
 | Phase B report buttons, part 1 (C21): the phone turns its location into a cell about 350 m across, so exact coordinates never leave it, and keeps a report until it can send it | `app/src/components/ReportButtons.tsx`, `app/src/lib/reports.ts`, `app/src/lib/cell.ts` | Live. A report waiting on the phone is sent when the page is open again |
 | Phase B report buttons, part 2 (C21): on Android a small service worker sends a waiting report by itself when signal returns, even with the page closed. On iPhone the page sends it the next time it opens | `app/src/sw.ts`, `app/src/lib/backgroundSend.ts`, `app/src/lib/reportStore.ts` | Live. Tested on desktop Chrome and on an iPhone, not yet on an Android phone |
 | Phase B nightly report copy, part 1 (C23): copies new reports into the lake, sets aside reports outside the mapped area or in a contradicting burst, and lets the copied ones expire after 30 days | `pipelines/signal/report_copy.py`, task `copy_reports` | Live, in the nightly DAG |
@@ -63,7 +63,7 @@ npm run build
 npm run dev
 ```
 
-`npm test` should report about 329 tests passing. `npm run dev` starts a local preview. The status page reads `app/public/status.json`.
+`npm test` should report about 347 tests passing. `npm run dev` starts a local preview. The status page reads `app/public/status.json`.
 
 ### 3. Terraform
 
