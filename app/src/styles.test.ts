@@ -206,3 +206,39 @@ describe('the page head', () => {
     expect(indexHtml).toContain('name="theme-color" media="(prefers-color-scheme: dark)"')
   })
 })
+
+describe('the link preview card', () => {
+  function meta(key: string): string | undefined {
+    return indexHtml.match(new RegExp(`<meta\\s+(?:property|name)="${key}"\\s+content="([^"]*)"`))?.[1]
+  }
+
+  const shippedPhotos = Object.keys(import.meta.glob('../public/trails/*.jpg'))
+
+  it('gives the title, the type and the address of the site', () => {
+    expect(meta('og:title')).toBe('Will I have signal out there?')
+    expect(meta('og:type')).toBe('website')
+    expect(meta('og:url')).toBe('https://signal.johnwasikye.com/')
+  })
+
+  it('reuses the page description, and the description names the three carriers', () => {
+    const description = meta('description')
+    expect(meta('og:description')).toBe(description)
+    expect(description).toContain('AT&amp;T, T-Mobile and Verizon')
+  })
+
+  it('uses a photo the site already ships, at an absolute https address', () => {
+    const image = meta('og:image')
+    expect(image).toMatch(/^https:\/\/signal\.johnwasikye\.com\/trails\/[\w-]+\.jpg$/)
+    expect(image).toBe('https://signal.johnwasikye.com/trails/grca-bright-angel.jpg')
+    expect(shippedPhotos).toContain('../public/trails/grca-bright-angel.jpg')
+  })
+
+  it('describes the photo for people who cannot see it', () => {
+    expect(meta('og:image:alt')?.length).toBeGreaterThan(20)
+    expect(meta('twitter:image:alt')).toBe(meta('og:image:alt'))
+  })
+
+  it('asks for a large image card', () => {
+    expect(meta('twitter:card')).toBe('summary_large_image')
+  })
+})
