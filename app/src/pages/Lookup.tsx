@@ -3,6 +3,7 @@ import { AnswerCard, type SampleRow } from '../components/AnswerCard'
 import { ColdStartNotice } from '../components/ColdStartNotice'
 import { LateNotice } from '../components/LateNotice'
 import { sampleUrl } from '../lib/api'
+import { usePageTitle } from '../lib/usePageTitle'
 
 const NOT_FOUND_MESSAGE = 'No sample row with that key.'
 const GENERIC_ERROR_MESSAGE = 'Something went wrong. Try again.'
@@ -23,6 +24,7 @@ async function fetchSample(key: string): Promise<LookupResult> {
 }
 
 export function Lookup() {
+  usePageTitle('Lookup')
   const [key, setKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<LookupResult | null>(null)

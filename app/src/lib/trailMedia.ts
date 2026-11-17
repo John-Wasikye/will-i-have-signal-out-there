@@ -1,8 +1,6 @@
 import { TRAIL_ELEVATIONS_M } from './trailElevations'
 import type { MapPoint } from './trailSignal'
 
-const FEET_PER_METER = 3.28084
-
 export interface TrailTerrain {
   imageUrl: string
   elevationsM: number[]
@@ -58,8 +56,4 @@ export function profileLine(heights: number[], width: number, height: number): M
     x: (index / Math.max(heights.length - 1, 1)) * width,
     y: height - ((value - low) / span) * height,
   }))
-}
-
-export function toFeet(meters: number): number {
-  return Math.round(meters * FEET_PER_METER)
 }

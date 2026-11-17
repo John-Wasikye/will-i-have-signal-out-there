@@ -10,6 +10,7 @@ import { latestOnly } from '../lib/latestOnly'
 import type { ReportCount } from '../lib/reportCounts'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
 import { useNow } from '../lib/useNow'
+import { usePageTitle } from '../lib/usePageTitle'
 
 const LOAD_ERROR = 'The trail data could not be loaded. Try again.'
 
@@ -20,6 +21,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export function Trails() {
+  usePageTitle('Trails')
   const [trails, setTrails] = useState<TrailSummary[]>([])
   const [trailId, setTrailId] = useState('')
   const [signal, setSignal] = useState<TrailSignal | null>(null)

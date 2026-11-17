@@ -45,7 +45,40 @@ describe('the navigation', () => {
   })
 })
 
+describe('the site footer', () => {
+  it.each(pages)('follows the main part of the page on %s', (path) => {
+    const markup = renderPage(path)
+    expect(markup.indexOf('<footer')).toBeGreaterThan(markup.indexOf('</main>'))
+  })
+
+  it.each(pages)('says it is a portfolio project that is not checked in the field on %s', (path) => {
+    const footer = visibleText(renderPage(path).split('<footer')[1] ?? '')
+    expect(footer).toContain('I built this site as a portfolio project')
+    expect(footer).toContain('not checked in the field')
+  })
+
+  it.each(pages)('links to how it works, status, the credits and the source code on %s', (path) => {
+    const footer = renderPage(path).split('<footer')[1] ?? ''
+    expect(footer).toMatch(/<a href="\/about"[^>]*>How it works<\/a>/)
+    expect(footer).toMatch(/<a href="\/status"[^>]*>Status<\/a>/)
+    expect(footer).toMatch(/<a href="\/about#credits-heading"[^>]*>Data sources and credits<\/a>/)
+    expect(footer).toMatch(
+      /<a href="https:\/\/github\.com\/John-Wasikye\/will-i-have-signal-out-there" rel="noopener noreferrer">Source code on GitHub<\/a>/,
+    )
+  })
+
+  it('has a credits heading on the About page for the footer link to reach', () => {
+    expect(renderPage('/about')).toContain('id="credits-heading"')
+  })
+})
+
 describe('routes', () => {
+  it('shows a page not found page with a way back, not a bare heading', () => {
+    const markup = renderPage('/no-such-page')
+    expect(visibleText(markup)).toContain('I could not find that page.')
+    expect(markup).toContain('<h1>Page not found</h1>')
+  })
+
   it('makes the trail tool the home page', () => {
     const text = visibleText(renderPage('/'))
     expect(text).toContain('Choose a trail')

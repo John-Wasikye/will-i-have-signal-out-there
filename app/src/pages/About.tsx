@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Credits } from '../components/Credits'
 import { DtcRequirementsNote } from '../components/DtcRequirementsNote'
+import { usePageTitle } from '../lib/usePageTitle'
 
 export function About() {
+  usePageTitle('How it works')
   return (
     <>
       <h1>How it works</h1>

@@ -7,6 +7,7 @@ import { trailSignalUrl, trailsUrl } from '../lib/api'
 import { formatUtc, pipelinesNeedingNotice, type StatusDoc } from '../lib/status'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
 import { useNow } from '../lib/useNow'
+import { usePageTitle } from '../lib/usePageTitle'
 
 type LoadState =
   | { kind: 'loading' }
@@ -28,6 +29,7 @@ async function fetchFirstTrail(baseUrl: string): Promise<TrailSignal> {
 }
 
 export function Status() {
+  usePageTitle('Status')
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' })
   const [trail, setTrail] = useState<TrailLoad>({ kind: 'loading' })
   const now = useNow()

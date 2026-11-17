@@ -77,6 +77,22 @@ describe('the color modes', () => {
   })
 })
 
+describe('the site footer', () => {
+  const rules = (css.match(/\.(?:site-footer|footer-links)[^{]*\{[^}]*\}/g) ?? []).join('\n')
+
+  it('is styled in the stylesheet', () => {
+    expect(rules).not.toBe('')
+  })
+
+  it('takes every color from the color variables, so both color modes work', () => {
+    expect(rules).not.toMatch(/#[0-9a-f]{3,6}\b/i)
+  })
+
+  it('lets the links wrap on a narrow phone', () => {
+    expect(rules).toContain('flex-wrap: wrap')
+  })
+})
+
 describe('phone width', () => {
   it('does not hide sideways overflow, so a too wide element shows up in checks', () => {
     expect(css).not.toContain('overflow-x: hidden')

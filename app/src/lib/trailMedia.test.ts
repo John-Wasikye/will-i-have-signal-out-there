@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { TRAIL_IDS_WITH_PHOTOS, photoFor, profileLine, terrainFor, toFeet } from './trailMedia'
+import { TRAIL_IDS_WITH_PHOTOS, photoFor, profileLine, terrainFor } from './trailMedia'
 
 describe('terrainFor', () => {
   it('gives the terrain picture and heights of a known trail', () => {
@@ -49,11 +49,5 @@ describe('profileLine', () => {
   it('puts high ground near the top', () => {
     expect(line[0].y).toBeLessThan(line[2].y)
     expect(line[2].y).toBeLessThan(line[1].y)
-  })
-})
-
-describe('toFeet', () => {
-  it('converts meters to whole feet', () => {
-    expect(toFeet(1000)).toBe(3281)
   })
 })

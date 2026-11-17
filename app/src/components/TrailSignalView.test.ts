@@ -71,6 +71,22 @@ describe('TrailSignalView', () => {
     expect(visibleText(markup)).toMatch(/Elevation about [\d,]+ m \([\d,]+ ft\)/)
   })
 
+  it('shows heights and distances in feet and miles as well, for hikers in the United States', () => {
+    const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
+    const text = visibleText(renderMarkup(createElement(TrailSignalView, { signal: known, now })))
+    expect(text).toMatch(/Highest [\d,]+ m \([\d,]+ ft\)/)
+    expect(text).toMatch(/Lowest [\d,]+ m \([\d,]+ ft\)/)
+    expect(text).toContain('About 0.00 km (0.00 mi) along the trail')
+  })
+
+  it('gives the heights in feet too in the description of the elevation chart', () => {
+    const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
+    const markup = renderMarkup(createElement(TrailSignalView, { signal: known, now }))
+    expect(markup).toMatch(
+      /aria-label="Elevation along the trail, between [\d,]+ m \([\d,]+ ft\) and [\d,]+ m \([\d,]+ ft\)"/,
+    )
+  })
+
   it('shows a photo of the trail with its credit', () => {
     const known = { ...signal, trail_id: 'grca-bright-angel', points: manyPoints(255) }
     const markup = renderMarkup(createElement(TrailSignalView, { signal: known, now }))

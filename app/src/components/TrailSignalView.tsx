@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { openReportStore } from '../lib/reportStore'
 import { loadCarrier } from '../lib/reports'
 import { formatUtc, formatUtcRange } from '../lib/status'
-import { photoFor, profileLine, terrainFor, toFeet, type TrailPhoto } from '../lib/trailMedia'
+import { photoFor, profileLine, terrainFor, type TrailPhoto } from '../lib/trailMedia'
+import { formatDistance, formatElevation } from '../lib/units'
 import {
   coveredPointCount,
   distanceKm,
@@ -127,7 +128,7 @@ function ElevationProfile({ elevations, selected, onSelect }: ElevationProfilePr
         viewBox={`0 0 ${MAP_WIDTH} ${PROFILE_HEIGHT}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Elevation along the trail, between ${low} and ${high} meters`}
+        aria-label={`Elevation along the trail, between ${formatElevation(low)} and ${formatElevation(high)}`}
         onClick={selectAlong}
       >
         <polygon
@@ -138,8 +139,8 @@ function ElevationProfile({ elevations, selected, onSelect }: ElevationProfilePr
         <line className="profile-you" x1={you.x} x2={you.x} y1={0} y2={PROFILE_HEIGHT} />
       </svg>
       <p className="profile-scale">
-        <span>Highest {high.toLocaleString('en-US')} m</span>
-        <span>Lowest {low.toLocaleString('en-US')} m</span>
+        <span>Highest {formatElevation(high)}</span>
+        <span>Lowest {formatElevation(low)}</span>
       </p>
     </figure>
   )
@@ -213,11 +214,10 @@ function PointDetail({ point, elevationM, now, late }: PointDetailProps) {
   const covered = point.coverage.some((item) => item.covered)
   return (
     <section className="point-detail" aria-labelledby="point-heading">
-      <h3 id="point-heading">About {distanceKm(point.seq).toFixed(2)} km along the trail</h3>
+      <h3 id="point-heading">About {formatDistance(distanceKm(point.seq))} along the trail</h3>
       {elevationM !== undefined && (
         <p className="point-height">
-          Elevation about {elevationM.toLocaleString('en-US')} m (
-          {toFeet(elevationM).toLocaleString('en-US')} ft)
+          Elevation about {formatElevation(elevationM)}
         </p>
       )}
       <div className="answer-tiles">
