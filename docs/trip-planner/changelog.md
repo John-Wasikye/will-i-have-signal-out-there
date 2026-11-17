@@ -25,6 +25,7 @@ This file records two things: changes to the documents, and, once code exists, c
 - The late notice uses the same plain pipeline name as its card, and the card no longer shows the test record count.
 - The report area width reads "about 350 m (1,150 ft) across", and the trails page spells out the Federal Communications Commission (FCC).
 - John approved new wording and styling for the report section: "Yes, I have signal" and "No signal" under "On the trail right now? Report your signal". FR-49 and the other places that fix the old button words carry a dated line and keep their original text.
+- John approved contract `hiker_signal_reports` 0.2.1 on Nov 17, 2026: the purpose and the `had_signal` description use the new button words "Yes, I have signal" and "No signal". Names, fields and values are unchanged.
 - The site tests went from 329 to 347.
 
 ### Nov 16, 2026: unplaceable satellites, tie in reachable periods
