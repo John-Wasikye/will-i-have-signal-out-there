@@ -55,6 +55,10 @@ describe('ReportButtons', () => {
     expect(statusAt).toBeLessThan(privacyAt)
   })
 
+  it('keeps the status line in the page with nothing inside it until there is a message', () => {
+    expect(markup).toMatch(/<p aria-live="polite" class="report-status"><\/p>/)
+  })
+
   it('has a privacy note under the status line, with the area in feet too', () => {
     expect(text).toContain(
       'Your phone will ask for your location. Only an area about 350 m (1,150 ft) across, your ' +

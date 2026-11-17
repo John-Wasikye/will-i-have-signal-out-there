@@ -917,9 +917,13 @@ input[type='range'] {
 }
 
 .report-status {
-  min-height: 1.5em;
-  margin-top: 12px;
+  margin: 12px 0 0;
   font-weight: 700;
+}
+
+/* Not display: none, because a live region has to exist before its text changes. */
+.report-status:empty {
+  margin: 0;
 }
 
 .site-footer {

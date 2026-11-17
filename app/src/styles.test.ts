@@ -119,6 +119,12 @@ describe('the report buttons', () => {
     expect(rule('.report-no')).toContain('border-color: var(--color-error)')
   })
 
+  it('takes no height or margin while the status line is empty, but stays in the page', () => {
+    expect(rule('.report-status')).not.toContain('min-height')
+    expect(rule('.report-status:empty')).toContain('margin: 0')
+    expect(rule('.report-status:empty')).not.toContain('display: none')
+  })
+
   it('has hover states for both buttons', () => {
     expect(rule('.report-yes:hover')).not.toBe('')
     expect(rule('.report-no:hover')).not.toBe('')
