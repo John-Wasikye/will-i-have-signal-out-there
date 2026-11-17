@@ -164,12 +164,12 @@ describe('the trail placeholder', () => {
   const base = start < 0 ? '' : css.slice(start, css.indexOf('}', start))
 
   it('reserves height, so the sections below do not move when the trail arrives', () => {
-    expect(base).toMatch(/min-height:\s*\d+(\.\d+)?rem/)
+    expect(base).toContain('min-height: 46rem;')
   })
 
   it('reserves more height on a phone, where the trail view is stacked and taller', () => {
     expect(css).toMatch(
-      /@media \(max-width: 760px\) \{[^@]*?\.trail-placeholder \{\s*min-height:\s*\d+(\.\d+)?rem/,
+      /@media \(max-width: 760px\) \{[^@]*?\.trail-placeholder \{\s*min-height: 92rem;/,
     )
   })
 

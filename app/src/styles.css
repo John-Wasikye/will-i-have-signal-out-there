@@ -407,10 +407,11 @@ label {
   align-items: start;
 }
 
-/* The heights are estimates of the trail view, which is shorter on a wide screen, where its two
-   panels sit side by side. They keep the sections below from jumping when the trail arrives. */
+/* The heights come from measuring the trail view (.walker) in a browser with a 16 px root font:
+   741 px tall at 1024 px wide, where its two panels sit side by side, and 1481 px tall at 375 px
+   wide, where they stack. They keep the sections below from jumping when the trail arrives. */
 .trail-placeholder {
-  min-height: 44rem;
+  min-height: 46rem;
   padding: 16px 20px;
   background: var(--color-card);
   border: 1px solid var(--color-border);
@@ -431,7 +432,7 @@ label {
   }
 
   .trail-placeholder {
-    min-height: 64rem;
+    min-height: 92rem;
   }
 }
 
