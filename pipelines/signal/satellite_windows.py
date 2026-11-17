@@ -40,6 +40,7 @@ __all__ = [
     "SPAN_MINUTES",
     "STEP_MINUTES",
     "MAX_WINDOW_ROWS",
+    "MAX_UNPLACED_SHARE",
     "PropagationError",
     "RowLimitExceeded",
     "SatelliteElements",
@@ -51,6 +52,7 @@ __all__ = [
     "flags_to_windows",
     "look_angles",
     "minute_times",
+    "placeable_satellites",
     "propagate_satellites",
     "reachable_flags",
     "sensitivity_report",
@@ -66,6 +68,7 @@ SENSITIVITY_ELEVATIONS_DEG = (5.0, 10.0, 20.0)  # the comparison ADR 0003 asks f
 # John's choice (Nov 4, 2026): about twice the 2,156,029 windows measured from that night's
 # 637 satellites and 932 points, so constellation growth fits but a doubling bug stops (ADR 0005).
 MAX_WINDOW_ROWS = 4_000_000
+MAX_UNPLACED_SHARE = 0.05
 
 SGP4_EPOCH_JD = 2433281.5  # SGP4 counts epochs in days from 1949-12-31 00:00 UTC
 WGS84_A_KM = 6378.137
@@ -137,15 +140,36 @@ def teme_positions(elements: Sequence[SatelliteElements], times: Sequence[dateti
     """Propagate every satellite to every time with SGP4; return TEME positions in km.
 
     The result has shape (satellites, times, 3). A satellite SGP4 cannot place raises
-    ``PropagationError`` naming it, so a bad element set stops the run instead of leaving gaps.
+    ``PropagationError`` naming it. The nightly run drops such satellites first with
+    ``placeable_satellites``, so this is the backstop against gaps in a track.
     """
-    satellites = SatrecArray([_satrec(e) for e in elements])
-    jd, fr = (np.array(part) for part in zip(*(_julian(t) for t in times), strict=True))
-    errors, positions, _ = satellites.sgp4(jd, fr)
-    failed = sorted({elements[i].norad_cat_id for i in np.flatnonzero(errors.any(axis=1))})
-    if failed:
-        raise PropagationError(f"SGP4 could not place satellites {failed}")
+    failed, positions = _sgp4(elements, times)
+    if failed.any():
+        raise PropagationError(f"SGP4 could not place satellites {_ids(elements, failed)}")
     return positions
+
+
+def placeable_satellites(
+    elements: Sequence[SatelliteElements], times: Sequence[datetime]
+) -> tuple[list[SatelliteElements], list[int]]:
+    """Split the satellites into those SGP4 places at every time and the ids of those it does not.
+
+    A satellite that fails at any time is dropped for the whole span, so no track has a gap. The
+    placed satellites keep their input order and the ids are sorted. A few decaying satellites are
+    normal, but if more than ``MAX_UNPLACED_SHARE`` of them fail, or none is placed, the element
+    file is the likelier culprit and ``PropagationError`` stops the run.
+    """
+    failed, _ = _sgp4(elements, times)
+    unplaced = _ids(elements, failed)
+    placed = [e for e, bad in zip(elements, failed, strict=True) if not bad]
+    if not placed:
+        raise PropagationError(f"SGP4 placed none of the satellites, it could not place {unplaced}")
+    if len(unplaced) / len(elements) > MAX_UNPLACED_SHARE:
+        raise PropagationError(
+            f"SGP4 could not place {len(unplaced)} of {len(elements)} satellites {unplaced}, "
+            f"over the limit of {MAX_UNPLACED_SHARE:.0%}; check the element file"
+        )
+    return placed, unplaced
 
 
 def teme_to_ecef(teme_km: np.ndarray, times: Sequence[datetime]) -> np.ndarray:
@@ -291,6 +315,20 @@ def _minutes(window: Window) -> int:
 def _julian(moment: datetime) -> tuple[float, float]:
     t = moment.astimezone(UTC)
     return jday(t.year, t.month, t.day, t.hour, t.minute, t.second + t.microsecond / 1e6)
+
+
+def _sgp4(
+    elements: Sequence[SatelliteElements], times: Sequence[datetime]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return which satellites SGP4 failed to place at any time, and the TEME positions in km."""
+    satellites = SatrecArray([_satrec(e) for e in elements])
+    jd, fr = (np.array(part) for part in zip(*(_julian(t) for t in times), strict=True))
+    errors, positions, _ = satellites.sgp4(jd, fr)
+    return errors.any(axis=1), positions
+
+
+def _ids(elements: Sequence[SatelliteElements], mask: np.ndarray) -> list[int]:
+    return sorted(e.norad_cat_id for e, chosen in zip(elements, mask, strict=True) if chosen)
 
 
 def _satrec(e: SatelliteElements) -> Satrec:

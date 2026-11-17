@@ -5,6 +5,7 @@ tests run it the way the box does, as a separate program. They skip when that en
 not there. CI installs it from platform/box/requirements-dbt.txt.
 """
 
+import random
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -246,6 +247,24 @@ def test_a_minute_with_no_satellite_splits_the_periods(tmp_path):
 def test_each_point_has_its_own_periods(tmp_path):
     windows = [_window(0, "1", 5, 8), _window(1, "1", 7, 12)]
     assert _periods(tmp_path, windows) == [("0", 5, 8), ("1", 7, 12)]
+
+
+def test_satellites_with_identical_windows_give_one_period_each_time_whatever_the_row_order(
+    tmp_path,
+):
+    # Many satellites share each window's start and end, as the real run's neighbors in a
+    # constellation do. The two sorts that number the periods must break those ties the same way,
+    # or a period is split in two with the same start.
+    satellites, groups = 300, 40
+    windows = [
+        _window(point, f"{58000 + satellite}", group * 20, group * 20 + 5)
+        for point in range(2)
+        for group in range(groups)
+        for satellite in range(satellites)
+    ]
+    random.Random(7).shuffle(windows)
+    expected = [(str(point), g * 20, g * 20 + 5) for point in range(2) for g in range(groups)]
+    assert _periods(tmp_path, windows) == expected
 
 
 def test_a_period_carries_the_run_stamps_the_page_shows(marts):

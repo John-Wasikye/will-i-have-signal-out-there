@@ -5,15 +5,22 @@ checks the row limit before anything is written, and writes the run date's parti
 fake that answers those reads and runs the job's partitions in this process.
 """
 
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
+import signal_nightly
 from sample_iceberg_job import CATALOG_NAME
-from satellite_windows import SPAN_MINUTES, WINDOW_COLUMNS, RowLimitExceeded
+from satellite_windows import (
+    SPAN_MINUTES,
+    WINDOW_COLUMNS,
+    PropagationError,
+    RowLimitExceeded,
+    SatelliteElements,
+)
 from signal_nightly import compute_windows
-from test_window_job import HORIZONS, POINTS, SATELLITES
+from test_window_job import HORIZONS, POINTS, SATELLITES, satellite
 from test_window_job import FakeSpark as JobSpark
 from trail_loader import TrailPoint
 
@@ -66,11 +73,17 @@ class FakeSpark(JobSpark):
     """Answers the step's reads from the lake and keeps what it writes."""
 
     def __init__(
-        self, *, dtc_rows=True, points_date=RUN_DATE, horizons_date=RUN_DATE, windows=False
+        self,
+        *,
+        dtc_rows=True,
+        points_date=RUN_DATE,
+        horizons_date=RUN_DATE,
+        windows=False,
+        satellites=SATELLITES,
     ):
         super().__init__()
         self.dtc_rows = (
-            [asdict(s) | {"perigee_km": 340.0, "apogee_km": 342.0} for s in SATELLITES]
+            [asdict(s) | {"perigee_km": 340.0, "apogee_km": 342.0} for s in satellites]
             if dtc_rows
             else []
         )
@@ -129,13 +142,50 @@ def test_the_step_writes_the_run_date_partition_and_reports_its_counts():
     spark = FakeSpark()
     result = run(spark)
     rows = spark.written[WINDOWS_TABLE]
-    assert result == {"satellites": len(SATELLITES), "points": len(POINTS), "windows": len(rows)}
+    assert result == {
+        "satellites": len(SATELLITES),
+        "skipped_satellites": [],
+        "points": len(POINTS),
+        "windows": len(rows),
+    }
     assert len(rows) > 0
     values = dict(zip(WINDOW_COLUMNS, rows[0], strict=True))
     assert values["run_date"] == RUN_DATE
     assert values["valid_until_utc"] == SPAN_START + timedelta(minutes=SPAN_MINUTES)
     assert values["run_started_utc"] == STARTED
     assert values["loaded_at_utc"] == NOW
+
+
+def decayed(norad: int) -> SatelliteElements:
+    return replace(satellite(norad, 0.0, 0.0), eccentricity=0.5)  # perigee far below the ground
+
+
+# Twenty placeable satellites, so one that has decayed is exactly the share the step tolerates.
+PLACEABLE = [satellite(61000 + i, 18.0 * i, 31.0 * i) for i in range(20)]
+
+
+def test_a_satellite_sgp4_cannot_place_is_skipped_and_reported_and_the_rest_are_used(monkeypatch):
+    passed_on = []
+    real = signal_nightly.run_window_job
+
+    def spy(spark, run, satellites, *arguments, **keywords):
+        passed_on.extend(satellites)
+        return real(spark, run, satellites, *arguments, **keywords)
+
+    monkeypatch.setattr(signal_nightly, "run_window_job", spy)
+    spark = FakeSpark(satellites=[*PLACEABLE[:7], decayed(58706), *PLACEABLE[7:]])
+    result = run(spark)
+    assert passed_on == PLACEABLE
+    assert result["satellites"] == 20
+    assert result["skipped_satellites"] == [58706]
+    assert len(spark.written[WINDOWS_TABLE]) == result["windows"] > 0
+
+
+def test_too_many_satellites_sgp4_cannot_place_stop_the_step_before_anything_is_written():
+    spark = FakeSpark(satellites=[*PLACEABLE, decayed(58706), decayed(58707)])
+    with pytest.raises(PropagationError, match=r"\[58706, 58707\].*over the limit"):
+        run(spark)
+    assert spark.written == {}
 
 
 def test_the_satellites_are_the_run_dates_selection():
