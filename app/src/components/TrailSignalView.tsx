@@ -233,7 +233,7 @@ function PointDetail({ point, elevationM, now, late }: PointDetailProps) {
           </ul>
         </div>
         <div className="answer-tile">
-          <p className="answer-label">Satellite</p>
+          <p className="answer-label">Satellite text (T-Mobile only)</p>
           <p className="answer-value">{satelliteAnswer(point, now, late)}</p>
         </div>
       </div>

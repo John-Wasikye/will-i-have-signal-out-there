@@ -36,7 +36,7 @@ const PHOTOS: Record<string, Omit<TrailPhoto, 'url'>> = {
   },
 }
 
-export const PHASE_A_TRAIL_IDS = Object.keys(PHOTOS)
+export const TRAIL_IDS_WITH_PHOTOS = Object.keys(PHOTOS)
 
 /** The picture and heights were drawn for one version of a trail, so they must match its points. */
 export function terrainFor(trailId: string, pointCount: number): TrailTerrain | undefined {

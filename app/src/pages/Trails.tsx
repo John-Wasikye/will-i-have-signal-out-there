@@ -9,7 +9,6 @@ import { reportCountsUrl, trailSignalUrl, trailsUrl } from '../lib/api'
 import { latestOnly } from '../lib/latestOnly'
 import type { ReportCount } from '../lib/reportCounts'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
-import { PHASE_A_TRAILS } from '../lib/trails'
 
 const LOAD_ERROR = 'The trail data could not be loaded. Try again.'
 const MINUTE_MS = 60_000
@@ -82,6 +81,10 @@ export function Trails() {
   return (
     <>
       <h2 className="walk-heading">Walk a trail before you go</h2>
+      <p className="lede">
+        Choose a trail, pick your carrier, and press "Walk the trail". The map then shows where that
+        carrier claims coverage and, on T-Mobile, when a satellite text could get through.
+      </p>
       <div className="trail-choices" role="group" aria-label="Choose a trail">
         <p className="trail-choices-label">Choose a trail</p>
         {trails.map((trail) => (
@@ -107,12 +110,6 @@ export function Trails() {
       <ReportCounts counts={counts} failed={countsFailed} />
 
       <ReportButtons />
-
-      <p className="lede">
-        I cover three main trails at Grand Canyon National Park: {PHASE_A_TRAILS.join(', ')}. Choose
-        one, press walk, and watch where T-Mobile claims coverage and where a satellite could be
-        reachable.
-      </p>
 
       <DtcRequirementsNote />
       <Credits />

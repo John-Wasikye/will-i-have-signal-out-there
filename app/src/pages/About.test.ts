@@ -19,11 +19,37 @@ describe('About page', () => {
     expect(text).toContain('Predictions valid until')
   })
 
-  it('states the Phase A scope: main trails, T-Mobile, the next 24 hours', () => {
-    expect(text).toContain('Phase A')
+  it('says what it covers today: trails, carriers, satellite, the next 24 hours, reports', () => {
+    expect(text).toContain('What it covers today')
     expect(text).toContain('Bright Angel, South Kaibab and North Kaibab')
-    expect(text).toContain('T-Mobile')
-    expect(text).toContain('next 24 hours')
+    expect(text).toContain('AT&T, T-Mobile and Verizon, on 4G LTE')
+    expect(text).toContain('next 24 hours, refreshed every night')
+  })
+
+  it('names all three carriers in the opening and in the map bullet', () => {
+    expect(text).toContain('where AT&T, T-Mobile and Verizon claim coverage along a trail')
+    expect(text).toContain('A carrier picker above the map')
+    expect(text).not.toContain('One carrier')
+  })
+
+  it('says satellite texting needs T-Mobile', () => {
+    expect(text).toContain('Satellite texting needs T-Mobile')
+  })
+
+  it('explains hiker reports and what leaves the phone', () => {
+    expect(text).toContain('Hiker reports')
+    expect(text).toContain('Only an area about 350 m across')
+    expect(text).toContain('at least 5 reports in 7 days')
+  })
+
+  it('looks ahead without promising dates', () => {
+    expect(text).toContain('Still to come')
+    expect(text).toContain('more places than Grand Canyon')
+    expect(text).toContain('confidence rating')
+  })
+
+  it('never uses the word Phase', () => {
+    expect(text).not.toContain('Phase')
   })
 
   it('explains the nightly run and that the page works with the nightly machine off', () => {

@@ -61,13 +61,13 @@ describe('routes', () => {
   it('moves the explanation to /about', () => {
     const text = visibleText(renderPage('/about'))
     expect(text).toContain('How it works')
-    expect(text).toContain('Phase A')
+    expect(text).toContain('What it covers today')
     expect(text).not.toContain('Page not found')
   })
 
   it('serves the trails page at /trails', () => {
     const text = visibleText(renderPage('/trails'))
-    expect(text).toContain('Bright Angel')
+    expect(text).toContain('Walk a trail before you go')
     expect(text).not.toContain('Page not found')
   })
 
@@ -85,6 +85,10 @@ describe('routes', () => {
 })
 
 describe('visible text on every page', () => {
+  it.each(pages)('never uses the word Phase on %s', (path) => {
+    expect(visibleText(renderPage(path))).not.toContain('Phase')
+  })
+
   it.each(pages)('uses no em dash, en dash or spaced hyphen on %s', (path) => {
     const text = visibleText(renderPage(path))
     expect(text).not.toContain('—')

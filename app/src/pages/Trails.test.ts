@@ -6,10 +6,16 @@ import { Trails } from './Trails'
 describe('Trails page', () => {
   const text = visibleText(renderMarkup(createElement(Trails)))
 
-  it('lists the three Phase A trails by name', () => {
-    expect(text).toContain('Bright Angel')
-    expect(text).toContain('South Kaibab')
-    expect(text).toContain('North Kaibab')
+  it('introduces the tool directly under the heading', () => {
+    expect(text).toContain(
+      'Walk a trail before you go Choose a trail, pick your carrier, and press "Walk the trail".',
+    )
+    expect(text).toContain('on T-Mobile, when a satellite text could get through')
+  })
+
+  it('no longer ends with the old paragraph about T-Mobile coverage', () => {
+    expect(text).not.toContain('I cover three main trails')
+    expect(text).not.toContain('where T-Mobile claims coverage and where a satellite')
   })
 
   it('no longer says the data is coming soon', () => {

@@ -104,6 +104,10 @@ describe('TrailSignalView', () => {
     expect(text).toContain('Reachable now')
   })
 
+  it('says the satellite answer applies to T-Mobile only', () => {
+    expect(visibleText(render(now))).toContain('Satellite text (T-Mobile only)')
+  })
+
   it('leaves the satellite out of the key when the data is late', () => {
     const text = visibleText(render(late))
     expect(text).not.toContain('a satellite is reachable now')

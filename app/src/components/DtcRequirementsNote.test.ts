@@ -11,9 +11,13 @@ describe('DtcRequirementsNote', () => {
     expect(text).toContain('needs T-Mobile service in the United States')
   })
 
-  it('says a supported phone is also needed and that T-Mobile is the Phase A carrier', () => {
+  it('says a supported phone is also needed', () => {
     expect(text).toContain('a supported phone')
-    expect(text).toContain('T-Mobile is the carrier for Phase A')
+  })
+
+  it('says the map shows satellite reach only when T-Mobile is the chosen carrier', () => {
+    expect(text).toContain('shows satellite reach only when T-Mobile is the chosen carrier')
+    expect(text).not.toContain('Phase')
   })
 
   it('says satellite texts are not guaranteed and coverage maps are a carrier claim', () => {
