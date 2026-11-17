@@ -965,3 +965,45 @@ input[type='range'] {
   padding: 0;
   list-style: none;
 }
+
+/* The header is tall for a phone, so the trail tool started below the first screen. */
+@media (max-width: 760px) {
+  .header-bar {
+    padding-top: 8px;
+  }
+
+  .brand {
+    font-size: 1rem;
+  }
+
+  .header-bar .logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .hero-text {
+    padding-top: 4px;
+  }
+
+  .hero-text h1 {
+    margin-bottom: 4px;
+    font-size: 1.75rem;
+  }
+
+  .hero-text p {
+    font-size: 1rem;
+  }
+
+  .mountains {
+    height: 64px;
+  }
+
+  .hero .mountains {
+    height: 72px;
+  }
+
+  .hero-hiker .logo {
+    width: 32px;
+    height: 32px;
+  }
+}

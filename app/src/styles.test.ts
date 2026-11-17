@@ -157,6 +157,39 @@ describe('the trail placeholder', () => {
   })
 })
 
+describe('the header on a phone', () => {
+  // The hero rules for narrow screens are the last block at the breakpoint the stylesheet uses.
+  const start = css.lastIndexOf('@media (max-width: 760px) {')
+  const phone = start < 0 ? '' : css.slice(start, css.indexOf('\n}\n', start))
+
+  function size(selector: string, property: string): number {
+    const at = phone.indexOf(`\n  ${selector} {`)
+    const body = at < 0 ? '' : phone.slice(at, phone.indexOf('}', at))
+    const match = body.match(new RegExp(`${property}:\\s*([\\d.]+)(px|rem)`))
+    if (!match) return Number.NaN
+    return Number(match[1]) * (match[2] === 'rem' ? 16 : 1)
+  }
+
+  it('has rules for narrow screens that make the hero shorter', () => {
+    expect(phone).toContain('\n  .hero-text h1 {')
+  })
+
+  it('uses a smaller heading than the 2.3rem minimum of a wide screen', () => {
+    expect(size('.hero-text h1', 'font-size')).toBeLessThan(2.3 * 16)
+  })
+
+  it('draws lower mountains in the hero and on the other pages', () => {
+    expect(size('.hero .mountains', 'height')).toBeLessThanOrEqual(72)
+    expect(size('.mountains', 'height')).toBeLessThanOrEqual(64)
+  })
+
+  it('leaves the wide screen header as it was', () => {
+    expect(css).toContain('font-size: clamp(2.3rem, 6vw, 3.8rem);')
+    expect(css).toContain('height: clamp(110px, 15vw, 230px);')
+    expect(css).toContain('height: clamp(96px, 16.7vw, 280px);')
+  })
+})
+
 describe('phone width', () => {
   it('does not hide sideways overflow, so a too wide element shows up in checks', () => {
     expect(css).not.toContain('overflow-x: hidden')
