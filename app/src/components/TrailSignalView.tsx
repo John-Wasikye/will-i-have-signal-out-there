@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { openReportStore } from '../lib/reportStore'
 import { loadCarrier } from '../lib/reports'
-import { formatUtc } from '../lib/status'
+import { formatUtc, formatUtcRange } from '../lib/status'
 import { photoFor, profileLine, terrainFor, toFeet, type TrailPhoto } from '../lib/trailMedia'
 import {
   coveredPointCount,
@@ -247,7 +247,7 @@ function PointDetail({ point, elevationM, now, late }: PointDetailProps) {
               key={window.start_utc}
               className={window.passed ? 'window window-passed' : 'window'}
             >
-              {formatUtc(window.start_utc)} to {formatUtc(window.end_utc)}
+              {formatUtcRange(window.start_utc, window.end_utc)}
               {window.passed && ' (passed)'}
             </li>
           ))}

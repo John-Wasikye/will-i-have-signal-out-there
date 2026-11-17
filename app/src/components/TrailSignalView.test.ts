@@ -135,6 +135,12 @@ describe('TrailSignalView', () => {
     expect(text).toContain('T-Mobile: covered')
   })
 
+  it('reads a satellite window as one range, with the zone said once', () => {
+    const items = render(now).match(/<li class="window[^"]*">[^<]*<\/li>/g) ?? []
+    expect(items).toHaveLength(2)
+    for (const item of items) expect(visibleText(item)).toMatch(/\d{4}, \d{1,2}:\d{2} [AP]M to \d{1,2}:\d{2} [AP]M \S+/)
+  })
+
   it('draws a passed window in grey with a label and never hides it', () => {
     const markup = render(now)
     expect(markup.match(/class="window window-passed"/g)?.length).toBe(1)
