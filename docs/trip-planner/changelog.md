@@ -14,6 +14,7 @@ This file records two things: changes to the documents, and, once code exists, c
 
 - `compute_windows` failed on Nov 15 and 16 with "SGP4 could not place satellites [58706]": STARLINK-11075 is re-entering the atmosphere, and SGP4 failed for it from minute 1215 of the span on Nov 15 and from minute 0 on Nov 16. The step now skips a satellite SGP4 cannot place at any minute for the whole night and returns the ids as `skipped_satellites`. It stops only when more than 5 percent of the satellites cannot be placed, or none can, because that points at a bad element file. `teme_positions` stays strict as the backstop. The design doc (table 7.B, C5 and the nightly flow) says so.
 - The dbt test `unique_columns_fct_reachable_period_trail_point_id__period_start_utc` failed on Nov 14 with 2 results. Two satellites can give one trail point windows with the same start and end, and the two sorts in `fct_reachable_period` could order those windows differently, which split one period in two. Both sorts now end with `satellite_id`.
+- The alert email and the incident record for that Nov 14 failure showed only passing tests, because they keep the first 300 characters of an error and dbt prints what failed at the very end. `dbt_runner.failure_text` now puts dbt's summary of what failed first, and leaves out colour codes and lines that hold only a time.
 
 ### Nov 13, 2026: session box on demand, every carrier live
 

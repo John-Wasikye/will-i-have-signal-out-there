@@ -68,3 +68,48 @@ def test_a_retry_starts_from_empty_folders(tmp_path):
 def test_a_failed_build_stops_the_run_and_says_why(tmp_path):
     with pytest.raises(DbtBuildFailed, match="unique_fct_satellite_window"):
         _run(tmp_path, Recorder(returncode=1, stdout="FAIL 1 unique_fct_satellite_window\n"))
+
+
+# The real output of the failed build of Nov 14, 2026, shortened: passing tests, then dbt's summary.
+PASSING = [
+    f"\x1b[0m10:10:41  {n} of 52 PASS not_null_dim_trail_point_{n} [\x1b[32mPASS\x1b[0m in 0.02s]"
+    for n in range(1, 52)
+]
+FAILED_TEST = "unique_columns_fct_reachable_period_trail_point_id__period_start_utc"
+SUMMARY = [
+    "\x1b[0m10:10:41  Finished running 6 external models, 42 data tests in 5.98 seconds.",
+    "\x1b[0m10:10:41  ",
+    "\x1b[0m10:10:41  \x1b[31mCompleted with 1 error, 0 partial successes, and 0 warnings:\x1b[0m",
+    "\x1b[0m10:10:41  ",
+    f"\x1b[0m10:10:41  \x1b[31mFailure in test {FAILED_TEST} (models/marts/marts.yml)\x1b[0m",
+    "\x1b[0m10:10:41    Got 2 results, configured to fail if != 0",
+    "\x1b[0m10:10:41  ",
+    "\x1b[0m10:10:41  Done. PASS=51 WARN=0 ERROR=1 SKIP=0 TOTAL=52",
+]
+
+
+def _failure_text(tmp_path, lines) -> str:
+    with pytest.raises(DbtBuildFailed) as caught:
+        _run(tmp_path, Recorder(returncode=1, stdout="\n".join(lines) + "\n"))
+    return str(caught.value)
+
+
+def test_the_failure_text_starts_with_what_failed_so_a_cut_alert_still_says_it(tmp_path):
+    text = _failure_text(tmp_path, PASSING + SUMMARY)
+    # The alert email and the incident record keep only the first 300 characters.
+    assert f"Failure in test {FAILED_TEST}" in text[:300]
+    assert "Got 2 results" in text[:300]
+
+
+def test_the_failure_text_has_no_colour_codes(tmp_path):
+    assert "\x1b" not in _failure_text(tmp_path, PASSING + SUMMARY)
+
+
+def test_the_lines_before_the_summary_follow_it(tmp_path):
+    text = _failure_text(tmp_path, PASSING + SUMMARY)
+    assert text.index("Completed with 1 error") < text.index("51 of 52 PASS")
+
+
+def test_output_without_a_summary_keeps_its_last_lines(tmp_path):
+    text = _failure_text(tmp_path, ["Compilation Error", "  model x depends on a missing node"])
+    assert text.endswith("Compilation Error\n  model x depends on a missing node")
