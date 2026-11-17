@@ -1,11 +1,13 @@
 -- Merges each point's overlapping and touching satellite windows into reachable periods. A window
 -- starts a new period when it begins more than one minute after every earlier window has ended.
+-- Both sorts end with satellite_id: windows with the same start and end must come in the same
+-- order in both, or one period is split in two.
 with ordered as (
     select
         *,
         max(window_end_utc) over (
             partition by trail_point_id
-            order by window_start_utc, window_end_utc
+            order by window_start_utc, window_end_utc, satellite_id
             rows between unbounded preceding and 1 preceding
         ) as latest_end_so_far
     from {{ ref('stg_satellite_window') }}
@@ -22,7 +24,7 @@ numbered as (
             end
         ) over (
             partition by trail_point_id
-            order by window_start_utc, window_end_utc
+            order by window_start_utc, window_end_utc, satellite_id
             rows unbounded preceding
         ) as period_number
     from ordered
