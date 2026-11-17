@@ -8,7 +8,7 @@ function renderPage(path: string): string {
   return renderMarkup(createElement(MemoryRouter, { initialEntries: [path] }, createElement(App)))
 }
 
-const pages = ['/', '/trails', '/about', '/lookup', '/status', '/no-such-page']
+const pages = ['/', '/trails', '/about', '/status', '/no-such-page']
 
 describe('the development banner', () => {
   it.each(pages)('is gone from %s, because the footer carries the safety note', (path) => {
@@ -39,9 +39,6 @@ describe('the navigation', () => {
     expect(text).toContain('Status')
   })
 
-  it('leaves out the lookup page, which is a developer sample', () => {
-    expect(renderPage('/')).not.toContain('href="/lookup"')
-  })
 })
 
 describe('the site footer', () => {
@@ -105,10 +102,10 @@ describe('routes', () => {
     expect(text).not.toContain('Page not found')
   })
 
-  it('keeps the lookup page working', () => {
+  it('shows the page not found page at /lookup, because the developer lookup page is gone', () => {
     const text = visibleText(renderPage('/lookup'))
-    expect(text).toContain('Enter a sample key')
-    expect(text).not.toContain('Page not found')
+    expect(text).toContain('Page not found')
+    expect(text).not.toContain('Enter a sample key')
   })
 
   it('keeps the status page working', () => {

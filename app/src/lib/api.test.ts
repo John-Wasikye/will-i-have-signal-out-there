@@ -1,38 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import contract from '../../../docs/platform/openapi-serving-template.yaml?raw'
 import tripPlannerContract from '../../../docs/trip-planner/openapi.yaml?raw'
-import { reportCountsUrl, reportsUrl, sampleUrl, trailSignalUrl, trailsUrl } from './api'
-
-// The API's routes, as the contract lists them under `paths:` (two spaces, then /name:).
-// platform/serving/tests/test_contract.py checks the API serves exactly these, so an address
-// that matches one of them reaches a real route.
-const contractPaths = [...contract.matchAll(/^ {2}(\/[^:\s]*):\s*$/gm)].map((match) => match[1])
+import { reportCountsUrl, reportsUrl, trailSignalUrl, trailsUrl } from './api'
 
 function pathOf(url: string): string {
   return new URL(url).pathname
 }
-
-describe('the API contract', () => {
-  it('lists the routes the site calls', () => {
-    expect(contractPaths).toContain('/sample')
-  })
-})
-
-describe('sampleUrl', () => {
-  it('asks for a route the API serves', () => {
-    expect(contractPaths).toContain(pathOf(sampleUrl('https://api.example.com', 'iceberg')))
-  })
-
-  it('puts the key in the query, encoded, so it cannot change the address', () => {
-    const url = new URL(sampleUrl('https://api.example.com', 'a/b&c=d'))
-    expect(url.searchParams.get('key')).toBe('a/b&c=d')
-    expect(url.searchParams.size).toBe(1)
-  })
-
-  it('accepts a base address that ends in a slash', () => {
-    expect(pathOf(sampleUrl('https://api.example.com/', 'x'))).toBe('/sample')
-  })
-})
 
 const tripPlannerPaths = [...tripPlannerContract.matchAll(/^ {2}(\/[^:\s]*):\s*$/gm)].map(
   (match) => match[1],
@@ -94,6 +66,6 @@ describe('the site', () => {
   })
 
   it('reads the source files it checks', () => {
-    expect(Object.keys(sources)).toContain('../pages/Lookup.tsx')
+    expect(Object.keys(sources)).toContain('../pages/Trails.tsx')
   })
 })

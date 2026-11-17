@@ -4,11 +4,11 @@ import { formatUtc } from '../lib/status'
 interface LateNoticeProps {
   // Missing when no run has succeeded yet, because status.json leaves it out.
   lastGoodRunUtc?: string
-  pipelineName?: string
+  pipelineName: string
 }
 
 export function LateNotice({ lastGoodRunUtc, pipelineName }: LateNoticeProps) {
-  const subject = pipelineName ? `${describePipeline(pipelineName).title} is late or has failed.` : 'A pipeline is late or has failed.'
+  const subject = `${describePipeline(pipelineName).title} is late or has failed.`
   const lastRun = lastGoodRunUtc
     ? `The last good run was ${formatUtc(lastGoodRunUtc)}.`
     : 'No good run has finished yet.'
