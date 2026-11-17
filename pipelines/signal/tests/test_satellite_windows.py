@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 from satellite_windows import (
+    MAX_UNPLACED_SHARE,
     MAX_WINDOW_ROWS,
     MIN_ELEVATION_DEG,
     SPAN_MINUTES,
@@ -26,6 +27,7 @@ from satellite_windows import (
     flags_to_windows,
     look_angles,
     minute_times,
+    placeable_satellites,
     propagate_satellites,
     reachable_flags,
     sensitivity_report,
@@ -306,6 +308,82 @@ def test_a_satellite_sgp4_cannot_place_stops_the_run():
     )
     with pytest.raises(PropagationError, match="12345"):
         teme_positions([SAT_00005, decayed], minute_times(START, 60))
+
+
+def _leo(norad: int, **changes) -> SatelliteElements:
+    """A Starlink-like satellite that SGP4 places for days; ``changes`` set elements it dislikes."""
+    elements = {
+        "norad_cat_id": norad,
+        "object_name": f"STARLINK-{norad}",
+        "epoch_utc": START - timedelta(hours=6),
+        "inclination_deg": 53.0,
+        "eccentricity": 0.0001,
+        "ra_of_asc_node_deg": 0.0,
+        "arg_of_pericenter_deg": 90.0,
+        "mean_anomaly_deg": 0.0,
+        "mean_motion_rev_per_day": 15.85,
+        "bstar": 0.0001,
+    }
+    return SatelliteElements(**(elements | changes))
+
+
+def _decayed(norad: int) -> SatelliteElements:
+    return _leo(norad, eccentricity=0.5)  # perigee far below the ground, so SGP4 fails at once
+
+
+def _decaying_late(norad: int) -> SatelliteElements:
+    """Drag so strong that SGP4 places it for the first hours only (it fails from minute 585)."""
+    return _leo(norad, bstar=0.1)
+
+
+DAY = minute_times(START, 1440)
+
+
+def test_a_decayed_satellite_is_skipped_and_named_and_the_others_keep_their_order():
+    good = [_leo(1000 + i, mean_anomaly_deg=7.0 * i) for i in range(30)]
+    mixed = [*good[:10], _decayed(58706), *good[10:]]
+    placed, skipped = placeable_satellites(mixed, DAY)
+    assert placed == good
+    assert skipped == [58706]
+
+
+def test_a_satellite_that_fails_only_late_in_the_span_is_skipped_for_the_whole_span():
+    late = _decaying_late(58706)
+    assert teme_positions([late], DAY[:60]).shape == (1, 60, 3), "it is fine early on"
+    good = [_leo(1000 + i) for i in range(30)]
+    placed, skipped = placeable_satellites([*good, late], DAY)
+    assert placed == good
+    assert skipped == [58706]
+
+
+def test_the_skipped_ids_are_sorted():
+    good = [_leo(1000 + i) for i in range(60)]
+    placed, skipped = placeable_satellites([_decayed(900), *good, _decayed(300)], DAY)
+    assert placed == good
+    assert skipped == [300, 900]
+
+
+def test_nothing_is_skipped_when_every_satellite_can_be_placed():
+    good = [_leo(1000 + i) for i in range(5)]
+    assert placeable_satellites(good, DAY) == (good, [])
+
+
+def test_a_share_of_unplaced_satellites_exactly_at_the_limit_is_allowed():
+    assert MAX_UNPLACED_SHARE == 0.05
+    good = [_leo(1000 + i) for i in range(19)]
+    placed, skipped = placeable_satellites([*good, _decayed(58706)], DAY)  # 1 of 20
+    assert (placed, skipped) == (good, [58706])
+
+
+def test_more_unplaced_satellites_than_the_share_stops_the_run_naming_them():
+    good = [_leo(1000 + i) for i in range(18)]
+    with pytest.raises(PropagationError, match=r"\[300, 900\]"):
+        placeable_satellites([_decayed(900), *good, _decayed(300)], DAY)  # 2 of 20
+
+
+def test_no_placeable_satellite_stops_the_run_naming_them():
+    with pytest.raises(PropagationError, match=r"none.*\[300, 900\]"):
+        placeable_satellites([_decayed(900), _decayed(300)], DAY)
 
 
 class _Counted:

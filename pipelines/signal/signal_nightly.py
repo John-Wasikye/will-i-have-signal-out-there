@@ -94,6 +94,8 @@ from satellite_windows import (
     SatelliteElements,
     WindowRun,
     enforce_row_limit,
+    minute_times,
+    placeable_satellites,
     run_window_job,
 )
 from terrain_horizon import RANGE_M, HorizonProfile, compute_horizons, validate_horizon
@@ -488,7 +490,12 @@ def compute_windows(
     are the newest partitions, because both are reference data (ADR 0028); horizons older than
     the points would belong to points that are gone, so they stop the step. The windows are
     built and counted inside Spark, and a count over ``max_rows`` stops the step before anything
-    is written (OQ-1). Returns how many satellites, points and windows there were.
+    is written (OQ-1). Returns how many satellites were used, which were skipped, and how many
+    points and windows there were.
+
+    A satellite SGP4 cannot place at some minute of the span, for example one re-entering the
+    atmosphere, is skipped for the whole span, and its id is returned. The step stops only when
+    too many cannot be placed, which points at a bad element file (C5).
     """
     satellites = _dtc_satellites(spark, f"{CATALOG_NAME}.{namespace}.dtc_satellite", run_date)
     points_table = f"{CATALOG_NAME}.{namespace}.trail_point"
@@ -511,6 +518,10 @@ def compute_windows(
         run_started_utc=run_started_utc,
         loaded_at_utc=now_utc,
     )
+    # The same times the job propagates over, so a satellite is only skipped for what it would hit.
+    satellites, skipped = placeable_satellites(
+        satellites, minute_times(run.span_start_utc, run.span_minutes)
+    )
     points = _trail_points(spark, points_table, points_date)
     columns = contract_columns(Path(contracts_dir) / "satellite_window.yaml", "satellite_window")
     frame = run_window_job(
@@ -524,7 +535,12 @@ def compute_windows(
         write_frame_partition(spark, "satellite_window", frame, namespace=namespace)
     finally:
         frame.unpersist()
-    return {"satellites": len(satellites), "points": len(points), "windows": windows}
+    return {
+        "satellites": len(satellites),
+        "skipped_satellites": skipped,
+        "points": len(points),
+        "windows": windows,
+    }
 
 
 def copy_tables_for_dbt(
