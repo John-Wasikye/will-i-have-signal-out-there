@@ -46,7 +46,7 @@ describe('PipelineCard', () => {
   it('says every fact in words', () => {
     const text = visibleText(render(pipeline))
     expect(text).toContain('Last finished')
-    expect(text).toContain('Should run at least every 26 hours')
+    expect(text).toContain('Every night. Counted as late after 26 hours.')
     expect(text).toContain('Test records checked: 3')
   })
 

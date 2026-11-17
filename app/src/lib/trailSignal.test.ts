@@ -151,14 +151,19 @@ describe('freshness', () => {
 
   it('says how much of the predictions time is left', () => {
     const result = freshness(lastRun, validUntil, noon)
-    expect(result.hoursLeft).toBe(12)
+    expect(result.minutesLeft).toBe(720)
     expect(result.shareLeft).toBeCloseTo(0.5)
     expect(result.late).toBe(false)
   })
 
+  it('counts whole minutes and rounds down', () => {
+    const result = freshness(lastRun, validUntil, new Date('2026-11-05T16:07:30Z'))
+    expect(result.minutesLeft).toBe(472)
+  })
+
   it('never goes below nothing once the data is late', () => {
     const result = freshness(lastRun, validUntil, new Date('2026-11-07T00:00:00Z'))
-    expect(result.hoursLeft).toBe(0)
+    expect(result.minutesLeft).toBe(0)
     expect(result.shareLeft).toBe(0)
     expect(result.late).toBe(true)
   })

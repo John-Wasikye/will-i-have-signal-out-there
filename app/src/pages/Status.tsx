@@ -6,6 +6,7 @@ import { PipelineCard, PipelineKey } from '../components/PipelineCard'
 import { trailSignalUrl, trailsUrl } from '../lib/api'
 import { formatUtc, pipelinesNeedingNotice, type StatusDoc } from '../lib/status'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
+import { useNow } from '../lib/useNow'
 
 type LoadState =
   | { kind: 'loading' }
@@ -29,6 +30,7 @@ async function fetchFirstTrail(baseUrl: string): Promise<TrailSignal> {
 export function Status() {
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' })
   const [trail, setTrail] = useState<TrailLoad>({ kind: 'loading' })
+  const now = useNow()
 
   // Every trail comes from the same nightly run, so one trail answers for all of them.
   useEffect(() => {
@@ -63,7 +65,7 @@ export function Status() {
         <DataFreshness
           lastGoodRunUtc={trail.signal.last_good_run_utc}
           validUntilUtc={trail.signal.valid_until_utc}
-          now={new Date()}
+          now={now}
         />
       )}
 

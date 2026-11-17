@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatUtc, formatUtcRange, pipelinesNeedingNotice, type Pipeline } from './status'
+import { describeTimeLeft, formatUtc, formatUtcRange, pipelinesNeedingNotice, type Pipeline } from './status'
 
 const base: Pipeline = {
   name: 'sample_pipeline',
@@ -78,5 +78,19 @@ describe('formatUtc', () => {
 
   it('says the time is unknown when the value cannot be parsed', () => {
     expect(formatUtc('not a date')).toBe('Unknown time')
+  })
+})
+
+describe('describeTimeLeft', () => {
+  it.each([
+    [472, 'another 7 hours 52 minutes'],
+    [61, 'another 1 hour 1 minute'],
+    [60, 'another 1 hour'],
+    [180, 'another 3 hours'],
+    [52, 'another 52 minutes'],
+    [1, 'another 1 minute'],
+    [0, 'less than a minute'],
+  ])('says %i minutes as "%s"', (minutes, words) => {
+    expect(describeTimeLeft(minutes)).toBe(words)
   })
 })

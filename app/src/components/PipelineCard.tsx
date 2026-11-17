@@ -39,7 +39,7 @@ export function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
         <dt>Last finished</dt>
         <dd>{formatUtc(pipeline.last_good_run_utc)}</dd>
         <dt>Schedule</dt>
-        <dd>Should run at least every {pipeline.freshness_target_hours} hours</dd>
+        <dd>Every night. Counted as late after {pipeline.freshness_target_hours} hours.</dd>
       </dl>
       {pipeline.last_row_count !== undefined && (
         <p className="note-text">Test records checked: {pipeline.last_row_count}</p>

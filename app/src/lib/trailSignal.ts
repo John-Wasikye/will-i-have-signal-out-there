@@ -37,7 +37,6 @@ export interface TrailSignal {
 }
 
 const MINUTE_MS = 60_000
-const HOUR_MS = 60 * MINUTE_MS
 const WALK_STEPS = 160
 const POINT_SPACING_KM = 0.05
 
@@ -183,7 +182,7 @@ export function freshness(lastGoodRunUtc: string, validUntilUtc: string, now: Da
   const end = new Date(validUntilUtc).getTime()
   const left = Math.max(end - now.getTime(), 0)
   return {
-    hoursLeft: left / HOUR_MS,
+    minutesLeft: Math.floor(left / MINUTE_MS),
     shareLeft: Math.min(left / (end - start), 1),
     late: isRunLate(validUntilUtc, now),
   }

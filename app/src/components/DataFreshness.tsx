@@ -1,4 +1,5 @@
-import { formatUtc } from '../lib/status'
+import { nextNightlyRun } from '../lib/nextRun'
+import { describeTimeLeft, formatUtc } from '../lib/status'
 import { freshness } from '../lib/trailSignal'
 
 interface DataFreshnessProps {
@@ -7,15 +8,9 @@ interface DataFreshnessProps {
   now: Date
 }
 
-function timeLeft(hours: number): string {
-  if (hours < 1) return 'less than an hour'
-  const rounded = Math.round(hours)
-  return `about ${rounded} more ${rounded === 1 ? 'hour' : 'hours'}`
-}
-
 /** The answer a hiker wants from the status page: can I trust what the trail map shows? */
 export function DataFreshness({ lastGoodRunUtc, validUntilUtc, now }: DataFreshnessProps) {
-  const { hoursLeft, shareLeft, late } = freshness(lastGoodRunUtc, validUntilUtc, now)
+  const { minutesLeft, shareLeft, late } = freshness(lastGoodRunUtc, validUntilUtc, now)
   const validUntil = formatUtc(validUntilUtc)
 
   return (
@@ -30,7 +25,7 @@ export function DataFreshness({ lastGoodRunUtc, validUntilUtc, now }: DataFreshn
       ) : (
         <>
           <p className="freshness-state">Up to date</p>
-          <p>The trail predictions are good for {timeLeft(hoursLeft)}.</p>
+          <p>The trail predictions are good for {describeTimeLeft(minutesLeft)}.</p>
           <meter
             className="freshness-meter"
             min={0}
@@ -46,7 +41,10 @@ export function DataFreshness({ lastGoodRunUtc, validUntilUtc, now }: DataFreshn
         <dt>Valid until</dt>
         <dd>{validUntil}</dd>
         <dt>Next update</dt>
-        <dd>A new run starts every night at 10:00 UTC (Coordinated Universal Time).</dd>
+        <dd>
+          Every night at 10:00 UTC (Coordinated Universal Time). The next one is{' '}
+          {formatUtc(nextNightlyRun(now).toISOString())}.
+        </dd>
       </dl>
     </section>
   )

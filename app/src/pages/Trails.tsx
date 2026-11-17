@@ -9,9 +9,9 @@ import { reportCountsUrl, trailSignalUrl, trailsUrl } from '../lib/api'
 import { latestOnly } from '../lib/latestOnly'
 import type { ReportCount } from '../lib/reportCounts'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
+import { useNow } from '../lib/useNow'
 
 const LOAD_ERROR = 'The trail data could not be loaded. Try again.'
-const MINUTE_MS = 60_000
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
@@ -27,14 +27,8 @@ export function Trails() {
   const [failed, setFailed] = useState(false)
   const [counts, setCounts] = useState<ReportCount[] | null>(null)
   const [countsFailed, setCountsFailed] = useState(false)
-  const [now, setNow] = useState(() => new Date())
+  const now = useNow()
   const beginRequest = useRef(latestOnly())
-
-  // Lateness and passed windows depend on the time, so they are checked again while the page is open.
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), MINUTE_MS)
-    return () => clearInterval(timer)
-  }, [])
 
   function chooseTrail(id: string) {
     setTrailId(id)

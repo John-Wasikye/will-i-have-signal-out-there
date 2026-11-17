@@ -16,7 +16,13 @@ describe('DataFreshness', () => {
   it('says in plain words that the data is fresh and for how long', () => {
     const text = visibleText(render('2026-11-05T12:00:00Z'))
     expect(text).toContain('Up to date')
-    expect(text).toContain('about 12 more hours')
+    expect(text).toContain('The trail predictions are good for another 12 hours.')
+  })
+
+  it('shows the exact time left in hours and minutes, never "about"', () => {
+    const text = visibleText(render('2026-11-05T16:07:30Z'))
+    expect(text).toContain('The trail predictions are good for another 7 hours 52 minutes.')
+    expect(text).not.toContain('about')
   })
 
   it('draws how much time the predictions have left', () => {
@@ -24,11 +30,27 @@ describe('DataFreshness', () => {
   })
 
   it('says when the next run is', () => {
-    expect(visibleText(render('2026-11-05T12:00:00Z'))).toContain('every night at 10:00 UTC')
+    expect(visibleText(render('2026-11-05T12:00:00Z'))).toContain(
+      'Every night at 10:00 UTC (Coordinated Universal Time).',
+    )
   })
 
-  it('says less than an hour near the end', () => {
-    expect(visibleText(render('2026-11-05T23:40:00Z'))).toContain('less than an hour')
+  it('gives the next run in the local time of the reader, with the zone name', () => {
+    // 10:00 UTC on Nov 6 is Nov 6 in every zone from UTC-10 to UTC+13, and Nov 5 further west.
+    expect(visibleText(render('2026-11-05T12:00:00Z'))).toMatch(
+      /The next one is Nov [56], 2026, \d{1,2}:00 [AP]M \S+\./,
+    )
+  })
+
+  it('moves the next run to the following day at exactly 10:00 UTC', () => {
+    const before = visibleText(render('2026-11-05T09:59:00Z'))
+    const at = visibleText(render('2026-11-05T10:00:00Z'))
+    expect(before).not.toEqual(at)
+  })
+
+  it('says the minutes near the end and less than a minute at the very end', () => {
+    expect(visibleText(render('2026-11-05T23:40:00Z'))).toContain('good for another 20 minutes.')
+    expect(visibleText(render('2026-11-05T23:59:30Z'))).toContain('good for less than a minute.')
   })
 
   it('shows the late notice with the last good run once the time has passed', () => {

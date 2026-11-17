@@ -69,3 +69,15 @@ export function formatUtcRange(startIso: string, endIso: string, timeZone?: stri
   if (!sameClock) return `${formatUtc(startIso, timeZone)} to ${formatUtc(endIso, timeZone)}`
   return `${format(start, DATE_AND_TIME, timeZone)} to ${format(end, { ...TIME_ONLY, timeZoneName: 'short' }, timeZone)}`
 }
+
+/** What is left of the predictions, in whole minutes rounded down, as a phrase for a sentence. */
+export function describeTimeLeft(minutes: number): string {
+  if (minutes < 1) return 'less than a minute'
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  const parts = [
+    hours > 0 ? `${hours} ${hours === 1 ? 'hour' : 'hours'}` : '',
+    rest > 0 ? `${rest} ${rest === 1 ? 'minute' : 'minutes'}` : '',
+  ]
+  return `another ${parts.filter(Boolean).join(' ')}`
+}
