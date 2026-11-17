@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 16, 2026: unplaceable satellites, tie in reachable periods
+
+- `compute_windows` failed on Nov 15 and 16 with "SGP4 could not place satellites [58706]": STARLINK-11075 is re-entering the atmosphere, and SGP4 failed for it from minute 1215 of the span on Nov 15 and from minute 0 on Nov 16. The step now skips a satellite SGP4 cannot place at any minute for the whole night and returns the ids as `skipped_satellites`. It stops only when more than 5 percent of the satellites cannot be placed, or none can, because that points at a bad element file. `teme_positions` stays strict as the backstop. The design doc (table 7.B, C5 and the nightly flow) says so.
+- The dbt test `unique_columns_fct_reachable_period_trail_point_id__period_start_utc` failed on Nov 14 with 2 results. Two satellites can give one trail point windows with the same start and end, and the two sorts in `fct_reachable_period` could order those windows differently, which split one period in two. Both sorts now end with `satellite_id`.
+
 ### Nov 13, 2026: session box on demand, every carrier live
 
 - The session box runs on demand instead of spot (platform ADR-0033). AWS reclaimed the spot box or had no spot capacity on Nov 10, 11, 12 and 13. The design doc, requirement QR-15, runbooks RB-8 and RB-9 and the cost table say so; the on-demand nightly cost cell now reads $5.91 (22 hours at $0.2688), so the on-demand all-in month is about $48 to $51.

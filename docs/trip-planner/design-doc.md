@@ -465,6 +465,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Inputs | `dtc_satellite`, `trail_point`, `trail_point_horizon`, run logical date |
 | Outputs | Iceberg `satellite_window` (one row per point, satellite and satellite window; partition per run date); sensitivity figures for 5, 10 and 20 degrees |
 | Main functions and classes | See table 7.B (full list) |
+| Unplaceable satellites | SGP4 cannot place a satellite that is re-entering the atmosphere (STARLINK-11075, NORAD id 58706, stopped the runs of Nov 15 and 16, 2026). The step skips such a satellite for the whole night and returns its id in `skipped_satellites`, next to the count of satellites used. It stops the run only when more than 5 percent of the satellites cannot be placed, or none can, which points at a bad element file |
 | Contract | contracts/fct_satellite_window.yaml (mart); internal Iceberg table follows the same columns |
 | ADRs | 0003, 0005, 0006, 0019 |
 
@@ -486,7 +487,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Job | Build staging, intermediate and a small star schema (a central fact table joined to descriptive tables; here trail point, time, coverage and satellite windows) on DuckDB; `source()` only in staging; unique and not_null tests on keys |
 | Inputs | Parquet copies of `trail_point`, `trail_point_coverage` and `satellite_window`, made by Spark from the Iceberg tables just before dbt starts (OQ-40) |
 | Outputs | Marts `dim_trail_point`, `dim_time`, `fct_trail_point_coverage`, `fct_satellite_window`, `fct_reachable_period`, one Parquet file each |
-| Models (as built) | Staging: `stg_trail_point`, `stg_fcc_coverage`, `stg_satellite_window`. Intermediate: `int_trail_point_coverage`. Marts as above. The other proposed models fed no mart, so I left them out |
+| Models (as built) | Staging: `stg_trail_point`, `stg_fcc_coverage`, `stg_satellite_window`. Intermediate: `int_trail_point_coverage`. Marts as above. The other proposed models fed no mart, so I left them out. `fct_reachable_period` sorts each point's windows by start, end and `satellite_id` in both of its window functions, so windows with the same start and end cannot be ordered differently by the two sorts and split one period in two |
 | Environment | dbt has its own Python environment (`platform/box/requirements-dbt.txt`), because Airflow's constraint file refuses it (`pathspec`). `dbt-core` 1.11.16 and `dbt-duckdb` 1.11.1: `dbt-core` 1.12 needs a parser with only pre-releases. The nightly run starts dbt as a separate program |
 | Contracts | contracts/*.yaml |
 | ADRs | 0018 |
@@ -701,7 +702,8 @@ Decided in ADR 0036 (OQ-24): range 15 km; ray step 30 m; observer height 1.7 m; 
 | `Window` (class) | One reachable interval for one point and satellite | `trail_point_id`, `satellite_id`, `start_utc`, `end_utc` | Immutable record |
 | `WindowRun` (class) | One run's metadata | Run id, logical date, span start, span length, `min_elev_deg`, `valid_until_utc` | Immutable record |
 | `minute_times(start, minutes, step_minutes)` | The span's minutes, from the run's scheduled time (its data interval end, engineering standard 3) | A start time with a time zone, 1,560 minutes, 1-minute step | List of UTC times |
-| `teme_positions(elements, times)` | Every satellite at every minute with SGP4 (WGS72 constants, improved mode), in the TEME frame. A satellite SGP4 cannot place stops the run (`PropagationError`) | Elements list, times | Array of km (satellites by minutes by 3) |
+| `teme_positions(elements, times)` | Every satellite at every minute with SGP4 (WGS72 constants, improved mode), in the TEME frame. It stays strict as the backstop: a satellite SGP4 cannot place raises `PropagationError` naming it. The nightly step drops such satellites first with `placeable_satellites` | Elements list, times | Array of km (satellites by minutes by 3) |
+| `placeable_satellites(elements, times)` | Propagate every satellite over all of the span's minutes and split them into those SGP4 places at every minute and those it does not (a decaying satellite can fail only late in the span, so a failure at any minute skips the satellite for the whole night and no track has a gap). If more than `MAX_UNPLACED_SHARE` (5 percent, exactly 5 percent is allowed) cannot be placed, or none can, it raises `PropagationError` naming the ids, because that points at a bad element file and not a few decaying satellites | Elements list, times | The placed satellites in input order, and the sorted NORAD ids of the others |
 | `teme_to_ecef(teme, times)` | Turn TEME positions earth-fixed by Greenwich mean sidereal time. Polar motion and UT1 minus UTC are left out (together under 100 m) | TEME positions, times | Earth-fixed positions in km |
 | `propagate_satellites(elements, times)` | Propagate once per satellite for all points | Elements list, times | `SatelliteTrack` list |
 | `look_angles(ecef_km, lat_deg, lon_deg, height_m)` | Azimuth and elevation seen from a point on the WGS84 ellipsoid. The height defaults to 0: a rim height of 2.5 km changes an elevation near 10 degrees by about 0.1 degree, below the 1-minute step's accuracy | Positions of any shape ending in 3, the point | `(azimuth_deg, elevation_deg)` arrays |
@@ -767,7 +769,7 @@ Step by step, with failure handling:
 3. C8 diffs the new file's schema against the contract. A mismatch stops the run before anything is loaded.
 4. C2 selects satellites and logs disagreements with the altitude and inclination cross-check. Disagreements do not fail the run; they are listed (AC-1A.1).
 5. C3, C4 and C6 run on the trail points. The cadence of these reference-data steps is decided in ADR 0028 (OQ-25). Either way, each of them overwrites its own partitions, so running again is safe.
-6. C5 propagates once per satellite and evaluates all trail points in parallel. If the row count or runtime exceeds its limit the job stops before publishing and opens an incident (the limit values come from OQ-1).
+6. C5 first skips the satellites SGP4 cannot place (the step stops only if more than 5 percent of them, or all, fail), then propagates once per satellite and evaluates all trail points in parallel. If the row count or runtime exceeds its limit the job stops before publishing and opens an incident (the limit values come from OQ-1).
 7. C7 runs dbt on DuckDB into staging. A failed dbt test fails the run.
 8. C9 runs the publish gate checks. On failure, publishing stops; the previously published Parquet stays (QR-4).
 9. C10 publishes gold Parquet; each run is stamped with its valid until time.
