@@ -138,6 +138,25 @@ describe('the report buttons', () => {
   })
 })
 
+describe('the trail placeholder', () => {
+  const start = css.indexOf('.trail-placeholder {')
+  const base = start < 0 ? '' : css.slice(start, css.indexOf('}', start))
+
+  it('reserves height, so the sections below do not move when the trail arrives', () => {
+    expect(base).toMatch(/min-height:\s*\d+(\.\d+)?rem/)
+  })
+
+  it('reserves more height on a phone, where the trail view is stacked and taller', () => {
+    expect(css).toMatch(
+      /@media \(max-width: 760px\) \{[^@]*?\.trail-placeholder \{\s*min-height:\s*\d+(\.\d+)?rem/,
+    )
+  })
+
+  it('does not animate, so it has nothing to switch off for reduced motion', () => {
+    expect(base).not.toContain('animation')
+  })
+})
+
 describe('phone width', () => {
   it('does not hide sideways overflow, so a too wide element shows up in checks', () => {
     expect(css).not.toContain('overflow-x: hidden')

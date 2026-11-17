@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ColdStartNotice } from '../components/ColdStartNotice'
 import { Credits } from '../components/Credits'
 import { DtcRequirementsNote } from '../components/DtcRequirementsNote'
 import { ReportButtons } from '../components/ReportButtons'
 import { ReportCounts } from '../components/ReportCounts'
+import { TrailPlaceholder } from '../components/TrailPlaceholder'
 import { TrailSignalView } from '../components/TrailSignalView'
 import { reportCountsUrl, trailSignalUrl, trailsUrl } from '../lib/api'
 import { latestOnly } from '../lib/latestOnly'
@@ -97,7 +97,7 @@ export function Trails() {
         ))}
       </div>
 
-      {loading && <ColdStartNotice />}
+      {loading && <TrailPlaceholder />}
       {failed && (
         <p role="alert" className="error-text">
           {LOAD_ERROR}

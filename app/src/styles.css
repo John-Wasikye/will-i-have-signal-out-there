@@ -407,6 +407,20 @@ label {
   align-items: start;
 }
 
+/* The heights are estimates of the trail view, which is shorter on a wide screen, where its two
+   panels sit side by side. They keep the sections below from jumping when the trail arrives. */
+.trail-placeholder {
+  min-height: 44rem;
+  padding: 16px 20px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.trail-placeholder .notice {
+  margin: 0;
+}
+
 .walker .panel {
   margin: 0;
 }
@@ -414,6 +428,10 @@ label {
 @media (max-width: 760px) {
   .walker {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trail-placeholder {
+    min-height: 64rem;
   }
 }
 

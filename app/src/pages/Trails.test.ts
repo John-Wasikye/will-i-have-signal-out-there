@@ -47,6 +47,12 @@ describe('Trails page', () => {
     expect(text).not.toContain('I had signal here')
   })
 
+  it('holds the place of the trail view while the trail loads, so the report section does not jump', () => {
+    const markup = renderMarkup(createElement(Trails))
+    expect(markup).toContain('class="trail-placeholder"')
+    expect(markup.indexOf('trail-placeholder')).toBeLessThan(markup.indexOf('report-panel'))
+  })
+
   it('shows the cold start notice', () => {
     expect(text).toContain('may take up to 10 seconds')
   })
