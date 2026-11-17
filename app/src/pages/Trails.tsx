@@ -79,7 +79,8 @@ export function Trails() {
       <h2 className="walk-heading">Walk a trail before you go</h2>
       <p className="lede">
         Choose a trail, pick your carrier, and press "Walk the trail". The map then shows where that
-        carrier claims coverage and, on T-Mobile, when a satellite text could get through.
+        carrier claims coverage, using the map of the Federal Communications Commission (FCC), and,
+        on T-Mobile, when a satellite text could get through.
       </p>
       <div className="trail-choices" role="group" aria-label="Choose a trail">
         <p className="trail-choices-label">Choose a trail</p>

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { captureCell as CaptureCell } from '../lib/cell'
 import { askForBackgroundSend, registerReportWorker } from '../lib/backgroundSend'
 import { openReportStore } from '../lib/reportStore'
+import { formatAreaWidth } from '../lib/units'
 import {
   CARRIERS,
+  REPORT_AREA_WIDTH_M,
   buildReport,
   enqueueReport,
   loadCarrier,
@@ -157,8 +159,8 @@ export function ReportButtons() {
     <section className="panel report-panel" aria-labelledby="report-heading">
       <h2 id="report-heading">Tell other hikers</h2>
       <p>
-        Did you have signal where you are standing? Your phone turns your position into an area about
-        350 m across and sends only that area, your carrier, and the hour. Your exact position never
+        Did you have signal where you are standing? Your phone turns your position into an area about{' '}
+        {formatAreaWidth(REPORT_AREA_WIDTH_M)} across and sends only that area, your carrier, and the hour. Your exact position never
         leaves your phone.
       </p>
       <label className="report-carrier">

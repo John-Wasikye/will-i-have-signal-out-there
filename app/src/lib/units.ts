@@ -17,3 +17,9 @@ export function formatElevation(meters: number): string {
 export function formatDistance(kilometers: number): string {
   return `${kilometers.toFixed(2)} km (${toMiles(kilometers).toFixed(2)} mi)`
 }
+
+/** For a width that is only approximate, so the feet are rounded to the nearest 10. */
+export function formatAreaWidth(meters: number): string {
+  const feet = Math.round((meters * FEET_PER_METER) / 10) * 10
+  return `${meters.toLocaleString('en-US')} m (${feet.toLocaleString('en-US')} ft)`
+}

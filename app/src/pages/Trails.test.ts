@@ -13,6 +13,11 @@ describe('Trails page', () => {
     expect(text).toContain('on T-Mobile, when a satellite text could get through')
   })
 
+  it('spells out FCC where the page first mentions it', () => {
+    expect(text).toContain('Federal Communications Commission (FCC)')
+    expect(text.indexOf('FCC')).toBe(text.indexOf('(FCC)') + 1)
+  })
+
   it('no longer ends with the old paragraph about T-Mobile coverage', () => {
     expect(text).not.toContain('I cover three main trails')
     expect(text).not.toContain('where T-Mobile claims coverage and where a satellite')

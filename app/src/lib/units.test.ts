@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDistance, formatElevation, toFeet, toMiles } from './units'
+import { formatAreaWidth, formatDistance, formatElevation, toFeet, toMiles } from './units'
 
 describe('toFeet', () => {
   it('converts meters to whole feet', () => {
@@ -24,5 +24,12 @@ describe('formatDistance', () => {
   it('shows kilometers with miles in brackets, both to two decimals', () => {
     expect(formatDistance(0)).toBe('0.00 km (0.00 mi)')
     expect(formatDistance(12.75)).toBe('12.75 km (7.92 mi)')
+  })
+})
+
+describe('formatAreaWidth', () => {
+  it('shows meters with feet in brackets, the feet to the nearest 10 because the width is approximate', () => {
+    expect(formatAreaWidth(350)).toBe('350 m (1,150 ft)')
+    expect(formatAreaWidth(100)).toBe('100 m (330 ft)')
   })
 })

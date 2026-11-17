@@ -13,6 +13,10 @@ describe('ReportButtons', () => {
     expect(markup.match(/<button/g)).toHaveLength(2)
   })
 
+  it('gives the width of the area in feet too', () => {
+    expect(text).toContain('about 350 m (1,150 ft) across')
+  })
+
   it('lets the hiker pick each carrier the API accepts', () => {
     for (const carrier of ['AT&amp;T', 'T-Mobile', 'Verizon']) {
       expect(markup).toContain(`<option value="${carrier}">`)

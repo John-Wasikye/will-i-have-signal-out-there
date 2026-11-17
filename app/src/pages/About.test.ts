@@ -38,7 +38,7 @@ describe('About page', () => {
 
   it('explains hiker reports and what leaves the phone', () => {
     expect(text).toContain('Hiker reports')
-    expect(text).toContain('Only an area about 350 m across')
+    expect(text).toContain('Only an area about 350 m (1,150 ft) across')
     expect(text).toContain('at least 5 reports in 7 days')
   })
 
