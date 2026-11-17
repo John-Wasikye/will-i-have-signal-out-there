@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { ColdStartNotice } from '../components/ColdStartNotice'
 import { DataFreshness } from '../components/DataFreshness'
 import { LateNotice } from '../components/LateNotice'
-import { PipelineCard, PipelineKey } from '../components/PipelineCard'
+import { PipelineCard, PipelineKey, PredictionsCard } from '../components/PipelineCard'
 import { trailSignalUrl, trailsUrl } from '../lib/api'
 import { formatUtc, pipelinesNeedingNotice, type StatusDoc } from '../lib/status'
+import { predictionsCard } from '../lib/trailPredictions'
 import type { TrailSignal, TrailSummary } from '../lib/trailSignal'
 import { useNow } from '../lib/useNow'
 import { usePageTitle } from '../lib/usePageTitle'
@@ -86,15 +87,15 @@ export function Status() {
           {pipelinesNeedingNotice(load.doc.pipelines).map((p) => (
             <LateNotice key={p.name} pipelineName={p.name} lastGoodRunUtc={p.last_good_run_utc} />
           ))}
-
-          <ul className="cards">
-            {load.doc.pipelines.map((p) => (
-              <PipelineCard key={p.name} pipeline={p} />
-            ))}
-          </ul>
-          <PipelineKey />
         </>
       )}
+
+      <ul className="cards">
+        <PredictionsCard card={predictionsCard(trail, now)} />
+        {load.kind === 'ready' &&
+          load.doc.pipelines.map((p) => <PipelineCard key={p.name} pipeline={p} />)}
+      </ul>
+      <PipelineKey />
     </>
   )
 }

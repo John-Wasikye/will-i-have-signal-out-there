@@ -1,5 +1,6 @@
 import { describePipeline } from '../lib/pipelineNames'
 import { formatUtc, type Pipeline } from '../lib/status'
+import type { PredictionsCard as PredictionsCardState } from '../lib/trailPredictions'
 
 const STATE_LABELS: Record<Pipeline['state'], string> = {
   ok: 'Working',
@@ -54,5 +55,28 @@ export function PipelineKey() {
         data.
       </li>
     </ul>
+  )
+}
+
+/** The nightly trail run, built from the trail answer, so it sits first among the pipelines. */
+export function PredictionsCard({ card }: { card: PredictionsCardState }) {
+  return (
+    <li className="card">
+      {card.kind === 'ready' && <StateBadge state={card.state} />}
+      <h3>Trail predictions</h3>
+      <p>The nightly job that works out coverage and satellite windows for every trail.</p>
+      {card.kind === 'loading' && <p>Loading the trail predictions.</p>}
+      {card.kind === 'error' && <p role="alert">The trail predictions are unavailable right now.</p>}
+      {card.kind === 'ready' && (
+        <dl className="facts">
+          <dt>Last finished</dt>
+          <dd>{formatUtc(card.lastGoodRunUtc)}</dd>
+          <dt>Valid until</dt>
+          <dd>{formatUtc(card.validUntilUtc)}</dd>
+          <dt>Schedule</dt>
+          <dd>Every night at 10:00 UTC.</dd>
+        </dl>
+      )}
+    </li>
   )
 }
