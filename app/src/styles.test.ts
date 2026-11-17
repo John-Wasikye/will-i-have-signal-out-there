@@ -47,7 +47,6 @@ const readablePairs = [
   ['color-on-accent', 'color-accent'],
   ['color-error', 'color-bg'],
   ['color-text', 'color-notice-bg'],
-  ['color-banner-text', 'color-banner-bg'],
   ['color-passed', 'color-card'],
 ]
 

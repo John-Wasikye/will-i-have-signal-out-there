@@ -10,8 +10,6 @@
   --color-notice-border: #a8642a;
   --color-error: #9a2f1d;
   --color-map-bg: #e8decb;
-  --color-banner-bg: #e6b45a;
-  --color-banner-text: #2a2319;
   --color-passed: #6c6962;
   --color-coverage: #4f7349;
   --color-reach: #b8602e;
@@ -44,8 +42,6 @@
     --color-notice-border: #d99a4e;
     --color-error: #f4a18c;
     --color-map-bg: #352c23;
-    --color-banner-bg: #6e4c17;
-    --color-banner-text: #fff1d6;
     --color-passed: #a5a199;
     --color-coverage: #8db57f;
     --color-reach: #e8955c;
@@ -303,17 +299,6 @@ h1 {
 
 .panel > .notice:first-child {
   margin-top: 0;
-}
-
-.dev-banner {
-  background: var(--color-banner-bg);
-  color: var(--color-banner-text);
-}
-
-.dev-banner p {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 10px var(--gutter);
 }
 
 .error-text {

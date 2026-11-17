@@ -5,7 +5,10 @@ const SOURCE_URL = 'https://github.com/John-Wasikye/will-i-have-signal-out-there
 export function SiteFooter() {
   return (
     <footer className="site-footer">
-      <p>I built this site as a portfolio project. The predictions are not checked in the field.</p>
+      <p>
+        I built this site as a portfolio project. I have not checked its predictions in the field,
+        so do not rely on it for your safety.
+      </p>
       <ul className="footer-links">
         <li>
           <Link to="/about">How it works</Link>

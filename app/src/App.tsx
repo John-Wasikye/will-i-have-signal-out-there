@@ -1,5 +1,4 @@
 import { Route, Routes } from 'react-router-dom'
-import { DevelopmentBanner } from './components/DevelopmentBanner'
 import { NavBar } from './components/NavBar'
 import { ScrollOnNavigate } from './components/ScrollOnNavigate'
 import { SiteFooter } from './components/SiteFooter'
@@ -12,7 +11,6 @@ import { Trails } from './pages/Trails'
 export default function App() {
   return (
     <>
-      <DevelopmentBanner />
       <ScrollOnNavigate />
       <NavBar />
       <main className="page">

@@ -11,11 +11,10 @@ function renderPage(path: string): string {
 const pages = ['/', '/trails', '/about', '/lookup', '/status', '/no-such-page']
 
 describe('the development banner', () => {
-  it.each(pages)('is shown above the navigation on %s', (path) => {
+  it.each(pages)('is gone from %s, because the footer carries the safety note', (path) => {
     const markup = renderPage(path)
-    const bannerAt = markup.indexOf('Under development:')
-    expect(bannerAt).toBeGreaterThanOrEqual(0)
-    expect(bannerAt).toBeLessThan(markup.indexOf('<header'))
+    expect(markup).not.toContain('dev-banner')
+    expect(visibleText(markup)).not.toContain('Under development')
   })
 })
 
@@ -51,10 +50,12 @@ describe('the site footer', () => {
     expect(markup.indexOf('<footer')).toBeGreaterThan(markup.indexOf('</main>'))
   })
 
-  it.each(pages)('says it is a portfolio project that is not checked in the field on %s', (path) => {
+  it.each(pages)('says it is a portfolio project and not to rely on it for safety on %s', (path) => {
     const footer = visibleText(renderPage(path).split('<footer')[1] ?? '')
-    expect(footer).toContain('I built this site as a portfolio project')
-    expect(footer).toContain('not checked in the field')
+    expect(footer).toContain('I built this site as a portfolio project.')
+    expect(footer).toContain(
+      'I have not checked its predictions in the field, so do not rely on it for your safety.',
+    )
   })
 
   it.each(pages)('links to how it works, status, the credits and the source code on %s', (path) => {
