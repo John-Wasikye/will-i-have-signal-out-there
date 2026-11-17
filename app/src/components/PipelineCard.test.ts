@@ -47,7 +47,10 @@ describe('PipelineCard', () => {
     const text = visibleText(render(pipeline))
     expect(text).toContain('Last finished')
     expect(text).toContain('Every night. Counted as late after 26 hours.')
-    expect(text).toContain('Test records checked: 3')
+  })
+
+  it('does not show the number of test records', () => {
+    expect(visibleText(render(pipeline))).not.toContain('Test records checked')
   })
 
   it('copes with a job that has not finished yet', () => {
