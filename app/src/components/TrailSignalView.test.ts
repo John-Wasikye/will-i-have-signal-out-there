@@ -120,8 +120,14 @@ describe('TrailSignalView', () => {
     expect(text).toContain('Reachable now')
   })
 
-  it('says the satellite answer applies to T-Mobile only', () => {
-    expect(visibleText(render(now))).toContain('Satellite text (T-Mobile only)')
+  it('names the satellite tile "Satellite text", with no suffix, on T-Mobile', () => {
+    const text = visibleText(render(now))
+    expect(text).toContain('Satellite text Reachable now')
+    expect(text).not.toContain('T-Mobile only')
+  })
+
+  it('lists the satellite windows from the chosen spot on T-Mobile', () => {
+    expect(visibleText(render(now))).toContain('Satellite windows from this spot')
   })
 
   it('leaves the satellite out of the key when the data is late', () => {
@@ -229,6 +235,18 @@ describe('TrailSignalView without T-Mobile on the map', () => {
   it('leaves the satellite out of the key, because the texts need T-Mobile', () => {
     expect(visibleText(markup)).not.toContain('satellite is reachable now')
     expect(visibleText(markup)).toContain('No coverage claimed')
+  })
+
+  it('says the satellite text needs T-Mobile in the point details', () => {
+    expect(visibleText(markup)).toContain('Satellite text Needs T-Mobile')
+  })
+
+  it('leaves the satellite windows and their heading out of the point details', () => {
+    const text = visibleText(markup)
+    expect(text).not.toContain('Satellite windows from this spot')
+    expect(text).not.toContain('No satellite is predicted')
+    expect(text).not.toContain('Reachable now')
+    expect(markup).not.toContain('class="window')
   })
 
   it('leaves the satellite count out of the map label', () => {
