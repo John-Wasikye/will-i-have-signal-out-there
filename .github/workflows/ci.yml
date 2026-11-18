@@ -66,6 +66,7 @@ jobs:
           pipelines/signal/tests/test_window_job_spark.py
           pipelines/signal/tests/test_dbt_copy_spark.py
           pipelines/signal/tests/test_coverage_spark.py
+          pipelines/signal/tests/test_orbit_stream_spark.py
 
   airflow:
     name: Airflow DAG tests

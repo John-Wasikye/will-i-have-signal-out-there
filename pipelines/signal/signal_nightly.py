@@ -21,6 +21,9 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
 10. ``tower_files_to_load`` and ``load_towers`` (C13) load the newest kept OpenCelliD file of
    each mobile country code into ``opencellid_tower``, only when the kept files differ from the
    last load's marker (ADR 0028).
+11. ``publish_orbit_updates`` and ``find_changed_satellites`` (C14) publish the night's new element
+   sets to Kafka and find the changed satellites with an availableNow streaming job, which writes
+   ``orbit_changed_satellite``.
 """
 
 from __future__ import annotations
@@ -88,6 +91,7 @@ from orbit_ingest import (
     parse_gp_records,
     store_raw,
 )
+from orbit_stream import publish_element_sets, run_orbit_stream
 from raw_store import latest_manifest, read_raw
 from report_copy import (
     cell_day_rows,
@@ -983,3 +987,45 @@ def _kept_reports_since(spark, table: str, first_day: date) -> list[dict]:  # no
         }
         for row in spark.sql(query).collect()
     ]
+
+
+def publish_orbit_updates(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    run_date: date,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+    bootstrap: str,
+) -> dict:
+    """Publish the run date's new element sets to Kafka (C14); return how many."""
+    published = publish_element_sets(
+        spark, run_date, contracts_dir=contracts_dir, namespace=namespace, bootstrap=bootstrap
+    )
+    return {"published": published}
+
+
+def find_changed_satellites(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    run_date: date,
+    detected_at: datetime,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+    bootstrap: str,
+    checkpoint: str,
+) -> dict:
+    """Read the new element sets from Kafka and write ``orbit_changed_satellite`` (C14).
+
+    Returns how many satellites changed in the run date's partition. A replay of the same
+    messages gives the same rows (AC-1B.2).
+    """
+    changed = run_orbit_stream(
+        spark,
+        run_date,
+        detected_at,
+        bootstrap=bootstrap,
+        checkpoint=checkpoint,
+        contracts_dir=contracts_dir,
+        namespace=namespace,
+    )
+    return {"changed": changed}
