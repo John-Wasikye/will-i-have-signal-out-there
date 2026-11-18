@@ -62,9 +62,20 @@ def _detect(batch, run_date=RUN_DATE):
     )
 
 
+def _as_utc(value):
+    """Return a time Spark collected as an aware UTC time.
+
+    Spark hands a timestamp back with no time zone, in the Python process's local time, so it is
+    read as local and converted; an empty value stays empty.
+    """
+    return None if value is None else value.astimezone(UTC)
+
+
 def _stored(spark):
     rows = spark.table(CHANGED).orderBy("norad_cat_id", "epoch_utc").collect()
-    return [(r["norad_cat_id"], r["epoch_utc"], r["previous_epoch_utc"]) for r in rows]
+    return [
+        (r["norad_cat_id"], _as_utc(r["epoch_utc"]), _as_utc(r["previous_epoch_utc"])) for r in rows
+    ]
 
 
 def test_a_satellite_new_to_the_table_is_written_with_no_previous_epoch(spark):
@@ -119,8 +130,8 @@ def test_a_row_has_the_contract_columns_the_run_time_and_the_run_date_partition(
     table = spark.table(CHANGED)
     assert table.columns == [c.name for c in columns] + ["run_date"]
     row = table.collect()[0]
-    assert row["detected_at_utc"] == DETECTED_AT
-    assert row["fetched_at_utc"] == FETCHED_AT
+    assert _as_utc(row["detected_at_utc"]) == DETECTED_AT
+    assert _as_utc(row["fetched_at_utc"]) == FETCHED_AT
     assert row["run_date"] == RUN_DATE
 
 
@@ -201,9 +212,10 @@ def test_the_reader_gets_back_what_the_publisher_wrote(spark):
 
     parsed = orbit_stream.parse_messages(raw, STREAM).collect()
 
-    assert [(r["norad_cat_id"], r["epoch_utc"], r["fetched_at_utc"]) for r in parsed] == [
-        (101, _epoch(18, 9), FETCHED_AT)
+    found = [
+        (r["norad_cat_id"], _as_utc(r["epoch_utc"]), _as_utc(r["fetched_at_utc"])) for r in parsed
     ]
+    assert found == [(101, _epoch(18, 9), FETCHED_AT)]
 
 
 def test_a_message_without_a_catalog_number_an_epoch_or_a_pull_time_is_left_out(spark):
