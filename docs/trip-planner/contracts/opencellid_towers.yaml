@@ -37,7 +37,7 @@ schema:
   - name: opencellid_tower
     physicalName: opencellid_tower
     physicalType: table
-    description: One row per cell whose estimated location is inside Arizona's box (longitude -114.82 to -109.04, latitude 31.33 to 37.00, the box of ookla_tile), from the newest kept file of each MCC, with the H3 resolution 9 cell of that location. Source columns, in order, are radio, mcc, net, area, cell, unit, lon, lat, range, samples, changeable, created, updated, averageSignal; changeable and averageSignal are retired by OpenCelliD and not kept.
+    description: One row per cell whose estimated location is inside Arizona's box (longitude -114.82 to -109.04, latitude 31.33 to 37.00, the box of ookla_tile), from the newest kept file of each MCC, with the H3 resolution 9 cell of that location. Source columns, in order, are radio, mcc, net, area, cell, unit, lon, lat, range, samples, changeable, created, updated, averageSignal; unit (scrambling code or physical cell ID) is not needed for distances and is not kept, and changeable and averageSignal are retired by OpenCelliD and not kept.
     properties:
       - name: tower_id
         logicalType: string
