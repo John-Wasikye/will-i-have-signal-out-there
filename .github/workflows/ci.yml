@@ -120,8 +120,14 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       # Trivy skips development packages, and the build tools are all development packages.
+      # npm audit cannot skip one advisory, so the gate reads its report: it fails on anything of
+      # moderate severity or worse that is not listed with an unexpired date. If the audit cannot
+      # run, its report holds an error, which the gate also fails on.
       - name: Audit the packages
-        run: npm audit --audit-level=moderate
+        run: |
+          npm audit --json > "$RUNNER_TEMP/npm-audit.json" || true
+          python3 ../.github/scripts/npm_audit_gate.py "$RUNNER_TEMP/npm-audit.json" \
+            ../.github/npm-audit-exceptions.txt
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
