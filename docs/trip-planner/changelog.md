@@ -10,6 +10,10 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 18, 2026: data as of dates on the trail page
+
+- The trail signal answer has a new field, `coverage_sources`: for each carrier on the trail, its FCC release and the date that release is as of (J26 is Jun 30, 2026, D25 is Dec 31, 2025). When a carrier has more than one release, the oldest is reported. The trail page shows a "Data as of" list with the picked carrier's date and the time of the last nightly run for the CelesTrak orbits. The contract has a `CoverageSource` schema, and the design doc C11 and C12 tables have an "As built" row. The pipeline did not change. The site tests went from 409 to 420.
+
 ### Nov 17, 2026: OpenCelliD cell locations (C13, part 3)
 
 - The C13 design has an "As built, part 3" row: `pipelines/signal/opencellid_towers.py` and the task `load_towers`, after `publish_marts` and beside `load_ookla`. I download the files by hand, because the download needs my API token. `load_towers_if_changed` keeps the newest file of each mobile country code and loads Iceberg `opencellid_tower` only when the set of kept file hashes changes (ADR 0028). The loader refuses a manifest whose `source_url` has a query, so the token is never stored.

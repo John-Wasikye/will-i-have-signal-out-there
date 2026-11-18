@@ -533,6 +533,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Main functions and classes (proposed) | FastAPI app `app`; `list_trails()`; `get_trail_signal(trail_id)`; `query_gold(sql, params)` (read-only DuckDB connection); response models `TrailSummary`, `TrailSignal`, `PointSignal`, `WindowOut`, `ErrorOut` |
 | Contract | openapi.yaml |
 | ADRs | 0006 |
+| As built (Nov 18, 2026) | `GET /trails/{trail_id}/signal` has a new field `coverage_sources`: one item per carrier on the trail, sorted by carrier, each `{carrier, fcc_release, data_as_of}`. `release_data_date` turns a release code into its date: J26 is Jun 30, 2026 and D25 is Dec 31, 2025, and the file's publish date after the underscore does not change it. A carrier with more than one release among the trail's points reports the oldest, because its map is only as fresh as its oldest file. The answer comes from the published `fct_trail_point_coverage` Parquet, so the pipeline did not change. The contract has a `CoverageSource` schema |
 
 #### C12 Trail page (F-1A.6)
 
@@ -543,6 +544,7 @@ Every component runs on the platform listed in section 11. Re-run safety rules (
 | Outputs | The page in the browser |
 | Main functions and classes (proposed) | React components `TrailPicker`, `TrailMap`, `WindowList`, `ValidUntilBanner`, `Credits`, `ColdStartNotice`, `DtcRequirementsNote`; `LateNotice` (the visible late notice); functions `isRunLate(validUntilUtc, now)` (definition of late: OQ-23), `formatLocalTime(utcIso)`, `windowsWithLateFlag(windows, now)` (marks each satellite window as late or current and never hides data); a timer that re-evaluates lateness while the page stays open |
 | ADRs | 0006 |
+| As built (Nov 18, 2026) | `TrailSignalView.tsx` shows a short "Data as of" list under the "Predictions valid until" line. It says "FCC coverage for <carrier>: data as of <date>" for the carrier picked on the map, and "Satellite orbits from CelesTrak: updated in the nightly run at <time>" from `last_good_run_utc` in the reader's local time with the time zone name. The date comes from the API, as a calendar date that the time zone does not move. If an older API answer has no `coverage_sources`, or none for the picked carrier, the coverage line is left out. Helpers `coverageSourceFor` and `formatDataDate` are in `app/src/lib/trailSignal.ts` |
 
 ### 7.2 Phase B components
 
