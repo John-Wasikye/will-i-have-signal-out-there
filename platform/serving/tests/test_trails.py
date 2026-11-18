@@ -157,3 +157,98 @@ def test_an_answer_has_every_field_the_contract_requires(signal):
     schemas = yaml.safe_load(OPENAPI.read_text(encoding="utf-8"))["components"]["schemas"]
     assert set(schemas["TrailSignal"]["required"]) <= set(signal)
     assert set(schemas["PointSignal"]["required"]) <= set(signal["points"][0])
+
+
+@pytest.mark.parametrize(
+    ("release", "expected"),
+    [
+        ("J26_10nov2026", date(2026, 6, 30)),
+        ("D25_12jan2026", date(2025, 12, 31)),
+        ("J25", date(2025, 6, 30)),
+        ("D24", date(2024, 12, 31)),
+    ],
+)
+def test_a_release_code_is_the_date_its_data_is_as_of(release, expected):
+    assert trails.release_data_date(release) == expected
+
+
+@pytest.mark.parametrize("release", ["", "X26_10nov2026", "J2_10nov2026", "june 2026", "J26x"])
+def test_an_unknown_release_format_raises_a_clear_error(release):
+    with pytest.raises(ValueError, match="Unknown FCC release"):
+        trails.release_data_date(release)
+
+
+def _write_coverage(folder: Path, rows: list[tuple[str, str, str]]) -> None:
+    """Replace the coverage file with (trail_point_id, carrier, fcc_release) rows."""
+    pq.write_table(
+        pa.table(
+            {
+                "trail_point_id": [row[0] for row in rows],
+                "carrier": [row[1] for row in rows],
+                "covered": [True] * len(rows),
+                "fcc_release": [row[2] for row in rows],
+            }
+        ),
+        folder / "fct_trail_point_coverage.parquet",
+    )
+
+
+def test_each_carrier_reports_the_date_its_coverage_data_is_as_of(signal):
+    assert signal["coverage_sources"] == [
+        {"carrier": "T-Mobile", "fcc_release": "D25", "data_as_of": "2025-12-31"}
+    ]
+
+
+def test_a_carrier_with_two_releases_reports_the_oldest(client, tmp_path):
+    _write_coverage(
+        tmp_path,
+        [
+            ("ba-00000", "Verizon", "J26_10nov2026"),
+            ("ba-00001", "Verizon", "D25_12jan2026"),
+            ("ba-00000", "AT&T", "J26_10nov2026"),
+            ("ba-00001", "AT&T", "J26_10nov2026"),
+        ],
+    )
+    sources = client.get("/trails/grca-bright-angel/signal").json()["coverage_sources"]
+    assert sources == [
+        {"carrier": "AT&T", "fcc_release": "J26_10nov2026", "data_as_of": "2026-06-30"},
+        {"carrier": "Verizon", "fcc_release": "D25_12jan2026", "data_as_of": "2025-12-31"},
+    ]
+
+
+def test_another_trails_releases_stay_out_of_the_sources(client, tmp_path):
+    _write_coverage(
+        tmp_path,
+        [("ba-00000", "T-Mobile", "J26"), ("sk-00000", "T-Mobile", "D24")],
+    )
+    sources = client.get("/trails/grca-bright-angel/signal").json()["coverage_sources"]
+    assert sources == [{"carrier": "T-Mobile", "fcc_release": "J26", "data_as_of": "2026-06-30"}]
+
+
+def test_a_release_the_api_cannot_read_leaves_that_carrier_out_and_the_answer_still_works(
+    client, tmp_path
+):
+    """A date is a detail; it must never break the trail page. With one release unreadable,
+    the carrier's oldest date is unknown, so the carrier gets no date at all."""
+    _write_coverage(
+        tmp_path,
+        [
+            ("ba-00000", "Verizon", "J26_10nov2026"),
+            ("ba-00001", "Verizon", "2026-H1"),
+            ("ba-00000", "AT&T", "J26_10nov2026"),
+        ],
+    )
+    response = client.get("/trails/grca-bright-angel/signal")
+
+    assert response.status_code == 200
+    assert response.json()["coverage_sources"] == [
+        {"carrier": "AT&T", "fcc_release": "J26_10nov2026", "data_as_of": "2026-06-30"}
+    ]
+
+
+def test_the_contract_describes_a_coverage_source():
+    schemas = yaml.safe_load(OPENAPI.read_text(encoding="utf-8"))["components"]["schemas"]
+    assert "coverage_sources" in schemas["TrailSignal"]["properties"]
+    source = schemas["CoverageSource"]
+    assert source["required"] == ["carrier", "fcc_release", "data_as_of"]
+    assert set(source["properties"]) == {"carrier", "fcc_release", "data_as_of"}

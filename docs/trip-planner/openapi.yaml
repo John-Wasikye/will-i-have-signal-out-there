@@ -238,7 +238,7 @@ components:
           description: From UNITCODE.
     TrailSignal:
       type: object
-      required: [trail_id, run_logical_date, valid_until_utc, last_good_run_utc, min_elevation_deg, points]
+      required: [trail_id, run_logical_date, valid_until_utc, last_good_run_utc, min_elevation_deg, coverage_sources, points]
       properties:
         trail_id:
           type: string
@@ -260,10 +260,28 @@ components:
           type: array
           items:
             type: string
+        coverage_sources:
+          type: array
+          description: One item per carrier on the trail, sorted by carrier. The FCC release behind that carrier's coverage and the date it is as of.
+          items:
+            $ref: '#/components/schemas/CoverageSource'
         points:
           type: array
           items:
             $ref: '#/components/schemas/PointSignal'
+    CoverageSource:
+      type: object
+      required: [carrier, fcc_release, data_as_of]
+      properties:
+        carrier:
+          type: string
+        fcc_release:
+          type: string
+          description: FCC release code, for example J26_10nov2026. The letter is J (June) or D (December), then the data year, then the date the file was published. If the trail's points use more than one release for this carrier, this is the oldest.
+        data_as_of:
+          type: string
+          format: date
+          description: The date the release's data is as of, June 30 or December 31 of the data year. A calendar date, not a time.
     PointSignal:
       type: object
       required: [trail_point_id, seq, lon, lat, coverage, windows]

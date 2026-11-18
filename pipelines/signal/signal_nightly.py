@@ -18,8 +18,9 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
    technology and flags each trail point, only when the files or the points changed (ADR 0028).
 9. ``ookla_quarter_to_load`` and ``load_ookla_quarter`` (C13) load Ookla's newest quarter of
    Arizona speed-test tiles into ``ookla_tile``, once per quarter.
-10. ``load_towers_if_changed`` (C13) loads the newest kept OpenCelliD file of each mobile country
-   code into ``opencellid_tower``, only when the kept files changed (ADR 0028).
+10. ``tower_files_to_load`` and ``load_towers`` (C13) load the newest kept OpenCelliD file of
+   each mobile country code into ``opencellid_tower``, only when the kept files differ from the
+   last load's marker (ADR 0028).
 """
 
 from __future__ import annotations
@@ -108,7 +109,7 @@ from satellite_windows import (
     run_window_job,
 )
 from terrain_horizon import RANGE_M, HorizonProfile, compute_horizons, validate_horizon
-from timeutil import require_utc
+from timeutil import format_utc, require_utc
 from trail_loader import (
     PHASE_A_TRAILS,
     PHASE_A_UNIT_CODE,
@@ -125,6 +126,8 @@ from trail_loader import (
 
 # Tiles reach 1 km past the horizon range, so no ray from a point near a tile edge runs off them.
 TILE_MARGIN_M = 1_000
+# Kept beside, not under, the OpenCelliD files, so the file listing never reads it as a manifest.
+OPENCELLID_LOADED_PREFIX = "signal/opencellid_loaded"
 # Lake copies of reports are deleted 30 days after their copy (ADR 0034).
 REPORT_COPY_RETENTION = timedelta(days=30)
 # A day's reports can be copied on later nights; 20 days of recount covers many missed nights.
@@ -828,30 +831,40 @@ def load_ookla_quarter(
     }
 
 
-def load_towers_if_changed(
+def tower_files_to_load(s3, raw_bucket: str) -> list[dict] | None:  # noqa: ANN001
+    """Return the newest kept OpenCelliD file of each MCC if they are not the loaded ones (C13).
+
+    Cells are reference data (ADR 0028), so most nights there is nothing to do. The check needs no
+    Spark: it compares the kept files with the "loaded" marker the last load wrote. The table
+    cannot answer this, because a kept file with no Arizona cells leaves no row and so no hash.
+    Returns None before the first file is kept, or when the kept files are the loaded ones.
+    """
+    manifests = _newest_tower_files(s3, raw_bucket)
+    if not manifests:
+        return None
+    if _kept_hashes(manifests) == _loaded_tower_hashes(s3, raw_bucket):
+        return None
+    return manifests
+
+
+def load_towers(
     spark,  # noqa: ANN001, a pyspark SparkSession
     s3,  # noqa: ANN001, a boto3 S3 client
     raw_bucket: str,
+    manifests: list[dict],
     run_date: date,
     *,
     contracts_dir: Path,
     namespace: str,
+    now_utc: datetime,
 ) -> dict:
-    """Load the newest kept OpenCelliD file of each mobile country code (C13 part 3).
+    """Load the given OpenCelliD files into ``opencellid_tower``, then write the loaded marker.
 
     The download needs John's API token, so the files are kept in the raw bucket by hand and this
-    step never downloads them. Cells are reference data (ADR 0028): the step loads only when the
-    kept files are not exactly the loaded ones, and every kept file is loaded each time, so the
-    newest partition holds every MCC. Before the first file is kept it does nothing. Returns
-    ``{"changed": False, "files": n}``, or how many files and cells were loaded, by radio.
+    step never downloads them. Every kept file is loaded each time, so the partition holds every
+    MCC. The marker is written only after the lake write, so a night that fails part way loads
+    again. Returns how many files and cells were loaded, by radio.
     """
-    manifests = _newest_tower_files(s3, raw_bucket)
-    if not manifests:
-        return {"changed": False, "files": 0}
-    kept = {manifest["content_sha256"] for manifest in manifests}
-    if kept == _loaded_hashes(spark, f"{CATALOG_NAME}.{namespace}.opencellid_tower"):
-        return {"changed": False, "files": len(manifests)}
-
     rows: list[dict] = []
     for manifest in manifests:
         check_manifest(manifest)
@@ -875,10 +888,62 @@ def load_towers_if_changed(
         ),
         namespace=namespace,
     )
+    _store_loaded_towers(s3, raw_bucket, manifests, run_date, now_utc)
     by_radio: dict[str, int] = {}
     for row in rows:
         by_radio[row["radio"]] = by_radio.get(row["radio"], 0) + 1
     return {"changed": True, "files": len(manifests), "cells": len(rows), "by_radio": by_radio}
+
+
+def _kept_hashes(manifests: list[dict]) -> list[str]:
+    return sorted(manifest["content_sha256"] for manifest in manifests)
+
+
+def _loaded_tower_hashes(s3, raw_bucket: str) -> list[str] | None:  # noqa: ANN001
+    """Return the file hashes in the newest loaded marker, or None if nothing was loaded yet."""
+    keys = [
+        item["Key"]
+        for page in s3.get_paginator("list_objects_v2").paginate(
+            Bucket=raw_bucket, Prefix=f"{OPENCELLID_LOADED_PREFIX}/"
+        )
+        for item in page.get("Contents", [])
+        if item["Key"].endswith("loaded.json")
+    ]
+    if not keys:
+        return None
+    return json.loads(read_raw(s3, raw_bucket, max(keys)))["content_sha256"]
+
+
+def _store_loaded_towers(
+    s3,  # noqa: ANN001, a boto3 S3 client
+    raw_bucket: str,
+    manifests: list[dict],
+    run_date: date,
+    now_utc: datetime,
+) -> None:
+    """Keep a marker of the loaded files, unless the newest one already lists exactly them.
+
+    Raw writes never replace a file, so a rerun of the same files writes nothing.
+    """
+    hashes = _kept_hashes(manifests)
+    if _loaded_tower_hashes(s3, raw_bucket) == hashes:
+        return
+    stamp = format_utc(require_utc(now_utc, "now_utc"))
+    s3.put_object(
+        Bucket=raw_bucket,
+        Key=f"{OPENCELLID_LOADED_PREFIX}/loaded_at={stamp}/loaded.json",
+        Body=json.dumps(
+            {
+                "loaded_at_utc": stamp,
+                "run_date": date(run_date.year, run_date.month, run_date.day).isoformat(),
+                "raw_keys": [manifest["raw_key"] for manifest in manifests],
+                "content_sha256": hashes,
+            },
+            indent=2,
+        ).encode(),
+        IfNoneMatch="*",
+        ContentType="application/json",
+    )
 
 
 def _newest_tower_files(s3, raw_bucket: str) -> list[dict]:  # noqa: ANN001

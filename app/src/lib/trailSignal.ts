@@ -25,6 +25,13 @@ export interface PointSignal {
   windows: WindowOut[]
 }
 
+/** The FCC release behind one carrier's coverage, and the date its data is as of. */
+export interface CoverageSource {
+  carrier: string
+  fcc_release: string
+  data_as_of: string
+}
+
 /** The answer from GET /trails/{trail_id}/signal. */
 export interface TrailSignal {
   trail_id: string
@@ -33,6 +40,8 @@ export interface TrailSignal {
   last_good_run_utc: string
   min_elevation_deg: number
   carriers: string[]
+  /** Missing in an answer from an older API. */
+  coverage_sources?: CoverageSource[]
   points: PointSignal[]
 }
 
@@ -191,4 +200,23 @@ export function freshness(lastGoodRunUtc: string, validUntilUtc: string, now: Da
 /** How far along the trail line a point is. Points are sampled every 50 meters. */
 export function distanceKm(seq: number): number {
   return seq * POINT_SPACING_KM
+}
+
+export function coverageSourceFor(
+  sources: CoverageSource[] | undefined,
+  carrier: string,
+): CoverageSource | undefined {
+  return sources?.find((source) => source.carrier === carrier)
+}
+
+/** A calendar date in words. It is a date, not a time, so the reader's time zone must not move it. */
+export function formatDataDate(isoDate: string): string {
+  const date = new Date(`${isoDate}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return 'Unknown date'
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
 }

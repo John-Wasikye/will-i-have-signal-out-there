@@ -320,15 +320,22 @@ def signal_phase_a_nightly():
     @task
     def load_towers(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
         """Load the kept OpenCelliD cells for Arizona when the kept files change (C13)."""
+        s3 = aws_client("s3")
+        raw_bucket = os.environ["PLATFORM_RAW_BUCKET"]
+        manifests = signal_nightly.tower_files_to_load(s3, raw_bucket)
+        if manifests is None:
+            return {"changed": False}
         spark = build_spark_session("signal_load_towers", WAREHOUSE, use_glue=USE_GLUE)
         try:
-            return signal_nightly.load_towers_if_changed(
+            return signal_nightly.load_towers(
                 spark,
-                aws_client("s3"),
-                os.environ["PLATFORM_RAW_BUCKET"],
+                s3,
+                raw_bucket,
+                manifests,
                 _run_date(dag_run, data_interval_end),
                 contracts_dir=_contracts_dir(),
                 namespace=ICEBERG_NAMESPACE,
+                now_utc=datetime.now(UTC),
             )
         finally:
             spark.stop()

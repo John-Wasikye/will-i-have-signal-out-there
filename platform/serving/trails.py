@@ -9,6 +9,7 @@ would not fit in one answer. Values from a request go in query parameters only.
 from __future__ import annotations
 
 import os
+import re
 from collections import defaultdict
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -20,6 +21,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 PUBLISHED_DIR = Path(os.environ.get("PUBLISHED_DIR", "published"))
+
+RELEASE_PATTERN = re.compile(r"(?P<half>[JD])(?P<year>\d{2})(?:_\w+)?")
 
 router = APIRouter(tags=["trails"])
 
@@ -63,6 +66,14 @@ class PointSignal(BaseModel):
     windows: list[WindowOut]
 
 
+class CoverageSource(BaseModel):
+    """The FCC release behind one carrier's coverage on a trail, and the date it is as of."""
+
+    carrier: str
+    fcc_release: str
+    data_as_of: date
+
+
 class TrailSignal(BaseModel):
     """Answer from GET /trails/{trail_id}/signal."""
 
@@ -72,6 +83,7 @@ class TrailSignal(BaseModel):
     last_good_run_utc: datetime
     min_elevation_deg: float
     carriers: list[str]
+    coverage_sources: list[CoverageSource]
     points: list[PointSignal]
 
 
@@ -85,6 +97,20 @@ def _utc(microseconds: int) -> datetime:
     DuckDB returns the number directly, so no timezone library is needed in Lambda.
     """
     return datetime.fromtimestamp(microseconds / 1_000_000, tz=UTC)
+
+
+def release_data_date(release: str) -> date:
+    """Return the date an FCC release's data is as of.
+
+    A release looks like J26 or J26_10nov2026: the letter is J for the June release and D for
+    the December release, the two digits are the data year, and an optional suffix after the
+    underscore is the date the file was published, which does not change the data date.
+    """
+    match = RELEASE_PATTERN.fullmatch(release)
+    if match is None:
+        raise ValueError(f"Unknown FCC release {release!r}: expected J or D, two digits of year.")
+    year = 2000 + int(match["year"])
+    return date(year, 6, 30) if match["half"] == "J" else date(year, 12, 31)
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
@@ -109,6 +135,39 @@ def _coverage_by_point(trail_id: str) -> dict[str, list[CarrierCoverage]]:
             CarrierCoverage(carrier=row["carrier"], covered=row["covered"])
         )
     return coverage
+
+
+def _coverage_sources(trail_id: str) -> list[CoverageSource]:
+    """One source per carrier: its oldest release, because the map is only as fresh as that.
+
+    A carrier with a release this code cannot read gets no source, since its oldest date is then
+    unknown; the date is a detail and must never break the trail answer.
+    """
+    rows = query_rows(
+        "SELECT DISTINCT c.carrier, c.fcc_release "
+        "FROM read_parquet(?) AS c JOIN read_parquet(?) AS p USING (trail_point_id) "
+        "WHERE p.trail_id = ?",
+        [_table("fct_trail_point_coverage"), _table("dim_trail_point"), trail_id],
+    )
+    unreadable = {
+        row["carrier"] for row in rows if RELEASE_PATTERN.fullmatch(row["fcc_release"]) is None
+    }
+    oldest: dict[str, CoverageSource] = {}
+    for row in rows:
+        if row["carrier"] in unreadable:
+            continue
+        source = CoverageSource(
+            carrier=row["carrier"],
+            fcc_release=row["fcc_release"],
+            data_as_of=release_data_date(row["fcc_release"]),
+        )
+        kept = oldest.get(source.carrier)
+        if kept is None or (source.data_as_of, source.fcc_release) < (
+            kept.data_as_of,
+            kept.fcc_release,
+        ):
+            oldest[source.carrier] = source
+    return [oldest[carrier] for carrier in sorted(oldest)]
 
 
 def _windows_by_point(trail_id: str) -> dict[str, list[WindowOut]]:
@@ -172,6 +231,7 @@ def get_trail_signal(trail_id: str) -> TrailSignal | JSONResponse:
         )
         coverage = _coverage_by_point(trail_id)
         windows = _windows_by_point(trail_id)
+        coverage_sources = _coverage_sources(trail_id)
     except duckdb.Error:
         return _unavailable()
 
@@ -182,6 +242,7 @@ def get_trail_signal(trail_id: str) -> TrailSignal | JSONResponse:
         last_good_run_utc=_utc(run["run_started_us"]),
         min_elevation_deg=run["min_elevation_deg"],
         carriers=sorted({item.carrier for flags in coverage.values() for item in flags}),
+        coverage_sources=coverage_sources,
         points=[
             PointSignal(
                 **point,

@@ -315,6 +315,21 @@ label {
   font-weight: 600;
 }
 
+.data-as-of {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+}
+
+.data-as-of-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.data-as-of ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
 .hero-text {
   max-width: 960px;
   margin: 0 auto;

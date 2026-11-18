@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   distanceKm,
   freshness,
@@ -8,6 +8,8 @@ import {
   nextWalkStep,
   nextWindow,
   coveredPointCount,
+  coverageSourceFor,
+  formatDataDate,
   pointState,
   startingCarrier,
   trailRuns,
@@ -248,5 +250,44 @@ describe('coveredPointCount', () => {
     }))
     expect(coveredPointCount(points, 'T-Mobile')).toBe(2)
     expect(coveredPointCount(points, 'AT&T')).toBe(3)
+  })
+})
+
+describe('coverageSourceFor', () => {
+  const sources = [
+    { carrier: 'AT&T', fcc_release: 'J26', data_as_of: '2026-06-30' },
+    { carrier: 'T-Mobile', fcc_release: 'D25', data_as_of: '2025-12-31' },
+  ]
+
+  it('finds the source of the chosen carrier', () => {
+    expect(coverageSourceFor(sources, 'T-Mobile')).toEqual(sources[1])
+  })
+
+  it('finds nothing for a carrier with no source', () => {
+    expect(coverageSourceFor(sources, 'Verizon')).toBeUndefined()
+  })
+
+  it('finds nothing when an older API sent no sources', () => {
+    expect(coverageSourceFor(undefined, 'T-Mobile')).toBeUndefined()
+  })
+})
+
+describe('formatDataDate', () => {
+  it('writes a calendar date in words', () => {
+    expect(formatDataDate('2026-06-30')).toBe('Jun 30, 2026')
+    expect(formatDataDate('2025-12-31')).toBe('Dec 31, 2025')
+  })
+
+  it('does not shift the date with the reader time zone', () => {
+    vi.stubEnv('TZ', 'Pacific/Honolulu')
+    try {
+      expect(formatDataDate('2026-06-30')).toBe('Jun 30, 2026')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('says so when the date cannot be read', () => {
+    expect(formatDataDate('soon')).toBe('Unknown date')
   })
 })
