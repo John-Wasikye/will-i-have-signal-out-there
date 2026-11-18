@@ -10,7 +10,7 @@ dataProduct: signal-planner
 description:
   purpose: Which satellites had a new element set, and when, found by the availableNow Structured Streaming job from the orbit update stream (C14, ADR 0016). A satellite is changed when a new element set has a later epoch than the last stored one for its catalog number (ADR 0028).
   limitations: Low-rate. Holds only element sets the stream delivered, so a satellite with no later epoch has no row. Replaying the same messages writes the same rows (AC-1B.2).
-  usage: The trigger for re-propagation in C5.
+  usage: A record of which satellites changed each night; the nightly task returns their count. C5 (compute_windows) does not read it, because the 26-hour span moves every night and C5 already propagates every satellite from its newest element set (C14 plan approved by John, Nov 17, 2026).
 team:
   - username: John
     role: owner

@@ -10,7 +10,7 @@ dataProduct: signal-planner
 description:
   purpose: Kafka topic of new CelesTrak element sets published by the nightly run, read by the availableNow Structured Streaming job to find changed satellites.
   limitations: Low-rate stream. The key is the NORAD catalog number as a string and the value is one JSON object per element set. Timestamps in the value are UTC text like 2026-11-18T09:30:00.000Z. The stream gives at-least-once delivery, so the same element set can arrive twice, and the reader drops the copy (dropDuplicatesWithinWatermark) and writes the same rows (AC-1B.2). The 2-hour watermark runs on fetched_at_utc, the pull time, which moves forward once a night. On the epoch it would drop real updates, because epochs are spread over a day or more.
-  usage: Input to C14 and the trigger for re-propagation in C5.
+  usage: Input to the C14 stream job, which writes orbit_changed_satellite.
 team:
   - username: John
     role: owner
