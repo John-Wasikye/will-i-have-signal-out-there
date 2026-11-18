@@ -1,4 +1,4 @@
-# Data contract (ODCS), proposed, waiting for John (Nov 2026). Internal Iceberg table written by the orbit stream job (C14); not a source or a published table. The job takes its column types from here. ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). 0.1.0 approved by John (Nov 18, 2026). Internal Iceberg table written by the orbit stream job (C14); not a source or a published table. The job takes its column types from here. ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-orbit-changed-satellite
@@ -9,7 +9,7 @@ domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: Which satellites had a new element set, and when, found by the availableNow Structured Streaming job from the orbit update stream (C14, ADR 0016). A satellite is changed when a new element set has a later epoch than the last stored one for its catalog number (ADR 0028).
-  limitations: Low-rate. Holds only element sets the stream delivered, so a satellite with no later epoch has no row. Replaying the same messages writes the same rows (AC-1B.2). The physical table allows empty values in every column, because Iceberg refuses a MERGE source that Spark cannot prove is never empty; the required columns below are enforced by the stream job, which drops any message without a catalog number or an epoch before it writes.
+  limitations: Low-rate. Holds only element sets the stream delivered, so a satellite with no later epoch has no row. Replaying the same messages writes the same rows (AC-1B.2). The physical table allows empty values in every column, because Iceberg refuses a MERGE source that Spark cannot prove is never empty; the required columns below are enforced by the stream job, which drops any message without a catalog number, an epoch or a pull time before it writes.
   usage: A record of which satellites changed each night; the nightly task returns their count. C5 (compute_windows) does not read it, because the 26-hour span moves every night and C5 already propagates every satellite from its newest element set (C14 plan approved by John, Nov 17, 2026).
 team:
   - username: John

@@ -142,7 +142,8 @@ def publish_element_sets(
 def parse_messages(raw, contract_path: Path):  # noqa: ANN001, ANN201, a DataFrame with ``value``
     """Return each message's catalog number, epoch and pull time, read with the explicit schema.
 
-    A message that is not JSON of that shape, or has no catalog number or epoch, is left out.
+    A message that is not JSON of that shape, or has no catalog number, epoch or pull time, is
+    left out: the watermark runs on the pull time, and the table relies on this check.
     """
     from pyspark.sql import functions as F
 
@@ -150,7 +151,11 @@ def parse_messages(raw, contract_path: Path):  # noqa: ANN001, ANN201, a DataFra
     return (
         raw.select(parsed.alias("message"))
         .select("message.norad_cat_id", "message.epoch_utc", "message.fetched_at_utc")
-        .where(F.col("norad_cat_id").isNotNull() & F.col("epoch_utc").isNotNull())
+        .where(
+            F.col("norad_cat_id").isNotNull()
+            & F.col("epoch_utc").isNotNull()
+            & F.col("fetched_at_utc").isNotNull()
+        )
     )
 
 

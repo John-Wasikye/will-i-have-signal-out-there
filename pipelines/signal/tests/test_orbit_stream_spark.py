@@ -206,6 +206,23 @@ def test_the_reader_gets_back_what_the_publisher_wrote(spark):
     ]
 
 
+def test_a_message_without_a_catalog_number_an_epoch_or_a_pull_time_is_left_out(spark):
+    """The watermark runs on the pull time, so every required field is checked before writing."""
+    whole = '{"norad_cat_id": 101, "epoch_utc": "2026-11-18T09:00:00.000Z", '
+    whole += '"fetched_at_utc": "2026-11-18T09:00:00.000Z", "elements": {}}'
+    values = [
+        whole,
+        '{"epoch_utc": "2026-11-18T09:00:00.000Z", "fetched_at_utc": "2026-11-18T09:00:00.000Z"}',
+        '{"norad_cat_id": 102, "fetched_at_utc": "2026-11-18T09:00:00.000Z"}',
+        '{"norad_cat_id": 103, "epoch_utc": "2026-11-18T09:00:00.000Z"}',
+    ]
+    raw = spark.createDataFrame([(v,) for v in values], "value STRING")
+
+    parsed = orbit_stream.parse_messages(raw, STREAM).collect()
+
+    assert [r["norad_cat_id"] for r in parsed] == [101]
+
+
 def _write_messages(folder: Path, *pairs, fetched_at=FETCHED_AT, name="messages.json") -> None:
     """Write messages as JSON lines, one file per pull, the way the topic would hold them."""
     folder.mkdir(exist_ok=True)

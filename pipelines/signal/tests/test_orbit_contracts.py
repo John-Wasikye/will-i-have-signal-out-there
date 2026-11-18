@@ -25,10 +25,10 @@ def _server_settings(contract: dict) -> dict[str, str]:
     return {item["property"]: item["value"] for item in server["customProperties"]}
 
 
-def test_both_contracts_are_proposals_at_the_versions_this_change_builds():
-    for path in (STREAM, TABLE):
+def test_both_contracts_are_approved_at_the_versions_this_change_builds():
+    for path, version in ((STREAM, "0.2.0"), (TABLE, "0.1.0")):
         first_line = path.read_text(encoding="utf-8").splitlines()[0]
-        assert "proposed, waiting for John" in first_line, path.name
+        assert f"{version} approved by John (Nov 18, 2026)" in first_line, path.name
     assert _load(STREAM)["version"] == "0.2.0"
     assert _load(TABLE)["version"] == "0.1.0"
 
