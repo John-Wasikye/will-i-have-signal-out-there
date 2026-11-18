@@ -11,6 +11,8 @@ box and CI use the AWS Glue catalog through the Iceberg Spark runtime.
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
 from datetime import date, datetime
 
 from sample_rows import build_sample_rows
@@ -42,6 +44,34 @@ def spark_packages(use_glue: bool) -> str:
     return ICEBERG_PACKAGE
 
 
+def spark_settings(warehouse: str, use_glue: bool, environ: Mapping[str, str]) -> dict[str, str]:
+    """Return the Spark settings for Iceberg, and for S3 through Hadoop's s3a driver.
+
+    The Airflow image already holds every jar (platform/box/spark-jars.txt) and sets
+    SPARK_JARS_IN_IMAGE, so only a session outside the image, such as CI's, downloads packages.
+    The s3a settings are for streaming checkpoints in S3: the box's instance role is the
+    credential, and the region is the one install.sh gives the pods.
+    """
+    prefix = f"spark.sql.catalog.{CATALOG_NAME}"
+    settings = {
+        "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+        prefix: "org.apache.iceberg.spark.SparkCatalog",
+        f"{prefix}.warehouse": warehouse,
+        "spark.hadoop.fs.s3a.aws.credentials.provider": (
+            "com.amazonaws.auth.DefaultAWSCredentialsProviderChain"
+        ),
+        "spark.hadoop.fs.s3a.endpoint.region": environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+    }
+    if environ.get("SPARK_JARS_IN_IMAGE") != "1":
+        settings["spark.jars.packages"] = spark_packages(use_glue)
+    if use_glue:
+        settings[f"{prefix}.catalog-impl"] = "org.apache.iceberg.aws.glue.GlueCatalog"
+        settings[f"{prefix}.io-impl"] = "org.apache.iceberg.aws.s3.S3FileIO"
+    else:
+        settings[f"{prefix}.type"] = "hadoop"
+    return settings
+
+
 def build_spark_session(app_name: str, warehouse: str, use_glue: bool = False):  # noqa: ANN201
     """Create a SparkSession configured for Iceberg.
 
@@ -50,26 +80,9 @@ def build_spark_session(app_name: str, warehouse: str, use_glue: bool = False): 
     """
     from pyspark.sql import SparkSession
 
-    builder = (
-        SparkSession.builder.appName(app_name)
-        .config("spark.jars.packages", spark_packages(use_glue))
-        .config(
-            "spark.sql.extensions",
-            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
-        )
-        .config(f"spark.sql.catalog.{CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog")
-        .config(f"spark.sql.catalog.{CATALOG_NAME}.warehouse", warehouse)
-    )
-    if use_glue:
-        builder = builder.config(
-            f"spark.sql.catalog.{CATALOG_NAME}.catalog-impl",
-            "org.apache.iceberg.aws.glue.GlueCatalog",
-        ).config(
-            f"spark.sql.catalog.{CATALOG_NAME}.io-impl",
-            "org.apache.iceberg.aws.s3.S3FileIO",
-        )
-    else:
-        builder = builder.config(f"spark.sql.catalog.{CATALOG_NAME}.type", "hadoop")
+    builder = SparkSession.builder.appName(app_name)
+    for key, value in spark_settings(warehouse, use_glue, os.environ).items():
+        builder = builder.config(key, value)
     return builder.getOrCreate()
 
 

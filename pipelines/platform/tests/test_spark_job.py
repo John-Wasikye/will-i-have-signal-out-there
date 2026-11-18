@@ -15,6 +15,7 @@ from sample_iceberg_job import (
     RowLimitExceeded,
     run_sample_iceberg_job,
     spark_packages,
+    spark_settings,
 )
 from sample_rows import build_sample_rows
 
@@ -149,3 +150,40 @@ def test_spark_uses_iceberg_1_12_for_both_packages():
     """1.12 lists orphan files with Iceberg's own S3 client; 1.6.1 needed Hadoop's S3 driver."""
     assert ICEBERG_PACKAGE.endswith(":1.12.0")
     assert ICEBERG_AWS_PACKAGE.endswith(":1.12.0")
+
+
+def test_a_session_outside_the_image_downloads_the_packages():
+    settings = spark_settings("/w", True, {})
+
+    assert settings["spark.jars.packages"] == spark_packages(use_glue=True)
+
+
+def test_a_session_in_the_image_downloads_nothing_because_the_jars_are_there():
+    settings = spark_settings("/w", True, {"SPARK_JARS_IN_IMAGE": "1"})
+
+    assert "spark.jars.packages" not in settings
+
+
+def test_the_iceberg_catalog_is_glue_on_the_box_and_a_local_folder_in_dev():
+    glue = spark_settings("s3://lake/warehouse", True, {})
+    local = spark_settings("/w", False, {})
+
+    prefix = f"spark.sql.catalog.{CATALOG_NAME}"
+    assert glue[f"{prefix}.catalog-impl"] == "org.apache.iceberg.aws.glue.GlueCatalog"
+    assert glue[f"{prefix}.io-impl"] == "org.apache.iceberg.aws.s3.S3FileIO"
+    assert glue[f"{prefix}.warehouse"] == "s3://lake/warehouse"
+    assert local[f"{prefix}.type"] == "hadoop"
+    assert f"{prefix}.catalog-impl" not in local
+
+
+def test_spark_keeps_checkpoints_in_s3_with_the_boxs_instance_role():
+    settings = spark_settings("/w", True, {"AWS_DEFAULT_REGION": "eu-west-2"})
+
+    assert settings["spark.hadoop.fs.s3a.aws.credentials.provider"] == (
+        "com.amazonaws.auth.DefaultAWSCredentialsProviderChain"
+    )
+    assert settings["spark.hadoop.fs.s3a.endpoint.region"] == "eu-west-2"
+
+
+def test_the_s3_region_is_us_east_1_when_the_environment_has_none():
+    assert spark_settings("/w", True, {})["spark.hadoop.fs.s3a.endpoint.region"] == "us-east-1"

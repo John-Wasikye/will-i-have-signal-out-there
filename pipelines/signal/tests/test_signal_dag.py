@@ -54,6 +54,8 @@ def test_every_step_is_a_task(signal_dag):
         "copy_reports",
         "load_ookla",
         "load_towers",
+        "publish_orbit_updates",
+        "find_changed_satellites",
     }
 
 
@@ -120,6 +122,21 @@ def test_the_tower_load_runs_last_after_a_good_publish(signal_dag):
     """The OpenCelliD cells feed only the confidence model (C17), like the Ookla tiles."""
     task = signal_dag.get_task("load_towers")
     assert task.upstream_task_ids == {"publish_marts"}
+    assert task.trigger_rule == "all_success"
+    assert task.downstream_task_ids == set()
+
+
+def test_the_orbit_updates_are_published_after_a_good_publish_and_never_delay_the_page(signal_dag):
+    """The stream feeds only re-propagation (C14), so like the Ookla load it runs last."""
+    task = signal_dag.get_task("publish_orbit_updates")
+    assert task.upstream_task_ids == {"publish_marts"}
+    assert task.trigger_rule == "all_success"
+    assert task.downstream_task_ids == {"find_changed_satellites"}
+
+
+def test_the_changed_satellites_are_found_after_the_updates_are_published(signal_dag):
+    task = signal_dag.get_task("find_changed_satellites")
+    assert task.upstream_task_ids == {"publish_orbit_updates"}
     assert task.trigger_rule == "all_success"
     assert task.downstream_task_ids == set()
 

@@ -10,6 +10,8 @@ These are the files that run on the session box, the one computer that runs the 
 | `airflow-values.yaml` | Settings for the official Airflow chart. Local executor, CPU and memory limits, connection keys from Parameter Store. |
 | `airflow-values-live.yaml` | The one thing that changes for live: the Parameter Store path. |
 | `install.sh` | Sets up the box: the image registry sign-in, k3s, Helm, the Python tools, the database secrets, the platform settings, Airflow, the database restore, a restart, and the watchdog. |
+| `kafka.yaml` | One Kafka broker for the orbit update stream: KRaft mode, the official image pinned by digest, a volume for the log, 7 days of retention. `install.sh` applies it and creates the topic `orbit-element-sets` if it is missing. |
+| `spark-jars.txt` | The Spark jars baked into the Airflow image (Iceberg, the Kafka connector, Hadoop S3), each with its SHA-1. The build fails on a mismatch. |
 | `ecr_registry_login.sh` | Writes a fresh ECR password where k3s reads it, so k3s can pull my image from the private repository. A service runs it before k3s at every boot. |
 | `requirements-host.txt` | The Python packages for the scripts that run on the box itself. |
 | `airflow_db_backup.py` | Saves Airflow's database to S3 and restores the newest copy. |
@@ -22,7 +24,8 @@ These are the files that run on the session box, the one computer that runs the 
 3. It puts the bucket names, the environment name and the run alerts topic in a settings object, because they hold the AWS account number and stay out of the repository. It refuses a topic from the other environment.
 4. It installs Airflow with the chart, using my image and my settings.
 5. It restores the newest database backup from S3, then restarts Airflow, so the run history is back.
-6. It starts the watchdog as a system service.
+6. It starts one Kafka broker in its own namespace and creates the orbit topic if it is missing.
+7. It starts the watchdog as a system service.
 
 The backup runs inside the PostgreSQL pod, where the password is already set, so the dump command never carries a password.
 

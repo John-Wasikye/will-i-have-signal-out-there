@@ -1,24 +1,33 @@
-# Data contract (ODCS). Approved by John (Oct 28, 2026), Phase B. ODCS version is a working placeholder (design-doc OQ-32). Names are proposals (OQ-21).
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 18, 2026): the message as built (key, value fields, topic, retention, watermark, checkpoint path, ADR 0016 and ADR 0028). ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-orbit-update-stream
 name: orbit_update_stream
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: Kafka topic of new CelesTrak element sets published by the nightly run, read by the availableNow Structured Streaming job to find changed satellites.
-  limitations: Low-rate stream with an explicit schema, S3 checkpoints, a watermark and dropDuplicatesWithinWatermark. Topic name, watermark and the meaning of changed are open.
-  usage: Input to C14 and the trigger for re-propagation in C5.
+  limitations: Low-rate stream. The key is the NORAD catalog number as a string and the value is one JSON object per element set. Timestamps in the value are UTC text like 2026-11-18T09:30:00.000Z. The stream gives at-least-once delivery, so the same element set can arrive twice, and the reader drops the copy (dropDuplicatesWithinWatermark) and writes the same rows (AC-1B.2). The 2-hour watermark runs on fetched_at_utc, the pull time, which moves forward once a night. On the epoch it would drop real updates, because epochs are spread over a day or more.
+  usage: Input to the C14 stream job, which writes orbit_changed_satellite.
 team:
   - username: John
     role: owner
 servers:
   - server: kafka-orbit-element-sets
     type: kafka
-    description: Kafka topic on the session box of each environment; low-rate (ADR 0016).
-    location: "Kafka topic orbit-element-sets on the session box (topic name proposed, OQ-30)."
+    description: Kafka topic on the session box of each environment, one broker in KRaft mode in the kafka namespace; low-rate (ADR 0016).
+    location: "Kafka topic orbit-element-sets at kafka.kafka.svc.cluster.local:9092 on the session box (topic name decided in OQ-30, ADR 0028). Airflow reads the address from SIGNAL_KAFKA_BOOTSTRAP."
+    customProperties:
+      - property: topic
+        value: orbit-element-sets
+      - property: retention
+        value: 7 days
+      - property: watermark
+        value: 2 hours
+      - property: checkpointLocation
+        value: s3a://<lake bucket>/checkpoints/orbit-element-sets/<env>/
 slaProperties:
   - property: frequency
     value: 1
@@ -28,26 +37,57 @@ customProperties:
   - property: openQuestions
     value: OQ-30
   - property: adr
-    value: adrs/0016
+    value: adrs/0016, adrs/0028
 schema:
   - name: orbit_update_stream
     physicalName: orbit_update_stream
     physicalType: table
-    description: One message per element set. Fields mirror celestrak_gp plus the pull time.
+    description: One message per element set whose epoch is later than every earlier celestrak_gp partition's epoch for that satellite (or whose satellite is new). The value fields mirror celestrak_gp plus the pull time.
+    customProperties:
+      - property: messageKey
+        value: norad_cat_id as a string
     properties:
       - name: norad_cat_id
         logicalType: integer
         required: true
+        description: Satellite catalog number. The same number is the message key, as text.
       - name: epoch_utc
         logicalType: timestamp
         required: true
+        description: Epoch of the element set, UTC.
       - name: fetched_at_utc
         logicalType: timestamp
         required: true
+        description: When the nightly run pulled the element set from CelesTrak, UTC. The watermark runs on this field.
       - name: elements
         logicalType: object
         required: true
-        description: Orbital elements as in celestrak_gp (column list there).
+        description: Orbital elements, the celestrak_gp columns that are not the key, the epoch or the pull facts. Names and types are the celestrak_gp columns.
+        properties:
+          - name: object_name
+            logicalType: string
+            required: true
+          - name: inclination_deg
+            logicalType: number
+            required: true
+          - name: mean_motion_rev_per_day
+            logicalType: number
+            required: true
+          - name: eccentricity
+            logicalType: number
+            required: true
+          - name: ra_of_asc_node_deg
+            logicalType: number
+            required: true
+          - name: arg_of_pericenter_deg
+            logicalType: number
+            required: true
+          - name: mean_anomaly_deg
+            logicalType: number
+            required: true
+          - name: bstar
+            logicalType: number
+            required: true
     quality:
       - type: library
         metric: nullValues

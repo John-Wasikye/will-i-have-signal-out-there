@@ -1,0 +1,12 @@
+# The jars baked into the Airflow image, in PySpark's jars folder (Dockerfile.airflow).
+# Each line is the path under https://repo1.maven.org/maven2/ and the jar's SHA-1. The build
+# fails when a download does not match. The versions match PySpark 3.5.9 (Hadoop 3.3.4, Kafka
+# clients 3.4.1, commons-pool2 2.11.1); hadoop-aws 3.3.4 declares AWS SDK bundle 1.12.262.
+org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.12.0/iceberg-spark-runtime-3.5_2.12-1.12.0.jar 9320e156d8ea8460e26e0604c0fed204c2579aa0
+org/apache/iceberg/iceberg-aws-bundle/1.12.0/iceberg-aws-bundle-1.12.0.jar 64d5012217035a60924feb633636b744d318eb0a
+org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.9/spark-sql-kafka-0-10_2.12-3.5.9.jar 17ef44bb094642e6cbe4c31283b49b0e524225a3
+org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.5.9/spark-token-provider-kafka-0-10_2.12-3.5.9.jar a925bf703b98506dd130cb56584eb2e8bd325380
+org/apache/kafka/kafka-clients/3.4.1/kafka-clients-3.4.1.jar a2f55251deb3d31a21903a0cfbd4d1fa6b7463ca
+org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar 8970fd110c965f285ed4c6e40be7630c62db6f68
+org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar a65839fbf1869f81a1632e09f415e586922e4f80
+com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar 02deec3a0ad83d13d032b1812421b23d7a961eea

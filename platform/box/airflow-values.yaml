@@ -131,6 +131,10 @@ env:
     value: /opt/airflow/data/incidents
   - name: PLATFORM_USE_GLUE
     value: "1"
+  # The broker install.sh starts. It is the same in dev and live, so only this file sets it (a
+  # list in the live file would replace this whole list).
+  - name: SIGNAL_KAFKA_BOOTSTRAP
+    value: kafka.kafka.svc.cluster.local:9092
 
 # The bucket names and the alerts topic include the AWS account number, so they are not written
 # here. The install script puts them in this settings object: PLATFORM_SITE_BUCKET,

@@ -10,6 +10,14 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 18, 2026: orbit update stream (C14)
+
+- The C14 design has an "As built (Nov 2026)" row: `pipelines/signal/orbit_stream.py` and the tasks `publish_orbit_updates` and `find_changed_satellites`, after `publish_marts` and beside `load_ookla` and `load_towers`. The nightly run publishes each new element set to the Kafka topic `orbit-element-sets`, and an availableNow Structured Streaming job (explicit schema, S3 checkpoint, 2-hour watermark, `dropDuplicatesWithinWatermark`) writes the satellites with a later epoch than the last stored one to Iceberg `orbit_changed_satellite`. Reading the same messages again writes the same rows (AC-1B.2).
+- The box runs one Kafka broker in KRaft mode: `platform/box/kafka.yaml`, applied by its own step of `install.sh`, which also creates the topic if it is missing. The image is `apache/kafka:4.4.0` pinned by digest; the log is kept 7 days.
+- Contracts approved by John (Nov 18, 2026): `orbit_update_stream` 0.2.0 (the message as built) and the new `orbit_changed_satellite` 0.1.0, whose required columns the stream job enforces (it drops a message without a catalog number, an epoch or a pull time).
+- Spark's jars are now baked into the Airflow image (`platform/box/spark-jars.txt`, each jar pinned by SHA-1) and no longer downloaded from Maven Central at each Spark start. The list adds the Kafka connector and Hadoop's S3 driver, so streaming checkpoints can live in S3. CI's Spark tests still download Iceberg, because pip's PySpark has no jars.
+- The 2-hour watermark runs on `fetched_at_utc`, the pull time. On the epoch, Spark would drop for good any update whose epoch is more than 2 hours older than the newest epoch it has seen, even on an earlier night, and CelesTrak epochs are spread over a day or more. A Spark test covers two nights with one checkpoint.
+
 ### Nov 18, 2026: OpenCelliD loads once, not every night
 
 - The first live load (Nov 18, 2026) showed `load_towers` loading again on a second run. The check compared the kept files' hashes with the hashes in `opencellid_tower`, and 312.csv.gz has no Arizona cells, so its hash never reached the table and the two sets never matched. The step is now `tower_files_to_load`, which needs no Spark and compares the kept files with a marker of the last load (`signal/opencellid_loaded/loaded_at=<UTC>/loaded.json` in the raw bucket), and `load_towers`, which writes the table and then the marker. The design doc C13 part 3 row follows.
