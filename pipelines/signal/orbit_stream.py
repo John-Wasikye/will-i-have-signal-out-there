@@ -1,7 +1,9 @@
 """Orbit update stream (C14): publish new element sets to Kafka, find the changed satellites.
 
-Kafka (a message queue) runs only while the session box is on, and this stream is low-rate: a few
-element sets a night (ADR 0016). Two steps, each a task of the nightly DAG:
+Kafka (a message queue) runs only while the session box is on, and this stream is low-rate by
+streaming standards (ADR 0016): one batch a night of about 11,000 small messages, one per
+satellite whose element set CelesTrak refreshed (10,872 on the first night, Nov 18, 2026).
+Two steps, each a task of the nightly DAG:
 
 1. ``publish_element_sets`` writes the run date's new element sets from ``celestrak_gp`` to the
    topic. An element set is new when its epoch is later than every earlier partition's epoch for
@@ -43,6 +45,13 @@ from timeutil import require_utc
 
 TOPIC = "orbit-element-sets"
 WATERMARK = "2 hours"
+# A nightly batch of about 11,000 small messages needs one state store; Spark's default 200 would
+# write about 400 tiny files to S3 a night.
+STATE_PARTITIONS = "1"
+# Spark keeps the partition count inside a checkpoint and ignores a new setting, so the move to one
+# partition (Nov 18, 2026) starts a new checkpoint folder. The stream then reads the topic again
+# from the start, and the MERGE writes the same rows (AC-1B.2).
+CHECKPOINT_VERSION = "v2"
 CHANGED_TABLE = "orbit_changed_satellite"
 SOURCE_TABLE = "celestrak_gp"
 DEFAULT_BOOTSTRAP = "kafka.kafka.svc.cluster.local:9092"
@@ -57,7 +66,7 @@ def kafka_bootstrap(environ: Mapping[str, str]) -> str:
 
 def checkpoint_location(lake_bucket: str, environment: str) -> str:
     """Return where the stream keeps its checkpoints, under the lake bucket (ADR 0016)."""
-    return f"s3a://{lake_bucket}/checkpoints/{TOPIC}/{environment}/"
+    return f"s3a://{lake_bucket}/checkpoints/{TOPIC}/{environment}/{CHECKPOINT_VERSION}/"
 
 
 def _message_properties(contract_path: Path) -> list[dict]:
@@ -221,6 +230,7 @@ def process_stream(
 ) -> None:
     """Read everything new in the stream, find the changed satellites, then stop."""
     contract = Path(contracts_dir) / "orbit_update_stream.yaml"
+    raw.sparkSession.conf.set("spark.sql.shuffle.partitions", STATE_PARTITIONS)
     unique = (
         parse_messages(raw, contract)
         .withWatermark("fetched_at_utc", WATERMARK)

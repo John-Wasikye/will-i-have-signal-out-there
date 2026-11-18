@@ -1,15 +1,15 @@
-# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 18, 2026): the message as built (key, value fields, topic, retention, watermark, checkpoint path, ADR 0016 and ADR 0028). ODCS version is a working placeholder (design-doc OQ-32).
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 approved by John (Nov 18, 2026): the message as built (key, value fields, topic, retention, watermark, checkpoint path, ADR 0016 and ADR 0028). 0.2.1 proposed (Nov 18, 2026), waiting for John: the measured rate and the v2 checkpoint path with one state partition. ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-internal-orbit-update-stream
 name: orbit_update_stream
-version: 0.2.0
+version: 0.2.1
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: Kafka topic of new CelesTrak element sets published by the nightly run, read by the availableNow Structured Streaming job to find changed satellites.
-  limitations: Low-rate stream. The key is the NORAD catalog number as a string and the value is one JSON object per element set. Timestamps in the value are UTC text like 2026-11-18T09:30:00.000Z. The stream gives at-least-once delivery, so the same element set can arrive twice, and the reader drops the copy (dropDuplicatesWithinWatermark) and writes the same rows (AC-1B.2). The 2-hour watermark runs on fetched_at_utc, the pull time, which moves forward once a night. On the epoch it would drop real updates, because epochs are spread over a day or more.
+  limitations: Low-rate by streaming standards, one batch a night of about 11,000 small messages, one per satellite whose element set CelesTrak refreshed (10,872 on the first night, Nov 18, 2026). The key is the NORAD catalog number as a string and the value is one JSON object per element set. Timestamps in the value are UTC text like 2026-11-18T09:30:00.000Z. The stream gives at-least-once delivery, so the same element set can arrive twice, and the reader drops the copy (dropDuplicatesWithinWatermark) and writes the same rows (AC-1B.2). The 2-hour watermark runs on fetched_at_utc, the pull time, which moves forward once a night. On the epoch it would drop real updates, because epochs are spread over a day or more.
   usage: Input to the C14 stream job, which writes orbit_changed_satellite.
 team:
   - username: John
@@ -27,7 +27,9 @@ servers:
       - property: watermark
         value: 2 hours
       - property: checkpointLocation
-        value: s3a://<lake bucket>/checkpoints/orbit-element-sets/<env>/
+        value: s3a://<lake bucket>/checkpoints/orbit-element-sets/<env>/v2/
+      - property: statePartitions
+        value: "1"
 slaProperties:
   - property: frequency
     value: 1
