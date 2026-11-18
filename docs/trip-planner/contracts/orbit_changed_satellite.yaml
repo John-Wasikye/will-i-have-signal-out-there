@@ -1,0 +1,69 @@
+# Data contract (ODCS), proposed, waiting for John (Nov 2026). Internal Iceberg table written by the orbit stream job (C14); not a source or a published table. The job takes its column types from here. ODCS version is a working placeholder (design-doc OQ-32).
+apiVersion: v3.0.2
+kind: DataContract
+id: p1-internal-orbit-changed-satellite
+name: orbit_changed_satellite
+version: 0.1.0
+status: active
+domain: project1-signal-planner
+dataProduct: signal-planner
+description:
+  purpose: Which satellites had a new element set, and when, found by the availableNow Structured Streaming job from the orbit update stream (C14, ADR 0016). A satellite is changed when a new element set has a later epoch than the last stored one for its catalog number (ADR 0028).
+  limitations: Low-rate. Holds only element sets the stream delivered, so a satellite with no later epoch has no row. Replaying the same messages writes the same rows (AC-1B.2).
+  usage: The trigger for re-propagation in C5.
+team:
+  - username: John
+    role: owner
+servers:
+  - server: lake-orbit-changed-satellite
+    type: glue
+    description: Iceberg table in the Glue database of each environment, one partition per run date.
+    location: "Iceberg table portfolio.portfolio_{env}.orbit_changed_satellite."
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    description: Written in each nightly run, after the element sets are published.
+customProperties:
+  - property: openQuestions
+    value: OQ-30
+  - property: adr
+    value: adrs/0016, adrs/0028
+schema:
+  - name: orbit_changed_satellite
+    physicalName: orbit_changed_satellite
+    physicalType: table
+    description: One row per element set that was later than the last stored one for its satellite. Partition per run date (run_date, added by the lake writer like the other tables).
+    properties:
+      - name: norad_cat_id
+        logicalType: integer
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Satellite catalog number.
+      - name: epoch_utc
+        logicalType: timestamp
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: Epoch of the new element set, UTC.
+      - name: previous_epoch_utc
+        logicalType: timestamp
+        required: false
+        description: The latest epoch stored for this satellite before this one. Empty when the satellite is new to the table.
+      - name: fetched_at_utc
+        logicalType: timestamp
+        required: true
+        description: When the nightly run pulled the new element set, UTC.
+      - name: detected_at_utc
+        logicalType: timestamp
+        required: true
+        description: The time of the run that found the change, passed into the job so a replay writes the same rows.
+    quality:
+      - type: library
+        metric: duplicateValues
+        mustBe: 0
+        arguments:
+          properties:
+            - norad_cat_id
+            - epoch_utc
