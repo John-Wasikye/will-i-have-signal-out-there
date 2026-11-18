@@ -29,7 +29,7 @@ def test_both_contracts_are_approved_at_the_versions_this_change_builds():
     for path, version in ((STREAM, "0.2.0"), (TABLE, "0.1.0")):
         first_line = path.read_text(encoding="utf-8").splitlines()[0]
         assert f"{version} approved by John (Nov 18, 2026)" in first_line, path.name
-    assert "0.2.1 proposed (Nov 18, 2026), waiting for John" in STREAM.read_text(encoding="utf-8")
+    assert "0.2.1 approved by John (Nov 18, 2026)" in STREAM.read_text(encoding="utf-8")
     assert _load(STREAM)["version"] == "0.2.1"
     assert _load(TABLE)["version"] == "0.1.0"
 

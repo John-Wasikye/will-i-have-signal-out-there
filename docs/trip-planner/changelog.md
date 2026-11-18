@@ -12,7 +12,7 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ### Nov 18, 2026: the orbit stream measured, one state partition
 
-- The first live night published 10,872 element sets, not a few: CelesTrak refreshes most satellites daily. The code docstring, contract `orbit_update_stream` 0.2.1 (proposed) and design doc C14 say so.
+- The first live night published 10,872 element sets, not a few: CelesTrak refreshes most satellites daily. The code docstring, contract `orbit_update_stream` 0.2.1 (approved by John, Nov 18, 2026) and design doc C14 say so.
 - The stream keeps its state in one partition instead of Spark's default 200 (about 400 small S3 files a night). Spark keeps the partition count inside a checkpoint, so the checkpoint moves to `.../<env>/v2/`; the stream reads the topic again from the start and writes the same rows.
 
 ### Nov 18, 2026: orbit update stream (C14)
