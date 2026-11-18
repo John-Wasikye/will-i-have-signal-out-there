@@ -25,6 +25,7 @@ Everything runs on AWS in two separate environments, dev and live, built with Te
 | Phase B Ookla speed tests, part 1 (C13): once a quarter, loads Ookla's open mobile speed-test tiles for Arizona (about 11,200 tiles) with an H3 resolution 8 cell each, for the confidence model. Only a manifest of the worldwide file is kept | `pipelines/signal/ookla_tiles.py`, task `load_ookla` | Live, in the nightly DAG. 2026 Q3 is loaded (11,180 Arizona tiles) |
 | Phase B every carrier, part 2 (C13): the coverage step loads the newest FCC file of each carrier and technology (AT&T, T-Mobile and Verizon, 4G LTE and 5G), and the trail map has a carrier picker that starts on the carrier the phone remembers | `pipelines/signal/signal_nightly.py`, `app/src/components/TrailSignalView.tsx` | Live. All six FCC files (release J26) are loaded. The map shows satellite reach only for T-Mobile, the carrier satellite texts need |
 | Phase B OpenCelliD cells, part 3 (C13): loads OpenCelliD's estimated cell locations for Arizona (11,627 cells in the first check) with an H3 resolution 9 cell each, for the distance to the nearest known cell. I download the files by hand, because the download needs my API token, which is never stored | `pipelines/signal/opencellid_towers.py`, task `load_towers` | Built, not deployed yet. Nothing is loaded into the lake yet |
+| Phase B orbit update stream (C14): the nightly run publishes each new element set to a Kafka topic on the box, and a Structured Streaming job finds the satellites whose element set has a later epoch than the last stored one | `pipelines/signal/orbit_stream.py`, tasks `publish_orbit_updates` and `find_changed_satellites`, `platform/box/kafka.yaml` | Built, not deployed yet. Nothing is published or loaded yet |
 | Terraform: storage, Glue catalog, IAM, budget, alerts, audit trail, Parameter Store, registry, serving, session box, site, visitor data | `platform/terraform` | Applied to dev and live |
 | Continuous integration, CodeQL and Dependabot | `.github/workflows` | Running on every pull request |
 | Deploys | `.github/workflows/deploy.yml`, `terraform-apply.yml` | Each merge builds and scans the Airflow image, then deploys to dev and live after I approve each one |
@@ -32,7 +33,7 @@ Everything runs on AWS in two separate environments, dev and live, built with Te
 Phase B has started. Not built yet:
 
 - The Snowflake warehouse (C15), and the labels and confidence model built from reports (C17).
-- The orbit update stream, lineage, the trip assistant and operations hardening (C14, C16, C18 to C20, C24).
+- Lineage, the trip assistant and operations hardening (C16, C18 to C20, C24).
 
 ## Run the checks yourself
 
