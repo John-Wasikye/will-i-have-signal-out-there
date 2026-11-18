@@ -5,8 +5,10 @@ import { formatUtc, formatUtcRange } from '../lib/status'
 import { photoFor, profileLine, terrainFor, type TrailPhoto } from '../lib/trailMedia'
 import { formatDistance, formatElevation } from '../lib/units'
 import {
+  coverageSourceFor,
   coveredPointCount,
   distanceKm,
+  formatDataDate,
   isReachableAt,
   isRunLate,
   nearestPoint,
@@ -263,6 +265,26 @@ function PointDetail({ point, elevationM, carrier, now, late }: PointDetailProps
   )
 }
 
+function DataAsOf({ signal, carrier }: { signal: TrailSignal; carrier: string }) {
+  const source = coverageSourceFor(signal.coverage_sources, carrier)
+  return (
+    <div className="data-as-of">
+      <p className="data-as-of-title">Data as of</p>
+      <ul>
+        {source && (
+          <li>
+            FCC coverage for {carrier}: data as of {formatDataDate(source.data_as_of)}
+          </li>
+        )}
+        <li>
+          Satellite orbits from CelesTrak: updated in the nightly run at{' '}
+          {formatUtc(signal.last_good_run_utc)}
+        </li>
+      </ul>
+    </div>
+  )
+}
+
 /** The carrier the phone remembers for reports, or null if none or the store cannot open. */
 async function rememberedCarrier(): Promise<string | null> {
   try {
@@ -350,6 +372,7 @@ export function TrailSignalView({ signal, now }: TrailSignalViewProps) {
       ) : (
         <p className="valid-until">Predictions valid until {validUntil}</p>
       )}
+      <DataAsOf signal={signal} carrier={carrier} />
 
       <div className="walker">
         <div className="panel walker-map">
