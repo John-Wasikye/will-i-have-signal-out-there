@@ -157,3 +157,22 @@ def test_an_answer_has_every_field_the_contract_requires(signal):
     schemas = yaml.safe_load(OPENAPI.read_text(encoding="utf-8"))["components"]["schemas"]
     assert set(schemas["TrailSignal"]["required"]) <= set(signal)
     assert set(schemas["PointSignal"]["required"]) <= set(signal["points"][0])
+
+
+@pytest.mark.parametrize(
+    ("release", "expected"),
+    [
+        ("J26_10nov2026", date(2026, 6, 30)),
+        ("D25_12jan2026", date(2025, 12, 31)),
+        ("J25", date(2025, 6, 30)),
+        ("D24", date(2024, 12, 31)),
+    ],
+)
+def test_a_release_code_is_the_date_its_data_is_as_of(release, expected):
+    assert trails.release_data_date(release) == expected
+
+
+@pytest.mark.parametrize("release", ["", "X26_10nov2026", "J2_10nov2026", "june 2026", "J26x"])
+def test_an_unknown_release_format_raises_a_clear_error(release):
+    with pytest.raises(ValueError, match="Unknown FCC release"):
+        trails.release_data_date(release)

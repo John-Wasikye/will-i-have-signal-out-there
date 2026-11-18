@@ -9,6 +9,7 @@ would not fit in one answer. Values from a request go in query parameters only.
 from __future__ import annotations
 
 import os
+import re
 from collections import defaultdict
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -20,6 +21,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 PUBLISHED_DIR = Path(os.environ.get("PUBLISHED_DIR", "published"))
+
+RELEASE_PATTERN = re.compile(r"(?P<half>[JD])(?P<year>\d{2})(?:_\w+)?")
 
 router = APIRouter(tags=["trails"])
 
@@ -85,6 +88,20 @@ def _utc(microseconds: int) -> datetime:
     DuckDB returns the number directly, so no timezone library is needed in Lambda.
     """
     return datetime.fromtimestamp(microseconds / 1_000_000, tz=UTC)
+
+
+def release_data_date(release: str) -> date:
+    """Return the date an FCC release's data is as of.
+
+    A release looks like J26 or J26_10nov2026: the letter is J for the June release and D for
+    the December release, the two digits are the data year, and an optional suffix after the
+    underscore is the date the file was published, which does not change the data date.
+    """
+    match = RELEASE_PATTERN.fullmatch(release)
+    if match is None:
+        raise ValueError(f"Unknown FCC release {release!r}: expected J or D, two digits of year.")
+    year = 2000 + int(match["year"])
+    return date(year, 6, 30) if match["half"] == "J" else date(year, 12, 31)
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
