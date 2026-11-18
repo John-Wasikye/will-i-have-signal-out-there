@@ -18,6 +18,10 @@ The Ookla tiles (C13) load last, after a good publish, because only the confiden
 reads them; after a failed night they load on the next one. Most nights the step finds its
 quarter already loaded and ends without starting Spark.
 
+The orbit stream (C14) runs last too: ``publish_orbit_updates`` writes the night's new element sets
+to Kafka, then ``find_changed_satellites`` reads them with an availableNow streaming job. Both wait
+for a good publish, so they never delay the page.
+
 The DAG only wires tasks together. The logic lives in pipelines/signal/signal_nightly.py.
 """
 
@@ -29,6 +33,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import alerts
+import orbit_stream
 import sample_flow
 import signal_nightly
 import trail_publish
@@ -340,6 +345,40 @@ def signal_phase_a_nightly():
         finally:
             spark.stop()
 
+    @task
+    def publish_orbit_updates(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Publish the run date's new element sets to Kafka (C14)."""
+        spark = build_spark_session("signal_publish_orbit_updates", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            return signal_nightly.publish_orbit_updates(
+                spark,
+                _run_date(dag_run, data_interval_end),
+                contracts_dir=_contracts_dir(),
+                namespace=ICEBERG_NAMESPACE,
+                bootstrap=orbit_stream.kafka_bootstrap(os.environ),
+            )
+        finally:
+            spark.stop()
+
+    @task
+    def find_changed_satellites(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Read the new element sets from Kafka and write orbit_changed_satellite (C14)."""
+        spark = build_spark_session("signal_find_changed_satellites", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            return signal_nightly.find_changed_satellites(
+                spark,
+                _run_date(dag_run, data_interval_end),
+                sample_flow.run_end(data_interval_end, dag_run.run_after),
+                contracts_dir=_contracts_dir(),
+                namespace=ICEBERG_NAMESPACE,
+                bootstrap=orbit_stream.kafka_bootstrap(os.environ),
+                checkpoint=orbit_stream.checkpoint_location(
+                    os.environ["PLATFORM_LAKE_BUCKET"], os.environ["PLATFORM_ENV"]
+                ),
+            )
+        finally:
+            spark.stop()
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
@@ -355,6 +394,7 @@ def signal_phase_a_nightly():
     [selected, horizons] >> windows
     published = [windows, coverage, reports] >> build_marts() >> publish_marts()
     published >> [load_ookla(), load_towers()]
+    published >> publish_orbit_updates() >> find_changed_satellites()
 
 
 signal_phase_a_nightly()

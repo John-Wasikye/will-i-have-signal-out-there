@@ -88,3 +88,11 @@ def test_the_log_is_on_a_persistent_volume_claim_on_the_box_disk(objects, contai
 def test_the_single_broker_is_stopped_before_a_new_one_starts(objects):
     """Two brokers on one volume would corrupt it, so an update stops the old pod first."""
     assert objects["Deployment"]["spec"]["strategy"]["type"] == "Recreate"
+
+
+def test_airflow_is_told_the_address_the_service_and_the_broker_use(settings):
+    values = yaml.safe_load((MANIFEST.parent / "airflow-values.yaml").read_text(encoding="utf-8"))
+    address = {item["name"]: item["value"] for item in values["env"]}["SIGNAL_KAFKA_BOOTSTRAP"]
+
+    assert address == "kafka.kafka.svc.cluster.local:9092"
+    assert settings["KAFKA_ADVERTISED_LISTENERS"] == f"PLAINTEXT://{address}"
