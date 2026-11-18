@@ -10,9 +10,9 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
-### Nov 18, 2026: data as of dates on the trail page
+### Nov 18, 2026: last updated dates on the trail page
 
-- The trail signal answer has a new field, `coverage_sources`: for each carrier on the trail, its FCC release and the date that release is as of (J26 is Jun 30, 2026, D25 is Dec 31, 2025). When a carrier has more than one release, the oldest is reported. The trail page shows a "Data as of" list with the picked carrier's date and the time of the last nightly run for the CelesTrak orbits. The contract has a `CoverageSource` schema, and the design doc C11 and C12 tables have an "As built" row. The pipeline did not change. The site tests went from 409 to 420.
+- The trail signal answer has a new field, `coverage_sources`: for each carrier on the trail, its FCC release and the date that release is as of (J26 is Jun 30, 2026, D25 is Dec 31, 2025). When a carrier has more than one release, the oldest is reported. The trail page shows a "Last updated" list: "<carrier> coverage map: FCC data from <date>" for the picked carrier, and "Satellite positions: <time>" from the last nightly run, which fetches the CelesTrak orbits. John asked for plain words instead of "Data as of". The contract has a `CoverageSource` schema, and the design doc C11 and C12 tables have an "As built" row. The pipeline did not change. The site tests went from 409 to 421.
 
 ### Nov 17, 2026: OpenCelliD cell locations (C13, part 3)
 

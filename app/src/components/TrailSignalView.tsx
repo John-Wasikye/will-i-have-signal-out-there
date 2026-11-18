@@ -269,17 +269,14 @@ function DataAsOf({ signal, carrier }: { signal: TrailSignal; carrier: string })
   const source = coverageSourceFor(signal.coverage_sources, carrier)
   return (
     <div className="data-as-of">
-      <p className="data-as-of-title">Data as of</p>
+      <p className="data-as-of-title">Last updated</p>
       <ul>
         {source && (
           <li>
-            FCC coverage for {carrier}: data as of {formatDataDate(source.data_as_of)}
+            {carrier} coverage map: FCC data from {formatDataDate(source.data_as_of)}
           </li>
         )}
-        <li>
-          Satellite orbits from CelesTrak: updated in the nightly run at{' '}
-          {formatUtc(signal.last_good_run_utc)}
-        </li>
+        <li>Satellite positions: {formatUtc(signal.last_good_run_utc)}</li>
       </ul>
     </div>
   )

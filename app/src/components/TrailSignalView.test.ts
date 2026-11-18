@@ -260,7 +260,7 @@ describe('TrailSignalView without T-Mobile on the map', () => {
   })
 })
 
-describe('TrailSignalView data as of', () => {
+describe('TrailSignalView last updated', () => {
   const sources = [
     { carrier: 'AT&T', fcc_release: 'J26_10nov2026', data_as_of: '2026-06-30' },
     { carrier: 'T-Mobile', fcc_release: 'D25_12jan2026', data_as_of: '2025-12-31' },
@@ -268,32 +268,38 @@ describe('TrailSignalView data as of', () => {
   const textFor = (answer: TrailSignal): string =>
     visibleText(renderMarkup(createElement(TrailSignalView, { signal: answer, now })))
 
-  it('says when the picked carrier coverage data is as of', () => {
-    const text = textFor({ ...signal, carriers: ['AT&T', 'T-Mobile'], coverage_sources: sources })
-    expect(text).toContain('FCC coverage for T-Mobile: data as of Dec 31, 2025')
-    expect(text).not.toContain('FCC coverage for AT&T')
+  it('heads the list in plain words', () => {
+    const text = textFor({ ...signal, coverage_sources: sources })
+    expect(text).toContain('Last updated')
+    expect(text).not.toContain('Data as of')
   })
 
-  it('says when the satellite orbits were last updated, in the reader local time', () => {
+  it('says which date the picked carrier coverage map is from', () => {
+    const text = textFor({ ...signal, carriers: ['AT&T', 'T-Mobile'], coverage_sources: sources })
+    expect(text).toContain('T-Mobile coverage map: FCC data from Dec 31, 2025')
+    expect(text).not.toContain('AT&T coverage map')
+  })
+
+  it('says when the satellite positions were last updated, in the reader local time', () => {
     const text = textFor({ ...signal, coverage_sources: sources })
     expect(text).toContain(
-      `Satellite orbits from CelesTrak: updated in the nightly run at ${formatUtc(signal.last_good_run_utc)}`,
+      `Satellite positions: ${formatUtc(signal.last_good_run_utc)}`,
     )
   })
 
   it('shows no coverage line when an older API sent no sources', () => {
     const text = textFor(signal)
-    expect(text).not.toContain('FCC coverage for')
-    expect(text).toContain('Satellite orbits from CelesTrak')
+    expect(text).not.toContain('coverage map: FCC data')
+    expect(text).toContain('Satellite positions:')
   })
 
   it('shows no coverage line when the picked carrier has no source', () => {
     const text = textFor({ ...signal, coverage_sources: [sources[0]] })
-    expect(text).not.toContain('FCC coverage for')
+    expect(text).not.toContain('coverage map: FCC data')
   })
 
   it('still shows the lines when the data is late', () => {
     const text = visibleText(renderMarkup(createElement(TrailSignalView, { signal: { ...signal, coverage_sources: sources }, now: late })))
-    expect(text).toContain('FCC coverage for T-Mobile: data as of Dec 31, 2025')
+    expect(text).toContain('T-Mobile coverage map: FCC data from Dec 31, 2025')
   })
 })
