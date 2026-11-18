@@ -66,6 +66,14 @@ class PointSignal(BaseModel):
     windows: list[WindowOut]
 
 
+class CoverageSource(BaseModel):
+    """The FCC release behind one carrier's coverage on a trail, and the date it is as of."""
+
+    carrier: str
+    fcc_release: str
+    data_as_of: date
+
+
 class TrailSignal(BaseModel):
     """Answer from GET /trails/{trail_id}/signal."""
 
@@ -75,6 +83,7 @@ class TrailSignal(BaseModel):
     last_good_run_utc: datetime
     min_elevation_deg: float
     carriers: list[str]
+    coverage_sources: list[CoverageSource]
     points: list[PointSignal]
 
 
@@ -126,6 +135,30 @@ def _coverage_by_point(trail_id: str) -> dict[str, list[CarrierCoverage]]:
             CarrierCoverage(carrier=row["carrier"], covered=row["covered"])
         )
     return coverage
+
+
+def _coverage_sources(trail_id: str) -> list[CoverageSource]:
+    """One source per carrier: its oldest release, because the map is only as fresh as that."""
+    rows = query_rows(
+        "SELECT DISTINCT c.carrier, c.fcc_release "
+        "FROM read_parquet(?) AS c JOIN read_parquet(?) AS p USING (trail_point_id) "
+        "WHERE p.trail_id = ?",
+        [_table("fct_trail_point_coverage"), _table("dim_trail_point"), trail_id],
+    )
+    oldest: dict[str, CoverageSource] = {}
+    for row in rows:
+        source = CoverageSource(
+            carrier=row["carrier"],
+            fcc_release=row["fcc_release"],
+            data_as_of=release_data_date(row["fcc_release"]),
+        )
+        kept = oldest.get(source.carrier)
+        if kept is None or (source.data_as_of, source.fcc_release) < (
+            kept.data_as_of,
+            kept.fcc_release,
+        ):
+            oldest[source.carrier] = source
+    return [oldest[carrier] for carrier in sorted(oldest)]
 
 
 def _windows_by_point(trail_id: str) -> dict[str, list[WindowOut]]:
@@ -189,6 +222,7 @@ def get_trail_signal(trail_id: str) -> TrailSignal | JSONResponse:
         )
         coverage = _coverage_by_point(trail_id)
         windows = _windows_by_point(trail_id)
+        coverage_sources = _coverage_sources(trail_id)
     except duckdb.Error:
         return _unavailable()
 
@@ -199,6 +233,7 @@ def get_trail_signal(trail_id: str) -> TrailSignal | JSONResponse:
         last_good_run_utc=_utc(run["run_started_us"]),
         min_elevation_deg=run["min_elevation_deg"],
         carriers=sorted({item.carrier for flags in coverage.values() for item in flags}),
+        coverage_sources=coverage_sources,
         points=[
             PointSignal(
                 **point,
