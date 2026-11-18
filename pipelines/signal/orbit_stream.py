@@ -17,9 +17,10 @@ element sets a night (ADR 0016). Two steps, each a task of the nightly DAG:
 epoch_utc) and keeps only epochs later than the stored latest, so reading the same messages again
 writes the same rows (AC-1B.2). The run's time is passed in for the same reason.
 
-The watermark runs on the epoch, as John approved. Spark drops a message whose epoch is more than
-2 hours older than the newest epoch it has seen, including one seen on an earlier night, because
-the watermark is kept in the checkpoint.
+The 2-hour watermark (ADR 0028, the nightly maximum) runs on the pull time, ``fetched_at_utc``,
+which moves forward once a night. It cannot run on the epoch: epochs are spread over a day or
+more, the watermark is kept in the checkpoint, and Spark would drop for good any update whose
+epoch is more than 2 hours older than the newest epoch it had seen, even on an earlier night.
 
 The checkpoint path is on S3 (``s3a://``), so it must be readable by Spark: the image has the
 Hadoop S3 jars and the box's instance role is the credential (platform/box/spark-jars.txt).
@@ -217,7 +218,7 @@ def process_stream(
     contract = Path(contracts_dir) / "orbit_update_stream.yaml"
     unique = (
         parse_messages(raw, contract)
-        .withWatermark("epoch_utc", WATERMARK)
+        .withWatermark("fetched_at_utc", WATERMARK)
         .dropDuplicatesWithinWatermark(["norad_cat_id", "epoch_utc"])
     )
 

@@ -16,7 +16,7 @@ This file records two things: changes to the documents, and, once code exists, c
 - The box runs one Kafka broker in KRaft mode: `platform/box/kafka.yaml`, applied by its own step of `install.sh`, which also creates the topic if it is missing. The image is `apache/kafka:4.4.0` pinned by digest; the log is kept 7 days.
 - Contracts, both proposed, waiting for John: `orbit_update_stream` 0.2.0 (the message as built) and the new `orbit_changed_satellite` 0.1.0.
 - Spark's jars are now baked into the Airflow image (`platform/box/spark-jars.txt`, each jar pinned by SHA-1) and no longer downloaded from Maven Central at each Spark start. The list adds the Kafka connector and Hadoop's S3 driver, so streaming checkpoints can live in S3. CI's Spark tests still download Iceberg, because pip's PySpark has no jars.
-- Known limit: the watermark is on the epoch, as decided, so Spark drops a message whose epoch is more than 2 hours older than the newest epoch it has seen. I want John to decide whether the watermark should run on `fetched_at_utc` instead.
+- The 2-hour watermark runs on `fetched_at_utc`, the pull time. On the epoch, Spark would drop for good any update whose epoch is more than 2 hours older than the newest epoch it has seen, even on an earlier night, and CelesTrak epochs are spread over a day or more. A Spark test covers two nights with one checkpoint.
 
 ### Nov 18, 2026: OpenCelliD loads once, not every night
 

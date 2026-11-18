@@ -206,22 +206,22 @@ def test_the_reader_gets_back_what_the_publisher_wrote(spark):
     ]
 
 
-def _write_messages(folder: Path, *pairs) -> None:
-    """Write messages as JSON lines, one file, the way the topic would hold them."""
-    folder.mkdir()
+def _write_messages(folder: Path, *pairs, fetched_at=FETCHED_AT, name="messages.json") -> None:
+    """Write messages as JSON lines, one file per pull, the way the topic would hold them."""
+    folder.mkdir(exist_ok=True)
     stamp = "%Y-%m-%dT%H:%M:%S.000Z"
     lines = [
         json.dumps(
             {
                 "norad_cat_id": norad,
                 "epoch_utc": epoch.strftime(stamp),
-                "fetched_at_utc": FETCHED_AT.strftime(stamp),
+                "fetched_at_utc": fetched_at.strftime(stamp),
                 "elements": {"object_name": f"STARLINK-{norad}"},
             }
         )
         for norad, epoch in pairs
     ]
-    (folder / "messages.json").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    (folder / name).write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def _process(spark, folder: Path, checkpoint: Path) -> None:
@@ -255,3 +255,28 @@ def test_replaying_the_same_messages_with_a_new_checkpoint_writes_the_same_rows(
 
     assert len(first) == 2
     assert second == first
+
+
+def test_a_later_night_keeps_an_update_whose_epoch_is_older_than_last_nights_newest(
+    spark, tmp_path
+):
+    """Epochs are spread over a day or more, so the watermark must follow the pull time.
+
+    Night 1 holds an epoch at 23:00 on Nov 17. Night 2 brings satellite 102 an epoch at 05:00 on
+    Nov 17, later than its stored 01:00 but far more than 2 hours before 23:00. A watermark on the
+    epoch would drop it for good; on the pull time it is kept.
+    """
+    night_one = datetime(2026, 11, 17, 10, 0, tzinfo=UTC)
+    _write_messages(
+        tmp_path / "in",
+        (101, _epoch(17, 23)),
+        (102, _epoch(17, 1)),
+        fetched_at=night_one,
+        name="night1.json",
+    )
+    _process(spark, tmp_path / "in", tmp_path / "checkpoint")
+    _write_messages(tmp_path / "in", (102, _epoch(17, 5)), name="night2.json")
+
+    _process(spark, tmp_path / "in", tmp_path / "checkpoint")
+
+    assert (102, _epoch(17, 5), _epoch(17, 1)) in _stored(spark)

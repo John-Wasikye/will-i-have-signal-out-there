@@ -9,7 +9,7 @@ domain: project1-signal-planner
 dataProduct: signal-planner
 description:
   purpose: Kafka topic of new CelesTrak element sets published by the nightly run, read by the availableNow Structured Streaming job to find changed satellites.
-  limitations: Low-rate stream. The key is the NORAD catalog number as a string and the value is one JSON object per element set. Timestamps in the value are UTC text like 2026-11-18T09:30:00.000Z. The stream gives at-least-once delivery, so the same element set can arrive twice, and the reader drops the copy (dropDuplicatesWithinWatermark) and writes the same rows (AC-1B.2). Spark drops a message whose epoch is more than 2 hours older than the newest epoch it has seen, so the watermark must be read with that in mind.
+  limitations: Low-rate stream. The key is the NORAD catalog number as a string and the value is one JSON object per element set. Timestamps in the value are UTC text like 2026-11-18T09:30:00.000Z. The stream gives at-least-once delivery, so the same element set can arrive twice, and the reader drops the copy (dropDuplicatesWithinWatermark) and writes the same rows (AC-1B.2). The 2-hour watermark runs on fetched_at_utc, the pull time, which moves forward once a night. On the epoch it would drop real updates, because epochs are spread over a day or more.
   usage: Input to C14 and the trigger for re-propagation in C5.
 team:
   - username: John
@@ -54,11 +54,11 @@ schema:
       - name: epoch_utc
         logicalType: timestamp
         required: true
-        description: Epoch of the element set, UTC. The watermark runs on this field.
+        description: Epoch of the element set, UTC.
       - name: fetched_at_utc
         logicalType: timestamp
         required: true
-        description: When the nightly run pulled the element set from CelesTrak, UTC.
+        description: When the nightly run pulled the element set from CelesTrak, UTC. The watermark runs on this field.
       - name: elements
         logicalType: object
         required: true
