@@ -53,6 +53,7 @@ def test_every_step_is_a_task(signal_dag):
         "publish_marts",
         "copy_reports",
         "load_ookla",
+        "load_towers",
     }
 
 
@@ -110,6 +111,14 @@ def test_the_ookla_load_runs_last_after_a_good_publish(signal_dag):
     run: Airflow judges a run by its last tasks, and "all done" would hide that failure.
     """
     task = signal_dag.get_task("load_ookla")
+    assert task.upstream_task_ids == {"publish_marts"}
+    assert task.trigger_rule == "all_success"
+    assert task.downstream_task_ids == set()
+
+
+def test_the_tower_load_runs_last_after_a_good_publish(signal_dag):
+    """The OpenCelliD cells feed only the confidence model (C17), like the Ookla tiles."""
+    task = signal_dag.get_task("load_towers")
     assert task.upstream_task_ids == {"publish_marts"}
     assert task.trigger_rule == "all_success"
     assert task.downstream_task_ids == set()

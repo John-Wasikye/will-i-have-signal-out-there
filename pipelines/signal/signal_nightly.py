@@ -18,6 +18,8 @@ again on its own: every step reads the raw file the pull kept, never a copy in A
    technology and flags each trail point, only when the files or the points changed (ADR 0028).
 9. ``ookla_quarter_to_load`` and ``load_ookla_quarter`` (C13) load Ookla's newest quarter of
    Arizona speed-test tiles into ``ookla_tile``, once per quarter.
+10. ``load_towers_if_changed`` (C13) loads the newest kept OpenCelliD file of each mobile country
+   code into ``opencellid_tower``, only when the kept files changed (ADR 0028).
 """
 
 from __future__ import annotations
@@ -67,6 +69,13 @@ from ookla_tiles import (
     newest_published_quarter,
     quarter_prefix,
     store_quarter_manifest,
+)
+from opencellid_towers import RAW_PREFIX as OPENCELLID_RAW_PREFIX
+from opencellid_towers import (
+    WrongOpenCellidFile,
+    arizona_cell_rows,
+    check_manifest,
+    read_cell_lines,
 )
 from orbit_ingest import (
     CELESTRAK_STARLINK_URL,
@@ -817,6 +826,76 @@ def load_ookla_quarter(
         "tiles": len(rows),
         "tests": sum(row["test_count"] for row in rows),
     }
+
+
+def load_towers_if_changed(
+    spark,  # noqa: ANN001, a pyspark SparkSession
+    s3,  # noqa: ANN001, a boto3 S3 client
+    raw_bucket: str,
+    run_date: date,
+    *,
+    contracts_dir: Path,
+    namespace: str,
+) -> dict:
+    """Load the newest kept OpenCelliD file of each mobile country code (C13 part 3).
+
+    The download needs John's API token, so the files are kept in the raw bucket by hand and this
+    step never downloads them. Cells are reference data (ADR 0028): the step loads only when the
+    kept files are not exactly the loaded ones, and every kept file is loaded each time, so the
+    newest partition holds every MCC. Before the first file is kept it does nothing. Returns
+    ``{"changed": False, "files": n}``, or how many files and cells were loaded, by radio.
+    """
+    manifests = _newest_tower_files(s3, raw_bucket)
+    if not manifests:
+        return {"changed": False, "files": 0}
+    kept = {manifest["content_sha256"] for manifest in manifests}
+    if kept == _loaded_hashes(spark, f"{CATALOG_NAME}.{namespace}.opencellid_tower"):
+        return {"changed": False, "files": len(manifests)}
+
+    rows: list[dict] = []
+    for manifest in manifests:
+        check_manifest(manifest)
+        body = read_raw(s3, raw_bucket, manifest["raw_key"])
+        if hashlib.sha256(body).hexdigest() != manifest["content_sha256"]:
+            raise WrongOpenCellidFile(f"{manifest['raw_key']}: the hash differs from its manifest")
+        rows.extend(arizona_cell_rows(read_cell_lines(body), manifest))
+    seen: set[str] = set()
+    for row in rows:
+        if row["tower_id"] in seen:
+            raise WrongOpenCellidFile(f"cell {row['tower_id']} is in two kept files")
+        seen.add(row["tower_id"])
+
+    write_run_partition(
+        spark,
+        "opencellid_tower",
+        rows,
+        run_date,
+        columns=contract_columns(
+            Path(contracts_dir) / "opencellid_towers.yaml", "opencellid_tower"
+        ),
+        namespace=namespace,
+    )
+    by_radio: dict[str, int] = {}
+    for row in rows:
+        by_radio[row["radio"]] = by_radio.get(row["radio"], 0) + 1
+    return {"changed": True, "files": len(manifests), "cells": len(rows), "by_radio": by_radio}
+
+
+def _newest_tower_files(s3, raw_bucket: str) -> list[dict]:  # noqa: ANN001
+    """Return the manifest of the newest kept OpenCelliD file of each MCC, in MCC order."""
+    newest: dict[int, dict] = {}
+    pages = s3.get_paginator("list_objects_v2").paginate(
+        Bucket=raw_bucket, Prefix=f"{OPENCELLID_RAW_PREFIX}/"
+    )
+    for page in pages:
+        for item in page.get("Contents", []):
+            if not item["Key"].endswith("manifest.json"):
+                continue
+            manifest = json.loads(read_raw(s3, raw_bucket, item["Key"]))
+            mcc = manifest["mcc"]
+            if mcc not in newest or manifest["fetched_at_utc"] > newest[mcc]["fetched_at_utc"]:
+                newest[mcc] = manifest
+    return [newest[mcc] for mcc in sorted(newest)]
 
 
 def _kept_reports_since(spark, table: str, first_day: date) -> list[dict]:  # noqa: ANN001

@@ -1,63 +1,102 @@
-# Data contract (ODCS). Approved by John (Oct 28, 2026), Phase B. ODCS version is a working placeholder (design-doc OQ-32).
-# Field names and source location are to be confirmed in the first-run check (OQ-20).
+# Data contract (ODCS). 0.1.0 approved by John (Oct 28, 2026), Phase B. 0.2.0 proposed (Nov 17, 2026), waiting for John: fields, license and update facts read from the OpenCelliD documentation on Nov 17, 2026 (OQ-20, OQ-22). ODCS version is a working placeholder (design-doc OQ-32).
 apiVersion: v3.0.2
 kind: DataContract
 id: p1-source-opencellid-towers
 name: opencellid_towers
-version: 0.1.0
+version: 0.2.0
 status: active
 domain: project1-signal-planner
 dataProduct: signal-planner
 description:
-  purpose: OpenCelliD cell tower locations, used to compute the distance to the nearest tower, one input of the coverage confidence model (Decided by John, Oct 9, 2026, ADR 0024).
-  limitations: OpenCelliD is share-alike, so derived data carries the same license. This is recorded in the license register and on the page. Attribution text and terms are not recorded (OQ-22). File size, format and update cadence are not recorded (OQ-7, OQ-20).
+  purpose: OpenCelliD cell locations for Arizona, used to compute the distance from each trail point to the nearest known cell, one input of the coverage confidence model (Decided by John, Oct 9, 2026, ADR 0024).
+  limitations: License CC BY-SA 4.0 (credit, share-alike), covering downloads and API results. Derived data published here carries the same license. Each row is an estimated location of one logical cell computed from community measurements, not a confirmed tower site, and several cells can share one tower. The exports hold only cells seen in the last 18 months, and a download is not a complete list of cells. The download needs a personal API token, so John downloads the files by hand and they are kept in the raw bucket; the token is never stored.
   usage: Input to C13 (loader) and C17 (confidence model features).
 team:
   - username: John
     role: owner
 servers:
   - server: opencellid-download
-    type: api
-    description: OpenCelliD download. Location, access method and any key (which would live in Parameter Store) to be fixed in the first-run check (OQ-20).
-    location: "Public OpenCelliD download; URL fixed by OQ-20. Raw copies: s3://{env}-signal-raw/opencellid/. Lake table: {env}_signal.opencellid_tower."
+    type: https
+    description: Country exports from the OpenCelliD download page, one gzip CSV per mobile country code (MCC), shown only after a personal API token is entered. OpenCelliD builds new exports daily by 02:00 GMT, and each file can be downloaded twice a day. John downloads the United States files by hand. First download (Nov 17, 2026) was 310.csv.gz (12,307,565 bytes), 311.csv.gz (3,305,760), 312.csv.gz (4,555), 313.csv.gz (102,509) and 314.csv.gz (4,984), gzip CSV with no header line, 11,627 cells inside Arizona's box.
+    location: "https://opencellid.org/downloads.php. Raw copies: s3://portfolio-{env}-raw-{account}/signal/opencellid/mcc={mcc}/fetched_at={UTC time}/ with the file and manifest.json (source_url without the token, mcc, fetched_at_utc, size_bytes, content_sha256, raw_key). Lake table: portfolio.portfolio_{env}.opencellid_tower."
 slaProperties:
   - property: frequency
-    value: refresh cadence open
-    description: See OQ-25.
+    value: 1
+    unit: quarter
+    description: Refreshed by hand about once a quarter; cell lists change slowly (OQ-25, ADR 0028).
   - property: retention
     value: raw files kept
 customProperties:
   - property: license
-    value: Share-alike. Derived data carries the same license (credit wording in ADR 0037; OpenCelliD terms to verify).
+    value: "Cell tower data from OpenCellID (https://opencellid.org), licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changes: cut to Arizona and matched to H3 cells."
   - property: openQuestions
-    value: OQ-7, OQ-20, OQ-22, OQ-25
+    value: OQ-25 (refresh cadence, by hand about once a quarter for now)
   - property: adr
-    value: adrs/0024, adrs/0018
+    value: adrs/0024, adrs/0018, adrs/0037
 schema:
   - name: opencellid_tower
     physicalName: opencellid_tower
     physicalType: table
-    description: One row per tower record for the area around the park. Field names to be confirmed (OQ-20).
+    description: One row per cell whose estimated location is inside Arizona's box (longitude -114.82 to -109.04, latitude 31.33 to 37.00, the box of ookla_tile), from the newest kept file of each MCC, with the H3 resolution 9 cell of that location. Source columns, in order, are radio, mcc, net, area, cell, unit, lon, lat, range, samples, changeable, created, updated, averageSignal; changeable and averageSignal are retired by OpenCelliD and not kept.
     properties:
       - name: tower_id
         logicalType: string
         required: true
         primaryKey: true
         primaryKeyPosition: 1
-        description: Source key for the tower record (name to be confirmed).
+        description: The cell's identity, radio, mcc, net, area and cell joined with hyphens, for example LTE-310-260-12345-678901.
+      - name: radio
+        logicalType: string
+        required: true
+        description: Radio technology, one of GSM, CDMA, UMTS, LTE, NR or NBIOT.
+      - name: mcc
+        logicalType: integer
+        required: true
+        description: Mobile country code.
+      - name: net
+        logicalType: integer
+        required: true
+        description: Mobile network code (MNC), or system identifier for CDMA.
+      - name: area
+        logicalType: integer
+        required: true
+        description: Location area code, tracking area code for LTE, or network identifier for CDMA.
+      - name: cell
+        logicalType: integer
+        required: true
+        description: Cell ID (for UMTS the combined RNC and cell ID; for CDMA the base station ID).
       - name: lon
         logicalType: number
         required: true
+        description: Estimated longitude of the cell in degrees.
       - name: lat
         logicalType: number
         required: true
+        description: Estimated latitude of the cell in degrees.
+      - name: range_m
+        logicalType: integer
+        required: true
+        description: The source's range, the estimated cell range in metres.
+      - name: samples
+        logicalType: integer
+        required: true
+        description: Number of measurements behind the estimate.
+      - name: created_utc
+        logicalType: timestamp
+        required: true
+        description: The source's created, when the cell was first seen (Unix seconds, UTC).
+      - name: updated_utc
+        logicalType: timestamp
+        required: true
+        description: The source's updated, when the cell was last seen (Unix seconds, UTC).
       - name: h3_cell_res9
         logicalType: string
         required: true
-        description: Resolution 9 cell of the tower (join key, ADR 0007).
+        description: H3 resolution 9 cell of the estimated location (join key, ADR 0007).
       - name: source_url
         logicalType: string
         required: true
+        description: Where the file came from, without the API token.
       - name: fetched_at_utc
         logicalType: timestamp
         required: true
@@ -74,4 +113,3 @@ schema:
         arguments:
           properties:
             - tower_id
-            - fetched_at_utc
