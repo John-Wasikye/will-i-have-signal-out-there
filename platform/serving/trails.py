@@ -138,15 +138,24 @@ def _coverage_by_point(trail_id: str) -> dict[str, list[CarrierCoverage]]:
 
 
 def _coverage_sources(trail_id: str) -> list[CoverageSource]:
-    """One source per carrier: its oldest release, because the map is only as fresh as that."""
+    """One source per carrier: its oldest release, because the map is only as fresh as that.
+
+    A carrier with a release this code cannot read gets no source, since its oldest date is then
+    unknown; the date is a detail and must never break the trail answer.
+    """
     rows = query_rows(
         "SELECT DISTINCT c.carrier, c.fcc_release "
         "FROM read_parquet(?) AS c JOIN read_parquet(?) AS p USING (trail_point_id) "
         "WHERE p.trail_id = ?",
         [_table("fct_trail_point_coverage"), _table("dim_trail_point"), trail_id],
     )
+    unreadable = {
+        row["carrier"] for row in rows if RELEASE_PATTERN.fullmatch(row["fcc_release"]) is None
+    }
     oldest: dict[str, CoverageSource] = {}
     for row in rows:
+        if row["carrier"] in unreadable:
+            continue
         source = CoverageSource(
             carrier=row["carrier"],
             fcc_release=row["fcc_release"],

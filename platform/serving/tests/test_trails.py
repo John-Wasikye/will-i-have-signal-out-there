@@ -225,6 +225,27 @@ def test_another_trails_releases_stay_out_of_the_sources(client, tmp_path):
     assert sources == [{"carrier": "T-Mobile", "fcc_release": "J26", "data_as_of": "2026-06-30"}]
 
 
+def test_a_release_the_api_cannot_read_leaves_that_carrier_out_and_the_answer_still_works(
+    client, tmp_path
+):
+    """A date is a detail; it must never break the trail page. With one release unreadable,
+    the carrier's oldest date is unknown, so the carrier gets no date at all."""
+    _write_coverage(
+        tmp_path,
+        [
+            ("ba-00000", "Verizon", "J26_10nov2026"),
+            ("ba-00001", "Verizon", "2026-H1"),
+            ("ba-00000", "AT&T", "J26_10nov2026"),
+        ],
+    )
+    response = client.get("/trails/grca-bright-angel/signal")
+
+    assert response.status_code == 200
+    assert response.json()["coverage_sources"] == [
+        {"carrier": "AT&T", "fcc_release": "J26_10nov2026", "data_as_of": "2026-06-30"}
+    ]
+
+
 def test_the_contract_describes_a_coverage_source():
     schemas = yaml.safe_load(OPENAPI.read_text(encoding="utf-8"))["components"]["schemas"]
     assert "coverage_sources" in schemas["TrailSignal"]["properties"]
