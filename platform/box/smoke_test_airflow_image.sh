@@ -16,6 +16,12 @@ in_image java -version
 echo "Airflow, PySpark and PyArrow import"
 in_image python -c "import airflow, pyspark, pyarrow, numpy, sgp4, h3"
 
+echo "Every Spark jar in spark-jars.txt is in PySpark's jars folder"
+spark_jars="$(in_image python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')"
+while read -r path _; do
+  in_image test -f "${spark_jars}/${path##*/}"
+done < <(grep --invert-match '^#' "$(dirname "${BASH_SOURCE[0]}")/spark-jars.txt")
+
 echo "The nightly DAG loads"
 in_image python -c "import platform_skeleton_dag as m; assert m.platform_skeleton_nightly().dag_id == 'platform_skeleton_nightly'"
 

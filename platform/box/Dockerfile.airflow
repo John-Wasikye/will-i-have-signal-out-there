@@ -37,6 +37,13 @@ RUN pip install --no-cache-dir "pip==26.2.2" "certifi==2026.10.19" "uv==0.13.5" 
 RUN spark_jars="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')" \
     && rm -f "${spark_jars}"/derby-*.jar "${spark_jars}"/zookeeper-*.jar
 
+# Spark loads every jar in that folder at start, so the jars it needs are put there at build time
+# and not downloaded by each Spark start. The nightly run must not depend on Maven Central being
+# up. Each jar is pinned in spark-jars.txt by SHA-1, and a mismatch fails the build.
+COPY --chown=airflow:root platform/box/spark-jars.txt /tmp/spark-jars.txt
+RUN spark_jars="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')"     && grep --invert-match '^#' /tmp/spark-jars.txt | while read -r path sha1; do         curl --fail --silent --show-error --location             --output "${spark_jars}/${path##*/}" "https://repo1.maven.org/maven2/${path}"         && echo "${sha1}  ${spark_jars}/${path##*/}" | sha1sum --check -         || exit 1;     done
+ENV SPARK_JARS_IN_IMAGE=1
+
 # dbt gets its own environment, because Airflow's constraint file refuses it (pathspec). It has no
 # pip of its own: the image's pip, already patched above, installs into it. requirements-dbt.txt
 # lists every package, so nothing is resolved here.
