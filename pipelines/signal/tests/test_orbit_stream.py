@@ -27,8 +27,9 @@ def test_kafka_is_found_at_its_address_on_the_box_unless_the_environment_says_ot
 
 
 def test_the_checkpoint_goes_to_the_lake_bucket_under_the_environments_folder():
+    """v2: the move to one state partition needs a new checkpoint (Spark keeps the old count)."""
     assert orbit_stream.checkpoint_location("portfolio-dev-lake-123456789012", "dev") == (
-        "s3a://portfolio-dev-lake-123456789012/checkpoints/orbit-element-sets/dev/"
+        "s3a://portfolio-dev-lake-123456789012/checkpoints/orbit-element-sets/dev/v2/"
     )
 
 

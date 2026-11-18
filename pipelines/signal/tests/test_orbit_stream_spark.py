@@ -309,3 +309,19 @@ def test_a_later_night_keeps_an_update_whose_epoch_is_older_than_last_nights_new
     _process(spark, tmp_path / "in", tmp_path / "checkpoint")
 
     assert (102, _epoch(17, 5), _epoch(17, 1)) in _stored(spark)
+
+
+def test_the_stream_keeps_its_state_in_one_partition(spark, tmp_path):
+    """A small nightly stream needs one state store, not Spark's default 200 (about 400 S3 files).
+
+    Spark records the count in the checkpoint's first offset file, and the state folder holds one
+    store per partition.
+    """
+    _write_messages(tmp_path / "in", (101, _epoch(18)))
+    checkpoint = tmp_path / "checkpoint"
+
+    _process(spark, tmp_path / "in", checkpoint)
+
+    offsets = (checkpoint / "offsets" / "0").read_text(encoding="utf-8").splitlines()
+    assert json.loads(offsets[1])["conf"]["spark.sql.shuffle.partitions"] == "1"
+    assert sorted(p.name for p in (checkpoint / "state" / "0").iterdir()) == ["0"]

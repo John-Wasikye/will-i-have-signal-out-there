@@ -10,6 +10,11 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 18, 2026: the orbit stream measured, one state partition
+
+- The first live night published 10,872 element sets, not a few: CelesTrak refreshes most satellites daily. The code docstring, contract `orbit_update_stream` 0.2.1 (approved by John, Nov 18, 2026) and design doc C14 say so.
+- The stream keeps its state in one partition instead of Spark's default 200 (about 400 small S3 files a night). Spark keeps the partition count inside a checkpoint, so the checkpoint moves to `.../<env>/v2/`; the stream reads the topic again from the start and writes the same rows.
+
 ### Nov 18, 2026: orbit update stream (C14)
 
 - The C14 design has an "As built (Nov 2026)" row: `pipelines/signal/orbit_stream.py` and the tasks `publish_orbit_updates` and `find_changed_satellites`, after `publish_marts` and beside `load_ookla` and `load_towers`. The nightly run publishes each new element set to the Kafka topic `orbit-element-sets`, and an availableNow Structured Streaming job (explicit schema, S3 checkpoint, 2-hour watermark, `dropDuplicatesWithinWatermark`) writes the satellites with a later epoch than the last stored one to Iceberg `orbit_changed_satellite`. Reading the same messages again writes the same rows (AC-1B.2).
