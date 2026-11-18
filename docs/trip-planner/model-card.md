@@ -44,7 +44,7 @@ This card describes the two AI components of Project 1 and what is known about e
 | FCC coverage claim per cell and carrier | FCC mobile coverage files, H3 resolution 9 | The claim is a model's output, not a measurement |
 | Ookla speed-test tiles | Ookla open data, quarterly, about 600 m tiles, GPS-accurate tests only | Speed tests exist only where phones already had signal. Dead zones are missing from the data |
 | Terrain features | Copernicus GLO-30 | A surface model, so trees and buildings count as terrain (ADR 0004) |
-| Distance to the nearest tower | OpenCelliD tower locations (ADR 0024) | Share-alike licence |
+| Distance to the nearest known cell | OpenCelliD cell locations (ADR 0024). Each row is an estimated cell location from community measurements, not a confirmed tower | Share-alike licence. Near the Grand Canyon trails the data is thin: 1 cell in the trail box on Nov 17, 2026 |
 | Remoteness | Distance to the nearest road or trailhead, from published data. Source: TIGER/Line roads and NPS trail lines (ADR 0035) | Definition recorded in ADR 0024 |
 | Labels | Hiker signal reports (Phase B), where at least N reports in one cell on one day agree (ADR 0008; N open, OQ-12) | Each report is from a different visitor, because of the one-per-cell rule. Reports arrive only from hikers who choose to tap |
 
@@ -117,7 +117,7 @@ These are known in advance from the design. Each one is tested or shown on the p
 ## 9. Licences
 
 - Ookla open data: CC BY-NC-SA 4.0. Confidence values derived from it are shared under the same licence, and the exact notice is shown (ADR 0013).
-- OpenCelliD: share-alike. Confidence values that use tower distance carry the same licence (ADR 0024).
+- OpenCelliD: CC BY-SA 4.0, share-alike (terms read on Nov 17, 2026, ADR 0037 amendment). Confidence values that use the distance to the nearest known cell carry the same licence (ADR 0024). The input is an estimated cell location, not a confirmed tower, and near the Grand Canyon trails the data is thin (1 cell in the trail box on Nov 17, 2026).
 - Databricks Free Edition: non-commercial.
 - Model provider: Anthropic. Terms to be recorded before the first call (OQ-39).
 
