@@ -117,6 +117,7 @@ def test_the_steps_run_in_a_safe_order():
         "stop airflow so nothing writes during the restore",
         "restore the database backup",
         "start airflow",
+        "start kafka and create the orbit topic",
         "start the watchdog",
     ]
 
@@ -361,3 +362,30 @@ def test_airflow_starts_again_after_the_restore():
     ):
         assert part in start
     assert "--replicas=1" in start
+
+
+def test_kafka_is_started_after_airflow_and_before_the_watchdog():
+    output = _run(["dev"]).stdout
+
+    assert (
+        output.index("STEP 11: start airflow")
+        < output.index("start kafka and create the orbit topic")
+        < output.index("start the watchdog")
+    )
+
+
+def test_the_kafka_manifest_is_applied_and_waited_for():
+    kafka = _section(_run(["dev"]).stdout, "start kafka")
+
+    apply = next(line for line in kafka.splitlines() if line.startswith("+ kubectl apply"))
+    assert apply.endswith("/platform/box/kafka.yaml")
+    assert "kubectl rollout status deployment/kafka --namespace kafka" in kafka
+
+
+def test_the_orbit_topic_is_created_only_if_it_does_not_exist():
+    kafka = _section(_run(["dev"]).stdout, "start kafka")
+
+    assert "kafka-topics.sh" in kafka
+    assert "--create --if-not-exists --topic orbit-element-sets" in kafka
+    assert "--partitions 1" in kafka
+    assert "--bootstrap-server localhost:9092" in kafka

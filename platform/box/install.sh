@@ -182,6 +182,16 @@ step "start airflow"
 run kubectl scale --namespace "${NAMESPACE}" --replicas=1 \
   deployment/airflow-api-server deployment/airflow-dag-processor statefulset/airflow-scheduler
 
+step "start kafka and create the orbit topic"
+# The nightly run publishes new element sets here and a streaming job reads them (C14). The
+# streaming job fails on a topic that does not exist, and a night with no new element sets
+# publishes nothing, so the topic is created here, and only if it is missing.
+run kubectl apply -f "${script_dir}/kafka.yaml"
+run kubectl rollout status deployment/kafka --namespace kafka --timeout 5m
+run kubectl exec --namespace kafka deployment/kafka -- \
+  /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
+  --create --if-not-exists --topic orbit-element-sets --partitions 1
+
 step "start the watchdog"
 # The watchdog switches the box off when the nightly run finishes, at the 2-hour maximum, or
 # when AWS sends its two-minute spot warning. It restarts if it stops, because it is a cost guard.
