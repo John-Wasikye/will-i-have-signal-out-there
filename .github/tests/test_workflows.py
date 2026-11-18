@@ -240,6 +240,17 @@ def test_the_site_job_lints_and_audits_its_packages():
     assert "npm audit" in runs
 
 
+def test_the_site_audit_goes_through_the_gate_with_dated_exceptions():
+    """npm audit cannot skip one advisory, so its report goes to the gate before lint runs."""
+    steps = _load(WORKFLOWS / "ci.yml")["jobs"]["site"]["steps"]
+    runs = [step.get("run", "") for step in steps]
+    (audit,) = [run for run in runs if "npm audit" in run]
+    assert "npm audit --json" in audit
+    assert "npm_audit_gate.py" in audit
+    assert "npm-audit-exceptions.txt" in audit
+    assert runs.index(audit) < runs.index("npm run lint")
+
+
 def test_the_python_job_checks_the_formatting_too():
     runs = _runs(_load(WORKFLOWS / "ci.yml")["jobs"]["python"])
     assert "ruff check ." in runs

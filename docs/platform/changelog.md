@@ -1,5 +1,11 @@
 # Changelog: Platform
 
+## Nov 17, 2026: the site's package audit accepts dated exceptions
+
+- GitHub published advisory GHSA-fc5q-39xc-vjpf (picomatch, ReDoS, high) at 15:56 UTC. Every picomatch version up to the newest, 4.0.7, is affected and none is fixed, so `npm audit --audit-level=moderate` failed the site job on every branch.
+- `npm audit` cannot skip one advisory, so the site job now saves its JSON report and `.github/scripts/npm_audit_gate.py` decides. It still fails on anything of moderate severity or worse, and on an audit that could not run, unless `.github/npm-audit-exceptions.txt` lists the advisory with an expiry date that has not passed, the same way `.trivyignore` works for the Airflow image.
+- Accepted until Dec 17, 2026: GHSA-fc5q-39xc-vjpf. picomatch is a development package used only by the build, lint and test tools with my own file patterns; it is not in the site visitors load.
+
 ## Nov 13, 2026: the session box runs on demand
 
 - ADR-0033: the session box (dev and live) runs on demand, not on spot. It replaces point 3 of ADR-0012 ("Spot only"). From Nov 10, 2026 AWS reclaimed the spot box or had no spot capacity on most nights, and its capacity score for `t4g.2xlarge` was 1 out of 10 in every us-east-1 zone.

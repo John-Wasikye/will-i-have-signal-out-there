@@ -10,6 +10,14 @@ This file records two things: changes to the documents, and, once code exists, c
 
 ## Documents
 
+### Nov 17, 2026: OpenCelliD cell locations (C13, part 3)
+
+- The C13 design has an "As built, part 3" row: `pipelines/signal/opencellid_towers.py` and the task `load_towers`, after `publish_marts` and beside `load_ookla`. I download the files by hand, because the download needs my API token. `load_towers_if_changed` keeps the newest file of each mobile country code and loads Iceberg `opencellid_tower` only when the set of kept file hashes changes (ADR 0028). The loader refuses a manifest whose `source_url` has a query, so the token is never stored.
+- Contract `opencellid_towers` 0.2.0 approved by John (Nov 17, 2026): the real fields, the license and credit, a quarterly refresh by hand, and `tower_id` alone as the unique key.
+- The site credits gain the OpenCellID credit: "Cell tower data from OpenCellID (https://opencellid.org), licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changes: cut to Arizona and matched to H3 cells."
+- ADR 0037 has an amendment: I read the OpenCelliD attribution page, the license is confirmed as CC BY-SA 4.0, and the credit above replaces the earlier wording. ADR 0024, the security and privacy document, the model card and the design doc (license table, OQ-7, OQ-20) carry the same facts.
+- First-run check: five United States files read on the laptop with the branch's reader (310, 311, 312, 313 and 314; 12,307,565, 3,305,760, 4,555, 102,509 and 4,984 bytes; 567,044, 150,979, 198, 5,347 and 260 lines). 11,627 cells are in Arizona (LTE 10,484, NR 964, UMTS 157, GSM 22), last seen from May 17, 2025 to Nov 15, 2026. There is no header line, every line has 14 columns, and no cell is in two files. Only 1 cell lies in the box around the Grand Canyon trails, so the data is thin there. Nothing is loaded into the lake or kept in the raw bucket yet.
+
 ### Nov 16, 2026: site text refresh
 
 - The site text no longer says "Phase A" or "One carrier: T-Mobile". The How it works page lists what the site covers today (three trails, three carriers on 4G LTE and 5G, satellite texts on T-Mobile, the next 24 hours, hiker reports) and what is still to come. The credit lines and the coverage disclaimer from ADR 0037 are unchanged.

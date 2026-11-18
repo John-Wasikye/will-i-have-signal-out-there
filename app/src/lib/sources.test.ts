@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest'
 import { DATA_SOURCES } from './sources'
 
 describe('DATA_SOURCES', () => {
-  it('names the five data sources', () => {
+  it('names the six data sources', () => {
     expect(DATA_SOURCES.map((source) => source.name)).toEqual([
       'CelesTrak',
       'National Park Service',
       'Federal Communications Commission (FCC)',
       'Copernicus',
       'Ookla',
+      'OpenCellID',
     ])
   })
 
@@ -19,6 +20,7 @@ describe('DATA_SOURCES', () => {
       'Coverage data: FCC National Broadband Map (broadbandmap.fcc.gov).',
       'Terrain produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.',
       'Includes data derived from Speedtest by Ookla® open data, licensed under CC BY-NC-SA 4.0. Derived data published here is shared under the same license.',
+      'Cell tower data from OpenCellID (https://opencellid.org), licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changes: cut to Arizona and matched to H3 cells.',
     ])
   })
 })

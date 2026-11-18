@@ -24,3 +24,4 @@ The confidence model uses distance to the nearest tower and remoteness, and the 
 - A source contract for OpenCelliD exists (contracts/opencellid_towers.yaml, draft).
 - Share-alike also applies to published confidence values that use tower distance, in addition to the Ookla license (ADR 0013).
 - The remoteness source is decided in ADR 0035 (OQ-18). Still open: the exact OpenCelliD attribution text and terms (OQ-22), and its fields (OQ-20).
+- The terms and fields were read on Nov 17, 2026 (ADR 0037 amendment, contract 0.2.0). A row is an estimated location of one logical cell, not a tower, so the model input is the distance to the nearest known cell.

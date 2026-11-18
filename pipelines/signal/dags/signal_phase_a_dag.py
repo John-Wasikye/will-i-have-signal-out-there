@@ -317,6 +317,22 @@ def signal_phase_a_nightly():
         finally:
             spark.stop()
 
+    @task
+    def load_towers(dag_run=None, data_interval_end: datetime | None = None) -> dict:  # noqa: ANN001
+        """Load the kept OpenCelliD cells for Arizona when the kept files change (C13)."""
+        spark = build_spark_session("signal_load_towers", WAREHOUSE, use_glue=USE_GLUE)
+        try:
+            return signal_nightly.load_towers_if_changed(
+                spark,
+                aws_client("s3"),
+                os.environ["PLATFORM_RAW_BUCKET"],
+                _run_date(dag_run, data_interval_end),
+                contracts_dir=_contracts_dir(),
+                namespace=ICEBERG_NAMESPACE,
+            )
+        finally:
+            spark.stop()
+
     manifest = pull_orbits()
     checked = check_orbit_schema(manifest)
     loaded = load_orbits(manifest)
@@ -330,7 +346,8 @@ def signal_phase_a_nightly():
     trails >> [horizons, coverage, reports]
     windows = compute_windows()
     [selected, horizons] >> windows
-    [windows, coverage, reports] >> build_marts() >> publish_marts() >> load_ookla()
+    published = [windows, coverage, reports] >> build_marts() >> publish_marts()
+    published >> [load_ookla(), load_towers()]
 
 
 signal_phase_a_nightly()

@@ -1,0 +1,9 @@
+# Package advisories I have looked at and accepted for now (read by .github/scripts/npm_audit_gate.py).
+# Each entry expires, so the audit fails again on the expiry date and I have to look again.
+# Reviewed on 2026-11-17.
+
+# picomatch 4.0.7, a development package (through fdir, tinyglobby, typescript-eslint and
+# vitest). A crafted glob pattern can make matching slow (ReDoS). Every version up to 4.0.7 is
+# affected and none is fixed yet. Only the build, lint and test tools use it, with my own file
+# patterns; it is not in the site that visitors load. Remove this line when a fixed version lands.
+GHSA-fc5q-39xc-vjpf exp:2026-12-17

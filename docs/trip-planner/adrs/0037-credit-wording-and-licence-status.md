@@ -1,6 +1,6 @@
 # 0037. Credit wording for each data source, and how far each licence has been checked
 
-- Status: Accepted. Two credit items are flagged as unverified; the page wording is decided here (OQ-22)
+- Status: Accepted. One credit item is still flagged as unverified (FCC mobile data); the OpenCelliD item is now verified (amendment, Nov 17, 2026). The Census rights flag stays a first-run check. The page wording is decided here (OQ-22)
 - Date: Oct 9, 2026
 - Source: Open question OQ-22. Each licence was read from the provider's primary page where one could be reached. Secondary sources are marked as such.
 
@@ -43,3 +43,10 @@ The page and the README must credit each source. The credit must match the licen
 
 - Three entries (OpenCelliD, FCC mobile data, the Census rights flag) must be checked before publishing. They are listed as open first-run checks in the platform and security documents.
 - The credit lines are the wording used on the page and in the README.
+
+## Amendment (Nov 17, 2026)
+
+- I read the OpenCelliD pages "License and attribution", "Access and limits", "Download the dataset", "Database format" and "List cells in an area" at docs.opencellid.org. The license is confirmed as CC BY-SA 4.0. It covers API results, dataset downloads and daily changes.
+- The credit must name OpenCellID, link to the source and the license, and say what was changed. The credit used is now: "Cell tower data from OpenCellID (https://opencellid.org), licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changes: cut to Arizona and matched to H3 cells." It replaces "Cell tower locations: OpenCelliD (opencellid.org), licensed CC BY-SA 4.0."
+- Placement: on the page that displays the data. An API that serves the data must carry the credit, the source link and the license link in every response that contains OpenCellID data. Exceptions are allowed only in writing from Unwired Labs.
+- The OpenCelliD item is now verified. One credit item remains unverified: FCC mobile data. The Census rights flag stays a first-run check.
