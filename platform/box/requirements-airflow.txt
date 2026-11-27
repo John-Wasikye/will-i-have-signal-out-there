@@ -2,10 +2,10 @@
 # where it covers them, so this file names only what the nightly DAG needs on top. pyarrow and
 # numpy (the terrain horizon, C4) are written with the versions Airflow's 3.3.2 constraint file
 # pins, so the versions show here too.
-pyspark==3.5.9
+pyspark==3.5.10
 pyarrow==25.0.1
 numpy==2.4.6
 # sgp4 (the satellite windows, C5) is not in the constraint file, so this pin is the only one.
 sgp4==2.27
 # h3 (the FCC coverage cells, C6).
-h3==4.5.0
+h3==4.5.1
